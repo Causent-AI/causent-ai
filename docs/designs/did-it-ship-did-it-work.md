@@ -310,6 +310,26 @@ collaborative decision/analysis, per-stat causal drill-down, and A/B setups are
 future iterations. Known mockup glitch: remix-1's "Neutral Impact" card shows a
 `/bin/zsh` placeholder — real value is `$0`/count.
 
+## Data Model (v1)
+
+The decision/causal graph is the core company asset and has its own living document:
+**`docs/designs/decision-graph.md`** — canonical source for the schema, build pipeline,
+belief/direction rules, rendering contract, invariants, and the deferred intelligence
+roadmap. Summary of the v1 shape:
+
+- **Postgres only** (no graph DB); the graph is *materialized* from relational tables
+  and rendered by React Flow.
+- **Scope hierarchy:** org → project → workspace; every row scoped, RLS per scope.
+- **Tables:** `orgs / projects / workspaces`, `metrics` + `metric_observations`
+  (daily series), `actions` (incl. `rationale_richtext`), `clusters`, `nodes`,
+  `causal_edges`, and append-only `evidence_objects` (methodology ∈ {ITS,
+  BEFORE_AFTER_14D, MANUAL}, plus raw stats n_pre/n_post/resid_var/cond_number/placebo).
+- **Build pipeline:** ingest actions + metrics → engine computes per action×metric×method
+  → append evidence → upsert one edge per action→metric (direction+belief from the
+  authoritative ITS row) → cluster overlay for co-occurring same-metric actions.
+
+Any change to the graph model goes in `decision-graph.md` first; this section is a pointer.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
