@@ -14,11 +14,16 @@ Contract: segmented_ols(series) -> Fit for the model
 Covariance: daily business metrics are serially correlated, so iid OLS SEs are
 understated and CIs too narrow (the panel's headline blocker). We report the
 Newey-West HAC covariance instead — a Bartlett-kernel sandwich
-    cov = (X'X)^-1 (X' Ω X) (X'X)^-1,  Ω via lags 0..L, weight w_l = 1 - l/(L+1),
-    auto lag L = floor(4*(n/100)^(2/9))
+    cov = (n/(n-k)) * (X'X)^-1 (X' Ω X) (X'X)^-1,
+    Ω via lags 0..L, weight w_l = 1 - l/(L+1), auto lag L = floor(4*(n/100)^(2/9))
 — which is consistent under autocorrelation and reduces to sigma^2 (X'X)^-1 when
-residuals are white. The Durbin-Watson statistic (~2 = no autocorrelation) and the
-chosen lag are stored as diagnostics on the Fit.
+residuals are white. The leading n/(n-k) is a finite-sample (HC1-style) dof
+inflation: the raw sandwich is severely downward-biased at the n=28-90 regime this
+engine operates in, so we widen it before it ever reaches a CI. It is NOT enough on
+its own at strong autocorrelation — the honest floor + Durbin-Watson belief cap
+(see its_readout / belief_direction) carry that — but it is the cheap correct first
+step. The Durbin-Watson statistic (~2 = no autocorrelation) and the chosen lag are
+stored as diagnostics on the Fit and consumed downstream (DW is not just displayed).
 
 Invariant: degenerate inputs return a defined Fit with degenerate=True — never a
 raise, never NaN. Degenerate = too few points, rank-deficient design (e.g. split
@@ -82,9 +87,16 @@ def segmented_ols(series: Series) -> Fit:
     resid_var = float(resid @ resid / dof) if dof > 0 else float("inf")
 
     lag = _hac_lag(n)
-    cov = _newey_west_cov(X, resid, np.linalg.pinv(X.T @ X), lag)
+    sandwich = _newey_west_cov(X, resid, np.linalg.pinv(X.T @ X), lag)
+    cov = (n / (n - k)) * sandwich if n > k else sandwich  # HC1-style dof inflation
     ss = float(resid @ resid)
-    dw = float(np.sum(np.diff(resid) ** 2) / ss) if ss > 0.0 else float("nan")
+    # A perfect (or numerically perfect) fit has no residual autocorrelation worth
+    # measuring: report DW = 2.0 (the "no serial correlation" value) rather than a
+    # 0/0 or a value dominated by float roundoff. "Numerically perfect" = residual SS
+    # negligible vs the total SS of y.
+    tss = float(((y - y.mean()) ** 2).sum())
+    dw = (float(np.sum(np.diff(resid) ** 2) / ss)
+          if ss > 1e-12 * max(tss, 1.0) else 2.0)
 
     degenerate = bool(
         rank < k or cond > _COND_MAX or dof <= 0 or float(y.var()) < _VAR_FLOOR

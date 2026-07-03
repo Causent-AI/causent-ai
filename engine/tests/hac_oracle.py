@@ -5,8 +5,10 @@ source of truth for the Bartlett-kernel sandwich the engine reports. Keeping it 
 (one place, not re-derived per file) obeys the "one implementation of the statistics"
 rule while staying separate from the shipped code in causal/segmented_ols.py.
 
-    cov = (X'X)^-1 Ω (X'X)^-1,  Ω = Γ_0 + Σ_{l=1..L} w_l (Γ_l + Γ_l'),
+    cov = (n/(n-k)) (X'X)^-1 Ω (X'X)^-1,  Ω = Γ_0 + Σ_{l=1..L} w_l (Γ_l + Γ_l'),
     w_l = 1 - l/(L+1),  L = floor(4*(n/100)^(2/9)),  Γ_l = Σ_t u_t u_{t-l}',  u_t = x_t e_t
+
+The leading n/(n-k) mirrors the shipped engine's finite-sample dof inflation.
 """
 
 import numpy as np
@@ -26,4 +28,6 @@ def hac_cov(X: np.ndarray, resid: np.ndarray) -> np.ndarray:
         g = u[l:].T @ u[:-l]
         omega = omega + w * (g + g.T)
     bread = np.linalg.pinv(X.T @ X)
-    return bread @ omega @ bread
+    k = X.shape[1]
+    ss_factor = n / (n - k) if n > k else 1.0
+    return ss_factor * (bread @ omega @ bread)
