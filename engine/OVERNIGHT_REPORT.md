@@ -122,3 +122,68 @@ objective coverage gate itself), but belief=1.0 still fires on pure autocorrelat
 3. Consume Durbin-Watson in a decision (widen/withhold) rather than only displaying it.
 4. Note BH-FDR does not restore its guarantee on anti-conservative p-values and is a no-op
    for single-action families.
+
+## Honest-inference rebuild (2026-07-03)
+
+Six commits on `honest-inference-floor` (`f004fd5`→`d43bcb2`) rebuild the readout as an
+**honest DESIGN, not an SE tweak.** The prior round shipped a correct HAC *formula* but
+still fired belief=1.0 on pure autocorrelated noise 13–27% of the time; the fix is four
+cooperating layers, not a bigger sandwich.
+
+**The four layers:**
+1. **`FLOOR_CONFIDENT=45` days/side.** Below it, `its_readout` returns status
+   `INSUFFICIENT_HISTORY` (direction `INCONCLUSIVE`; lift/CI/p withheld) and
+   `belief_direction` returns `None` with reason `INSUFFICIENT_HISTORY` ("gathering
+   data"). A confident 1.0 is unreachable until both sides clear the floor. (`MIN_SIDE=14`
+   is still the hard <28-pt no-fit floor; the 45-day floor sits above it.)
+2. **Small-sample HAC dof correction.** The Newey-West Bartlett sandwich in
+   `segmented_ols` is scaled by an HC1-style `n/(n-k)` (`segmented_ols.py:91`), mirrored
+   in the test HAC oracle. Corrects the downward SE bias at the engine's n=28–60 regime.
+3. **Durbin-Watson belief cap.** Belief 1.0 requires `DW >= DW_CONFIDENT_MIN=1.3`
+   (ρ₁ ≲ 0.35). Residual autocorrelation stronger than HAC can reliably correct at this n
+   caps belief at 0.5 with reason `AUTOCORRELATION`. DW is now **consumed** in the
+   decision, not merely stored/displayed.
+4. **Placebo-in-time that fires in-regime.** The fake split is placed *adjacent* to the
+   real intervention (`placebo_split = split - MIN_SIDE`), so 14+14 fits within
+   pre-history for any real `split >= 28` — replacing the old `split//2` placement that
+   needed ~112 days and silently never fired. Run via raw `segmented_ols` + `step_ci`,
+   it fires at a conservative `PLACEBO_ALPHA=0.01` or the magnitude clause, and only when
+   the real readout is itself significant. Not-evaluable is an explicit `INSUFFICIENT`
+   (placebo_lift=None, fired=False) — never a silent 0% fire; an unverifiable placebo
+   withholds the confident 1.0 (drops to 0.5) rather than granting it.
+
+A confident **belief 1.0 is reachable only when** both sides `>= 45`, the CI excludes 0,
+the placebo did not fire, **and** `DW >= 1.3`. An always-on 7d/14d descriptive before/after
+(`descriptive.py`) is wired into `batch_readout` so the product still shows a number below
+the floor, honestly labeled descriptive — never dressed as causal.
+
+**Coverage-gate result — GREEN (`gate_pass = true`).** The engine's own objective
+Monte-Carlo gate (`tests/test_autocorrelation_coverage.py`, 8000 NULL AR(1) draws,
+ρ∼U[0,0.8], n∼U[MIN_SIDE, ~90]) now passes all three assertions:
+
+| Gate assertion | Ceiling | Observed | Pass |
+|---|---|---|---|
+| Overall belief-1.0 rate on nulls | ≤ 0.06 | **0.0165** | ✅ |
+| Conditional FP rate (evaluable readouts) | ≤ 0.08 | **0.0263** (n=5012) | ✅ |
+| Power: belief-1.0 on a true large step w/ history | ≥ 0.90 | pass | ✅ |
+
+Down from the prior round's 0.135 / 0.197 / 0.274 conditional FP at ρ=0/0.5/0.8. Full
+suite: **1033 passed, 0 failed.**
+
+**Re-judge:**
+
+| Reviewer (re-review) | Prior round | Re-judge | Signs off? |
+|----------------------|:-----------:|:--------:|:----------:|
+| Senior data scientist | 4/10 | **8/10** | **Yes** |
+| Causal-inference researcher | 3/10 | **8/10** | **Yes** |
+
+Both reviewers confirm the round-1 blocker is empirically resolved: belief 1.0 no longer
+fires on autocorrelated noise above the gate, all four remaining issues from the prior
+report are addressed (small-sample HAC, in-regime placebo, DW consumed, floor honesty),
+and the engine's own gate is green.
+
+**Verdict: SAFE TO MERGE.** Both reviewers signed off (= true) and the objective coverage
+gate passes. No blockers remain. The honest-inference redesign holds the line that a
+confident causal claim (belief 1.0) is staked only with ≥45 days/side, a CI excluding 0, a
+non-firing placebo, and mild-enough residual autocorrelation (DW ≥ 1.3); everything below
+that is withheld ("gathering data") or shown as an explicitly descriptive cross-check.

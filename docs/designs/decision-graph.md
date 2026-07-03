@@ -137,12 +137,14 @@ Recompute from the latest **authoritative-method** (ITS) evidence row for the ed
 
 | Condition (ITS) | belief_score | direction | reason |
 |---|---|---|---|
-| CI excludes zero, **survives BH-FDR**, placebo did **not** fire | 1.0 | sign of lift (POSITIVE / NEGATIVE) | — |
+| CI excludes zero, **survives BH-FDR**, placebo did **not** fire, **DW ≥ 1.3**, **both sides ≥ 45 days** | 1.0 | sign of lift (POSITIVE / NEGATIVE) | — |
 | CI excludes zero but **fails BH-FDR** (not significant after correction) | 0.5 | INCONCLUSIVE | — |
+| CI excludes zero but **residual autocorrelation too strong** (Durbin-Watson < 1.3) | 0.5 | INCONCLUSIVE | `AUTOCORRELATION` |
 | **placebo-in-time fired** (falsified — method fabricates structure) | 0.0 | INCONCLUSIVE | `PLACEBO` |
 | 95% CI includes zero | 0.5 | INCONCLUSIVE | — |
 | confounded | 0.0 | INCONCLUSIVE | — |
 | **degenerate fit** (rank / condition / variance — unusable) | NULL | INCONCLUSIVE | `DEGENERATE` |
+| **below the confident floor** (fittable, but a side < 45 days) | NULL | INCONCLUSIVE | `INSUFFICIENT_HISTORY` |
 | insufficient data (<28 pts) | NULL | INCONCLUSIVE | — |
 | MANUAL evidence only | 0.3 | sign of stated expectation | — |
 
@@ -151,17 +153,38 @@ readout the placebo falsified. `NULL` means *"we don't know"* — too little dat
 fit too degenerate to trust. A degenerate fit is UNKNOWN, never "no effect", so it maps
 to NULL (reason `DEGENERATE`), not 0.0.
 
-**Falsification gates belief.** Belief 1.0 requires the readout to survive two guards
+**Falsification gates belief.** Belief 1.0 requires the readout to survive four guards
 beyond its own CI: (1) the **placebo-in-time** check must not fire — the same method,
-aimed at a fake pre-period intervention, must find nothing; a firing placebo drops the
-edge to 0.0 (reason `PLACEBO`). (2) **Benjamini-Hochberg FDR at q=0.05** across all
-actions tested against the metric — one metric fans out to many actions, so a per-action
-nominal p<0.05 inflates false edges; an edge that fails BH-FDR is demoted to 0.5.
+aimed at a fake pre-period intervention adjacent to the real split, must find nothing; a
+firing placebo drops the edge to 0.0 (reason `PLACEBO`), and a placebo that is *not
+evaluable* withholds the 1.0 (demote to 0.5) rather than granting it. (2)
+**Benjamini-Hochberg FDR at q=0.05** across all actions tested against the metric — one
+metric fans out to many actions, so a per-action nominal p<0.05 inflates false edges; an
+edge that fails BH-FDR is demoted to 0.5. (3) **Confident floor** — at least **45 days of
+history on each side** (`FLOOR_CONFIDENT`); a fittable-but-below-floor readout is withheld
+as `INSUFFICIENT_HISTORY` (belief NULL, "gathering data"), never staked as a causal claim.
+(4) **Durbin-Watson ≥ 1.3** (`DW_CONFIDENT_MIN`) — residual autocorrelation stronger than
+the small-sample HAC correction can reliably absorb at n=28–60 caps belief at 0.5 (reason
+`AUTOCORRELATION`). Below the floor, belief is NULL; the descriptive before/after still
+shows a labeled number so the product is never blank.
 
-The `BEFORE_AFTER_14D` method is stored and shown as a **descriptive cross-check**, but
-it is NOT authoritative — it never drives `direction`/`belief_score`. On method
-disagreement, ITS wins and the UI widens the uncertainty caveat (never shows the naive
-method's tighter CI as more trustworthy).
+### Methods: DESCRIPTIVE vs CAUSAL
+
+Two methods run on every series, and the distinction is load-bearing for honesty:
+
+- **`BEFORE_AFTER_14D` (always-on 7d/14d) is DESCRIPTIVE, not causal.** It reports the
+  raw mean shift across the split with a Welch interval. It is stored and shown as a
+  **descriptive cross-check only** — it never drives `direction`/`belief_score`, and the
+  UI labels it as descriptive so a mean difference is never mistaken for an effect.
+- **`ITS` (segmented OLS + HAC + placebo + floor/DW guards) is the CAUSAL method** and the
+  sole authority for `direction`/`belief_score`. It is a **frequentist interrupted
+  time-series** — segmented regression with a Newey-West HAC covariance and the
+  falsification guards above. It is **explicitly NOT CausalImpact / a Bayesian
+  structural-time-series (BSTS) model**: no synthetic control, no state-space prior, no
+  posterior — those are deferred (see the intelligence roadmap), not what v1 ships.
+
+On method disagreement, ITS wins and the UI widens the uncertainty caveat (never shows the
+descriptive method's tighter interval as more trustworthy).
 
 ## Rendering (one authoritative view per edge)
 
@@ -210,6 +233,13 @@ there is enough captured evidence to train it. This is where most future work li
 
 ## Change log
 
+- 2026-07-03 — Honest-inference rebuild. Belief rules now reflect the shipped engine:
+  added `INSUFFICIENT_HISTORY` (belief NULL below the 45-day/side confident floor) and
+  `AUTOCORRELATION` (belief 0.5 when Durbin-Watson < 1.3) rows; belief 1.0 now also
+  requires DW ≥ 1.3 and both sides ≥ 45 days; placebo placed adjacent to the real split so
+  it fires in-regime, and a not-evaluable placebo withholds 1.0. Added a Methods note
+  distinguishing the DESCRIPTIVE `BEFORE_AFTER_14D` from the CAUSAL frequentist ITS
+  (explicitly not CausalImpact / Bayesian structural-time-series). Coverage gate green.
 - 2026-07-02 — Initial model. Locked v1 schema; added scope hierarchy (org→project→
   workspace), `BEFORE_AFTER_14D` methodology, authoritative-method belief key, raw-stats
   columns on evidence, clustering-as-overlay, and the intelligence roadmap. Sourced from
