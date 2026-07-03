@@ -7,7 +7,7 @@ Goal: try to BREAK the naive before/after readout. Two prongs:
   2. Robustness — attack boundaries and degenerate/pathological finite inputs.
      The stated contract (see the module docstring) is total on finite series:
      non-finite window -> DEGENERATE, otherwise -> OK. It must NEVER raise on a
-     finite input. The xfail tests below document where that promise is broken.
+     finite input, even when the variance/df arithmetic overflows.
 
 scipy is a TEST-ONLY oracle; the engine is numpy-only.
 """
@@ -179,12 +179,9 @@ def test_tiny_lift_near_float_resolution():
 # ---------- ROBUSTNESS DEFECTS: finite input that makes the engine RAISE ----------
 # The contract is total on finite series (non-finite -> DEGENERATE, else -> OK).
 # A finite bad-data sentinel or a genuinely huge finite metric overflows the
-# variance/df arithmetic and throws an UNCAUGHT exception instead of degrading.
-# In C9 one poisoned action would take down the whole batch response.
+# variance/df arithmetic; the component must degrade to DEGENERATE, not throw,
+# so one poisoned action never takes down the whole C9 batch response.
 
-@pytest.mark.xfail(strict=True, reason="C5 raises ValueError on finite float-max "
-                   "sentinel: var overflows to inf -> Satterthwaite df=nan -> "
-                   "t_ppf(df=nan) raises; contract promises DEGENERATE/OK, not a crash")
 def test_float_max_sentinel_does_not_crash():
     warnings.simplefilter("ignore")
     pre = [1.0] * 14
@@ -195,9 +192,6 @@ def test_float_max_sentinel_does_not_crash():
     assert r.status in ("OK", "DEGENERATE")
 
 
-@pytest.mark.xfail(strict=True, reason="C5 raises OverflowError on huge finite "
-                   "values: (vp+vq)**2 at line 50 overflows the Python float; "
-                   "contract promises a returned status on any finite series")
 def test_huge_finite_values_do_not_crash():
     warnings.simplefilter("ignore")
     pre = [0.0, 1e150] * 7

@@ -9,7 +9,8 @@ disagreement ITS wins.
 
 Contract: before_after_14d(series) -> BeforeAfterResult, method "BEFORE_AFTER_14D".
   - fewer than 14 points on either side of split -> INSUFFICIENT (lift/ci None)
-  - a non-finite value in either 14-day window     -> DEGENERATE   (lift/ci None)
+  - a non-finite value in either 14-day window, or a magnitude so large the
+    variance/df overflows to non-finite                -> DEGENERATE   (lift/ci None)
   - otherwise -> OK: lift = post_mean - pre_mean with a 95% Welch t CI
     (unequal variances, Satterthwaite df). Constant windows (zero pooled SE)
     collapse to the exact point estimate (lift, lift), never a fabricated width.
@@ -17,7 +18,7 @@ Contract: before_after_14d(series) -> BeforeAfterResult, method "BEFORE_AFTER_14
 
 from __future__ import annotations
 
-from math import sqrt
+from math import isfinite, sqrt
 
 import numpy as np
 
@@ -47,6 +48,12 @@ def before_after_14d(series: Series) -> BeforeAfterResult:
     if se == 0.0:                       # both windows constant: exact, zero-width
         return BeforeAfterResult("BEFORE_AFTER_14D", "OK", lift, lift, lift)
 
-    df = (vp + vq) ** 2 / (vp * vp + vq * vq) * (_WINDOW - 1)
+    try:
+        df = (vp + vq) ** 2 / (vp * vp + vq * vq) * (_WINDOW - 1)
+    except OverflowError:
+        df = float("inf")
+    if not (isfinite(se) and isfinite(df)):   # a poisoned/overflow value degrades this one action, never throws
+        return BeforeAfterResult("BEFORE_AFTER_14D", "DEGENERATE", None, None, None)
+
     half = t_ppf(1.0 - _ALPHA / 2.0, df) * se
     return BeforeAfterResult("BEFORE_AFTER_14D", "OK", lift, lift - half, lift + half)
