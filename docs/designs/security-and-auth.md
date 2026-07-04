@@ -96,13 +96,13 @@ client-visible env:
 
 ## 7. v1 security task list
 
-- [ ] **SEC1 (P1)** — `memberships` table + RLS policies keyed off it (every table). *(new — closes the hierarchy access-control gap)*
-- [ ] **SEC2 (P1)** — Multi-provider Supabase Auth (email + Google + GitHub + SSO), login decoupled from the GitHub data connection.
-- [ ] **SEC3 (P1)** — Encrypt GitHub token at rest in Vault; 401/403 → reconnect flow (= T-TOK).
-- [ ] **SEC4 (P1)** — RLS cross-tenant test: user A cannot read user B's data (= ET7).
-- [ ] **SEC5 (P2)** — Connector SSRF guardrails (= T-CONN).
-- [ ] **SEC6 (P2)** — Engine endpoint shared-secret + rate limit + rotation (= ET1/ET17).
-- [ ] **SEC7 (P2)** — GitHub text untrusted in LLM prompts (= T-PI).
+- [x] **SEC1 (P1)** — `memberships` table + RLS policies keyed off it (every table). **BUILT + verified** (`supabase/migrations/`, tenant-isolation gate; 3 escalation holes caught+fixed).
+- [ ] **SEC2 (P1)** — Multi-provider Supabase Auth (email + Google + GitHub + SSO), login decoupled from the GitHub data connection. *(not started — arrives with the app)*
+- [ ] **SEC3 (P1)** — Encrypt GitHub token at rest in Vault; 401/403 → reconnect flow (= T-TOK). *(with GitHub ingestion)*
+- [x] **SEC4 (P1)** — RLS cross-tenant test: user A cannot read user B's data. **BUILT** (`engine/tests/test_rls_isolation*.py`) and **re-run in CI** on every push, closing the point-in-time risk.
+- [ ] **SEC5 (P2)** — Connector SSRF guardrails (= T-CONN). *(with the Postgres connector)*
+- [ ] **SEC6 (P2)** — Engine endpoint shared-secret + rate limit + rotation (= ET1/ET17). *(with engine deploy)*
+- [ ] **SEC7 (P2)** — GitHub text untrusted in LLM prompts (= T-PI). *(with the summary layer)*
 
 ## 8. Open questions
 

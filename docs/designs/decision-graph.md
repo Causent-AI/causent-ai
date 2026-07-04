@@ -80,6 +80,7 @@ GRAPH  (materialized from the above)
                  target_node_id FK→nodes,  # METRIC
                  direction∈{POSITIVE,NEGATIVE,INCONCLUSIVE},
                  belief_score REAL,        # 0..1 or NULL
+                 belief_reason,            # NULL | INSUFFICIENT_HISTORY | AUTOCORRELATION | FDR_DEMOTED | PLACEBO | DEGENERATE
                  authoritative_method,     # which method drives direction+belief (ITS in v1)
                  last_updated TIMESTAMPTZ)
 
@@ -90,6 +91,7 @@ EVIDENCE  (append-only — audit trail + ML feedstock)
                     lift?, ci_low?, ci_high?,
                     confounded BOOL, clustered BOOL,
                     n_pre INT, n_post INT, resid_var, cond_number,       # raw stats
+                    p_value?, durbin_watson?,                             # HAC significance + autocorrelation
                     placebo_lift?, placebo_fired BOOL,                    # E3 placebo
                     authorship_token JSONB,   # denormalized who-authored snapshot
                     created_at TIMESTAMPTZ)

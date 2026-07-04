@@ -7,6 +7,15 @@ Branch: main | Mode: SELECTIVE EXPANSION
 Repo: adamowens/causent
 Source PRD: ~/.gstack/projects/adam-causent-causent-ai/adamowens-main-design-20260701-093117.md (APPROVED, office-hours 2026-07-01)
 
+## Build Status (2026-07-03)
+
+**Backend loop BUILT + verified on `main`** (see `docs/STATUS.md` for the resume guide):
+honest causal engine (`engine/`, 1058 tests, 45-day confident floor), schema + RLS + RBAC
+memberships (`supabase/migrations/`, tenant-isolation verified), persistence bridge
+(`engine/persistence/`, live E2E verified), and CI. Remaining: app/UI, GitHub ingestion,
+engine deploy, Anthropic summary, multi-provider auth. This document is the plan of record;
+`docs/STATUS.md` tracks what is actually built.
+
 ## Vision
 
 ### 10x Check
