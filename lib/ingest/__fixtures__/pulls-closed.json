@@ -1,0 +1,42 @@
+[
+  {
+    "number": 8256,
+    "title": "Signup Funnel Rebuild",
+    "body": "Rebuild the signup funnel to cut steps from 5 to 3.\n\nHypothesis: fewer steps lifts activation.",
+    "html_url": "https://github.com/acme/orbit/pull/8256",
+    "state": "closed",
+    "merged_at": "2025-03-05T12:00:00Z",
+    "updated_at": "2025-03-06T08:00:00Z",
+    "user": { "login": "arya" }
+  },
+  {
+    "number": 8210,
+    "title": "Close without merge (abandoned spike)",
+    "body": "Spike only, not shipping.",
+    "html_url": "https://github.com/acme/orbit/pull/8210",
+    "state": "closed",
+    "merged_at": null,
+    "updated_at": "2025-02-25T11:00:00Z",
+    "user": { "login": "arya" }
+  },
+  {
+    "number": 8107,
+    "title": "Billing Retry Logic",
+    "body": "Retry failed card charges up to 3x with backoff.",
+    "html_url": "https://github.com/acme/orbit/pull/8107",
+    "state": "closed",
+    "merged_at": "2025-02-03T09:30:00Z",
+    "updated_at": "2025-02-03T09:30:00Z",
+    "user": { "login": "bel" }
+  },
+  {
+    "number": 7900,
+    "title": "Old change outside the 90-day window",
+    "body": "Merged last autumn.",
+    "html_url": "https://github.com/acme/orbit/pull/7900",
+    "state": "closed",
+    "merged_at": "2024-11-15T08:00:00Z",
+    "updated_at": "2024-11-15T08:00:00Z",
+    "user": { "login": "bel" }
+  }
+]
