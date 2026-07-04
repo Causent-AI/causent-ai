@@ -1,5 +1,4 @@
-import type { Action } from "@/lib/types";
-import { metricById } from "@/lib/seed";
+import type { Action, Metric } from "@/lib/types";
 import { formatShortDate } from "@/lib/format";
 import { Delta } from "@/components/ui/Delta";
 import { GitHubIcon } from "@/components/ui/icons";
@@ -9,7 +8,14 @@ import { GitHubIcon } from "@/components/ui/icons";
 
 const COLUMNS = ["arr", "grossProfit", "activation", "churn", "support"] as const;
 
-export function ActionsTable({ actions }: { actions: Action[] }) {
+export function ActionsTable({
+  actions,
+  metrics,
+}: {
+  actions: Action[];
+  metrics: Metric[];
+}) {
+  const nameById = new Map(metrics.map((m) => [m.id, m.name]));
   return (
     <div className="scroll-slim overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">
@@ -19,7 +25,7 @@ export function ActionsTable({ actions }: { actions: Action[] }) {
             <th className="px-2 py-2 font-medium">Shipped</th>
             {COLUMNS.map((id) => (
               <th key={id} className="px-2 py-2 text-right font-medium whitespace-nowrap">
-                {metricById(id)?.name}
+                {nameById.get(id)}
               </th>
             ))}
           </tr>

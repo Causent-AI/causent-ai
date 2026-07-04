@@ -1,15 +1,14 @@
-import {
-  actions,
-  aggregatedImpact,
-  impactByMetric,
-} from "@/lib/seed";
+import { loadDashboardData } from "@/lib/data/dashboard";
 import { Panel, PanelHeader } from "@/components/ui/Panel";
 import { AggregatedImpact } from "@/components/impact/AggregatedImpact";
 import { ActionsTable } from "@/components/impact/ActionsTable";
 import { TrustCaveat } from "@/components/impact/TrustCaveat";
 import { ImpactBar } from "@/components/charts/ImpactBar";
 
-export default function ImpactPage() {
+export default async function ImpactPage() {
+  const { actions, aggregatedImpact, impactByMetric, metrics } =
+    await loadDashboardData();
+
   return (
     <div className="mx-auto max-w-[1360px] space-y-4 p-5">
       <AggregatedImpact stats={aggregatedImpact} />
@@ -23,12 +22,12 @@ export default function ImpactPage() {
           <div className="mb-4">
             <TrustCaveat />
           </div>
-          <ImpactBar rows={impactByMetric} />
+          <ImpactBar rows={impactByMetric} metrics={metrics} />
         </Panel>
 
         <Panel>
           <PanelHeader title="Actions" />
-          <ActionsTable actions={actions} />
+          <ActionsTable actions={actions} metrics={metrics} />
         </Panel>
       </div>
     </div>

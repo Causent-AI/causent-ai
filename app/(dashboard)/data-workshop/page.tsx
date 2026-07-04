@@ -1,4 +1,4 @@
-import { metrics } from "@/lib/seed";
+import { loadDashboardData } from "@/lib/data/dashboard";
 import { Panel } from "@/components/ui/Panel";
 import { CsvDropzone } from "@/components/data-workshop/CsvDropzone";
 import { ConnectedMetrics } from "@/components/data-workshop/ConnectedMetrics";
@@ -37,7 +37,9 @@ function ProgressRing({ value, cap }: { value: number; cap: number }) {
   );
 }
 
-export default function DataWorkshopPage() {
+export default async function DataWorkshopPage() {
+  const { metrics } = await loadDashboardData();
+
   return (
     <div className="mx-auto grid max-w-[1360px] grid-cols-1 gap-4 p-5 lg:grid-cols-[1fr_340px]">
       <div className="space-y-4">

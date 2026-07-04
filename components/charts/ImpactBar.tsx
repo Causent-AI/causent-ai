@@ -1,6 +1,5 @@
-import type { MetricImpact } from "@/lib/types";
+import type { Metric, MetricImpact } from "@/lib/types";
 import { formatCurrencyDelta } from "@/lib/format";
-import { metricById } from "@/lib/seed";
 
 // Horizontal diverging bar chart: each metric's net impact, positive to the
 // right (teal) and negative to the left (red). Direction is reinforced by the
@@ -11,7 +10,14 @@ function niceTicks(min: number, max: number, count = 7): number[] {
   return Array.from({ length: count }, (_, i) => min + i * step);
 }
 
-export function ImpactBar({ rows }: { rows: MetricImpact[] }) {
+export function ImpactBar({
+  rows,
+  metrics,
+}: {
+  rows: MetricImpact[];
+  metrics: Metric[];
+}) {
+  const nameById = new Map(metrics.map((m) => [m.id, m.name]));
   const values = rows.map((r) => r.value);
   const rawMin = Math.min(0, ...values);
   const rawMax = Math.max(0, ...values);
@@ -32,7 +38,7 @@ export function ImpactBar({ rows }: { rows: MetricImpact[] }) {
 
       <div className="space-y-2.5">
         {rows.map((r) => {
-          const metric = metricById(r.metricId);
+          const metricName = nameById.get(r.metricId);
           const pos = r.value >= 0;
           const barColor = r.good ? "var(--pos)" : "var(--neg)";
           const left = Math.min(frac(r.value), zero);
@@ -40,7 +46,7 @@ export function ImpactBar({ rows }: { rows: MetricImpact[] }) {
           return (
             <div key={r.metricId} className="flex items-center">
               <div className="w-[112px] shrink-0 pr-3 text-right text-[13px] text-[var(--text)]">
-                {metric?.name}
+                {metricName}
               </div>
               <div className="relative h-6 flex-1">
                 {/* zero baseline */}

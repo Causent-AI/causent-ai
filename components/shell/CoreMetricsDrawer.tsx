@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { actions, metrics } from "@/lib/seed";
+import type { Action, Metric } from "@/lib/types";
 import { getMetricDelta } from "@/lib/derive";
-import { impactWindow } from "@/lib/seed";
 import { formatLongDate, formatShortDate } from "@/lib/format";
 import { LineTimeSeries, type SeriesFlag } from "@/components/charts/LineTimeSeries";
 import { Sparkline } from "@/components/charts/Sparkline";
@@ -12,11 +11,11 @@ import { CalendarIcon, ChevronIcon, PlusIcon } from "@/components/ui/icons";
 
 // Persistent bottom drawer. Core metrics "run through everything" — a daily time
 // series per metric with named action flags, always checkable in the background.
+// Data (metrics/actions/window) is fetched by the server layout and threaded in as
+// props; this component never reads the DB or the seed directly.
 
-const CHART_METRICS = metrics.slice(0, 3); // stacked hero charts
 const WINDOW_DAYS = 46; // matches the drawer's date-range control
 const MAX_FLAGS = 5; // thin so PR pills never overlap
-const DATE_LABEL = `${formatShortDate(impactWindow.start)} – ${formatLongDate(impactWindow.end)}`;
 
 /** Evenly sample at most `max` items so flags stay readable. */
 function thin<T>(arr: T[], max: number): T[] {
@@ -25,19 +24,35 @@ function thin<T>(arr: T[], max: number): T[] {
   return Array.from({ length: max }, (_, i) => arr[Math.round(i * step)]);
 }
 
-// All metrics share the same daily date axis, so one window start covers them all.
-const WINDOW_START =
-  metrics[0].series[metrics[0].series.length - WINDOW_DAYS].date;
-
-function flagsForMetric(color: string): SeriesFlag[] {
-  return thin(
-    actions.filter((a) => a.shippedAt >= WINDOW_START),
-    MAX_FLAGS,
-  ).map((a) => ({ date: a.shippedAt, label: `#${a.pr}`, color }));
-}
-
-export function CoreMetricsDrawer() {
+export function CoreMetricsDrawer({
+  metrics,
+  actions,
+  impactWindow,
+}: {
+  metrics: Metric[];
+  actions: Action[];
+  impactWindow: { start: string; end: string };
+}) {
   const [open, setOpen] = useState(true);
+
+  const chartMetrics = metrics.slice(0, 3); // stacked hero charts
+  const dateLabel =
+    impactWindow.start && impactWindow.end
+      ? `${formatShortDate(impactWindow.start)} – ${formatLongDate(impactWindow.end)}`
+      : "—";
+
+  // All metrics share the same daily date axis, so one window start covers them all.
+  const baseSeries = metrics[0]?.series ?? [];
+  const windowStart =
+    baseSeries.length > 0
+      ? baseSeries[Math.max(0, baseSeries.length - WINDOW_DAYS)].date
+      : "";
+
+  const flagsForMetric = (color: string): SeriesFlag[] =>
+    thin(
+      actions.filter((a) => a.shippedAt >= windowStart),
+      MAX_FLAGS,
+    ).map((a) => ({ date: a.shippedAt, label: `#${a.pr}`, color }));
 
   return (
     <section className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)]">
@@ -64,7 +79,7 @@ export function CoreMetricsDrawer() {
         <div className="flex items-center gap-2 text-[12px]">
           <span className="flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2 py-1 text-[var(--text-muted)]">
             <CalendarIcon className="text-[var(--text-subtle)]" />
-            {DATE_LABEL}
+            {dateLabel}
           </span>
           <span className="flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2 py-1 text-[var(--text-muted)]">
             Daily
@@ -77,7 +92,7 @@ export function CoreMetricsDrawer() {
         <div className="flex gap-4 px-5 pb-4">
           {/* stacked hero charts */}
           <div className="flex-1 space-y-1">
-            {CHART_METRICS.map((m) => {
+            {chartMetrics.map((m) => {
               const d = getMetricDelta(m);
               return (
                 <div key={m.id} className="flex items-stretch gap-3">

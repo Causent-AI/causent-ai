@@ -1,13 +1,15 @@
-import type { Action } from "@/lib/types";
-import { metrics, metricById } from "@/lib/seed";
+import type { Action, Metric } from "@/lib/types";
 import { CheckIcon, ChevronIcon } from "@/components/ui/icons";
 
 // The "why we built it" rationale surface. v1 is a read-oriented rich-text
 // layout (the persisted field is actions.rationale_richtext); collaborative
 // editing is deferred.
 
-function defaultRationale(a: Action): NonNullable<Action["rationale"]> {
-  const metric = metricById(a.primaryMetricId);
+function defaultRationale(
+  a: Action,
+  metricById: Map<string, Metric>,
+): NonNullable<Action["rationale"]> {
+  const metric = metricById.get(a.primaryMetricId);
   return {
     hypothesis: `We expect "${a.title}" to move ${metric?.name ?? "the target metric"}.`,
     expectedMetricId: a.primaryMetricId,
@@ -20,9 +22,16 @@ function defaultRationale(a: Action): NonNullable<Action["rationale"]> {
 
 const TOOLBAR = ["B", "I", "U", "S"];
 
-export function DecisionEditor({ action }: { action: Action }) {
-  const r = action.rationale ?? defaultRationale(action);
-  const expected = metricById(r.expectedMetricId);
+export function DecisionEditor({
+  action,
+  metrics,
+}: {
+  action: Action;
+  metrics: Metric[];
+}) {
+  const metricById = new Map(metrics.map((m) => [m.id, m]));
+  const r = action.rationale ?? defaultRationale(action, metricById);
+  const expected = metricById.get(r.expectedMetricId);
 
   return (
     <div className="flex h-full flex-col">

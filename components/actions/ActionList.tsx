@@ -1,18 +1,20 @@
-import type { Action } from "@/lib/types";
-import { metricById } from "@/lib/seed";
+import type { Action, Metric } from "@/lib/types";
 import { formatLongDate } from "@/lib/format";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { CheckIcon, GitHubIcon, PlusIcon } from "@/components/ui/icons";
 
 export function ActionList({
   actions,
+  metrics,
   selectedId,
   onSelect,
 }: {
   actions: Action[];
+  metrics: Metric[];
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
+  const metricById = new Map(metrics.map((m) => [m.id, m]));
   return (
     <div className="flex h-full flex-col">
       {/* actions */}
@@ -28,7 +30,7 @@ export function ActionList({
 
       <div className="scroll-slim min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
         {actions.map((a) => {
-          const metric = metricById(a.primaryMetricId);
+          const metric = metricById.get(a.primaryMetricId);
           const selected = a.id === selectedId;
           return (
             <button

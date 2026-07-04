@@ -1,23 +1,10 @@
-"use client";
+import { loadDashboardData } from "@/lib/data/dashboard";
+import { ActionsPageClient } from "@/components/actions/ActionsPageClient";
 
-import { useState } from "react";
-import { actions } from "@/lib/seed";
-import { Panel } from "@/components/ui/Panel";
-import { ActionList } from "@/components/actions/ActionList";
-import { DecisionEditor } from "@/components/actions/DecisionEditor";
+// Server page: reads actions + metrics from lib/data (Supabase, seed fallback) and
+// hands them to the client child, which owns the click-to-select interactivity.
 
-export default function ActionsPage() {
-  const [selectedId, setSelectedId] = useState(actions[0].id);
-  const selected = actions.find((a) => a.id === selectedId) ?? actions[0];
-
-  return (
-    <div className="mx-auto grid h-full max-w-[1360px] grid-cols-1 gap-4 p-5 lg:grid-cols-[400px_1fr]">
-      <Panel className="flex min-h-0 flex-col">
-        <ActionList actions={actions} selectedId={selectedId} onSelect={setSelectedId} />
-      </Panel>
-      <Panel className="flex min-h-0 flex-col">
-        <DecisionEditor action={selected} />
-      </Panel>
-    </div>
-  );
+export default async function ActionsPage() {
+  const { actions, metrics } = await loadDashboardData();
+  return <ActionsPageClient actions={actions} metrics={metrics} />;
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { scope } from "@/lib/seed";
+import type { Scope } from "@/lib/types";
 import { FolderIcon } from "@/components/ui/icons";
 
 const TABS = [
@@ -11,7 +11,7 @@ const TABS = [
   { href: "/impact", label: "Impact" },
 ] as const;
 
-export function TabStrip() {
+export function TabStrip({ scope }: { scope: Scope }) {
   const pathname = usePathname();
 
   return (
