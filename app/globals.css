@@ -1,26 +1,82 @@
 @import "tailwindcss";
 
+/*
+ * Causent brand + dashboard tokens. The approved mockups are a light UI, so the
+ * shell commits to a single light theme (no OS-dark flip that would wash out the
+ * brand palette or the colorblind-safe status colors).
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand */
+  --brand-teal: #00a29c;
+  --brand-blue: #377ded;
+  --brand-amber: #f0b73e;
+  --brand-grey: #595959;
+
+  /* Semantic status (never encoded by color alone — always paired with a glyph) */
+  --pos: #0f8a76; /* positive / improving */
+  --neg: #e5484d; /* negative / regressing */
+  --neutral: #6b7280; /* no material effect */
+
+  /* Surfaces */
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --border: #e6e8eb;
+  --border-strong: #d4d7dc;
+
+  /* Text */
+  --text: #1a1d21;
+  --text-muted: #6b7280;
+  --text-subtle: #9aa0a6;
+
+  --background: var(--bg);
+  --foreground: var(--text);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-foreground: var(--text);
+  --color-border: var(--border);
+
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-amber: var(--brand-amber);
+  --color-brand-grey: var(--brand-grey);
+
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --color-neutral: var(--neutral);
+
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin, unobtrusive scrollbars inside dashboard panels. */
+.scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.scroll-slim::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
 }
