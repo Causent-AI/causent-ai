@@ -20,8 +20,10 @@ a family of tests, so a per-action "CI excludes 0" (nominal p<0.05) inflates fal
 edges as the action count grows. We collect the actions' step p_values and apply
 Benjamini-Hochberg FDR at level q across them: an action earns belief 1.0 only if it
 BOTH clears BH-FDR AND its placebo did not fire. A would-be 1.0 edge that fails BH-FDR
-is demoted to 0.5 / INCONCLUSIVE (not significant after correction). Weaker verdicts
-(0.5 / 0.0 / None) are untouched — FDR only ever removes, never adds, confidence.
+is demoted to 0.5 / INCONCLUSIVE with reason FDR_DEMOTED (not significant after
+correction) — the reason keeps the demotion auditable so the persisted edge never
+silently disagrees with its authoritative evidence. Weaker verdicts (0.5 / 0.0 / None)
+are untouched — FDR only ever removes, never adds, confidence.
 
 Invariant: max_actions caps the fan-out (a metric can collide with an unbounded number
   of actions); exceeding it is a caller error -> ValueError, raised before any compute.
@@ -86,9 +88,11 @@ def batch_readout(
     for i, (action_ref, _, its, desc, before_after, placebo) in enumerate(computed):
         belief = belief_direction(its, placebo)
         # A 1.0 edge must also survive multiple-comparison correction; if not, the
-        # effect is not significant after FDR -> demote to 0.5 / INCONCLUSIVE.
+        # effect is not significant after FDR -> demote to 0.5 / INCONCLUSIVE. The
+        # demotion carries reason FDR_DEMOTED so it is auditable downstream (the edge
+        # would otherwise disagree with its authoritative evidence with no trace).
         if belief.belief_score == 1.0 and i not in discoveries:
-            belief = Belief(0.5, "INCONCLUSIVE")
+            belief = Belief(0.5, "INCONCLUSIVE", "FDR_DEMOTED")
         readouts.append(
             ActionReadout(action_ref, its, desc, before_after, placebo, belief)
         )

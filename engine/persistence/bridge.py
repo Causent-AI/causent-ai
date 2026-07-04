@@ -182,16 +182,19 @@ def _append_its_evidence(conn: Connection, scope_id: Id, edge_id: UUID,
                          action_id: UUID | None, cluster_id: UUID | None,
                          its: ITSResult, placebo: PlaceboResult, clustered: bool) -> None:
     """Append the authoritative ITS evidence row with the raw stats the deferred
-    belief model reuses (n_pre/n_post, resid_var, cond_number, placebo)."""
+    belief model reuses (n_pre/n_post, resid_var, cond_number, durbin_watson, placebo).
+    durbin_watson is stored because belief_direction CONSUMES it (the AUTOCORRELATION
+    gate), so without it the edge's belief is not reproducible from this row."""
     conn.execute(
         "insert into public.evidence_objects "
         "(scope_id, edge_id, action_id, cluster_id, methodology, lift, ci_low, "
         " ci_high, p_value, confounded, clustered, n_pre, n_post, resid_var, "
-        " cond_number, placebo_lift, placebo_fired) "
-        "values (%s, %s, %s, %s, 'ITS', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        " cond_number, durbin_watson, placebo_lift, placebo_fired) "
+        "values (%s, %s, %s, %s, 'ITS', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (scope_id, edge_id, action_id, cluster_id, its.lift, its.ci_low, its.ci_high,
          its.p_value, its.status == "CONFOUNDED", clustered, its.n_pre, its.n_post,
-         its.resid_var, its.cond_number, placebo.placebo_lift, placebo.fired),
+         its.resid_var, its.cond_number, its.durbin_watson,
+         placebo.placebo_lift, placebo.fired),
     )
 
 
@@ -211,10 +214,16 @@ def _append_before_after_evidence(conn: Connection, scope_id: Id, edge_id: UUID,
 
 
 def _upsert_cluster(conn: Connection, scope_id: Id, metric_id: Id, cluster: _Cluster) -> UUID:
+    """Upsert on the cluster's STABLE identity — (scope, metric, window_start), the
+    earliest member's date — and grow window_end in place. Keying on the full window
+    (…, window_end) instead would mint a NEW cluster row every time a later action
+    extends the group's window, orphaning the prior cluster's node/edge/evidence.
+    Two collision groups on one metric are >14 days apart, so their earliest-member
+    dates differ: window_start is a unique, re-run-stable key for the group."""
     return conn.execute(
         "insert into public.clusters (scope_id, metric_id, window_start, window_end) "
         "values (%s, %s, %s, %s) "
-        "on conflict (scope_id, metric_id, window_start, window_end) "
+        "on conflict (scope_id, metric_id, window_start) "
         "do update set window_end = excluded.window_end "
         "returning cluster_id",
         (scope_id, metric_id, cluster.window_start, cluster.window_end),
@@ -237,10 +246,21 @@ def persist_metric_readouts(conn: Connection, scope_id: Id, metric_id: Id) -> No
     if metric is None:
         return  # no observations yet — nothing to materialize
 
-    metric_name_row = conn.execute(
-        "select name from public.metrics where metric_id = %s", (metric_id,)
+    # The metric's OWN scope is authoritative for where its graph is materialized.
+    # Trusting the passed scope_id would let persist_metric_readouts(WS_X, metric_in_WS_Y)
+    # stamp WS_X's graph rows onto a metric owned by WS_Y — a workspace-isolation breach
+    # RLS cannot catch (an org member is a member of both). Refuse the cross-scope write.
+    metric_row = conn.execute(
+        "select scope_id, name from public.metrics where metric_id = %s", (metric_id,)
     ).fetchone()
-    metric_display = metric_name_row[0] if metric_name_row else None
+    if metric_row is None:
+        return  # metric not visible under RLS — nothing to materialize
+    metric_scope_id, metric_display = metric_row
+    if str(metric_scope_id) != str(scope_id):
+        raise ValueError(
+            f"metric {metric_id} belongs to scope {metric_scope_id}, not the passed "
+            f"scope {scope_id}; refusing cross-scope materialization"
+        )
     metric_node_id = _upsert_node(conn, scope_id, "METRIC", metric_id, metric_display)
 
     actions = _load_actions(conn, scope_id, metric)

@@ -56,7 +56,13 @@ ITS_CAVEAT = (
 # AUTOCORRELATION: residual autocorrelation (low DW) beyond HAC's small-sample reach.
 # INSUFFICIENT_HISTORY: fittable but below FLOOR_CONFIDENT — gathering data.
 # DEGENERATE: the fit was unusable, so the effect is UNKNOWN (score None), not zero.
-BeliefReason = Literal["PLACEBO", "AUTOCORRELATION", "INSUFFICIENT_HISTORY", "DEGENERATE"]
+# FDR_DEMOTED: a per-action would-be 1.0 that failed Benjamini-Hochberg correction
+#   across the metric's action family (batch_readout) — not significant after the
+#   multiple-comparison control, so demoted to 0.5. Recorded (not NULL) so the
+#   demotion is auditable and belief stays reproducible from the persisted edge.
+BeliefReason = Literal[
+    "PLACEBO", "AUTOCORRELATION", "INSUFFICIENT_HISTORY", "DEGENERATE", "FDR_DEMOTED"
+]
 
 # A readout status. INSUFFICIENT / INSUFFICIENT_HISTORY / DEGENERATE all render
 # "inconclusive" but are distinct causes: INSUFFICIENT = too few points to fit at all
