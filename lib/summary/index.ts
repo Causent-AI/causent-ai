@@ -23,6 +23,9 @@ export { generateSummary, resolveStrength, formatDelta } from "./generate.ts";
 export {
   generateSummaryWithPolish,
   enforceInvariants,
+  violatesHonestyClaim,
   noopPolisher,
   type SummaryPolisher,
 } from "./polish.ts";
+
+export { createAnthropicPolisher } from "./live-polish.ts";
