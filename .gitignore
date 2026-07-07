@@ -51,4 +51,7 @@ next-env.d.ts
 engine/.venv/
 engine/**/__pycache__/
 engine/.pytest_cache/
+
+# local agent tooling (gstack/skill mirrors — not project code)
 .gstack/
+.agents/
