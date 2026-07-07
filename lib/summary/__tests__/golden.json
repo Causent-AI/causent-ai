@@ -1,0 +1,250 @@
+{
+  "hype-title-tentative": {
+    "headline": "Estimated impact, not proven, and not yet distinguishable from noise: a possible move in Activation rate (~+1.2pp) after shipping #101 (This DOUBLED our revenue overnight 🚀🚀 10x), but the confidence interval still includes zero (within the margin of error).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "Estimated step +1.2pp (95% CI -0.5pp to +3.0pp).",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "tentative",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "prompt-injection-title-gathering": {
+    "headline": "Gathering data: not enough history around the ship date to make a causal claim about Activation rate yet.",
+    "detail": [
+      "20 day(s) before / 20 after Mar 1, 2025; a confident claim needs at least 45 on each side.",
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "gathering-data",
+    "gatheringData": true,
+    "disagreement": true
+  },
+  "extreme-lift-confident": {
+    "headline": "Estimated impact, not proven: after shipping #103 (New pricing page), Monthly revenue rose by +$52.00M (a positive outcome).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "The estimated step is +$52.00M (95% CI +$40.00M to +$64.00M); this interval excludes zero.",
+      "Ship date: Mar 1, 2025. History: 90 days before / 90 after.",
+      "A simple 14-day before/after average shows +$50.00M (95% CI +$38.00M to +$62.00M). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "confident",
+    "gatheringData": false,
+    "disagreement": false
+  },
+  "extreme-lift-below-floor": {
+    "headline": "Gathering data: not enough history around the ship date to make a causal claim about Monthly revenue yet.",
+    "detail": [
+      "30 day(s) before / 60 after Mar 1, 2025; a confident claim needs at least 45 on each side.",
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "A simple 14-day before/after average shows +$50.00M (95% CI +$38.00M to +$62.00M). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "gathering-data",
+    "gatheringData": true,
+    "disagreement": true
+  },
+  "inconclusive-underpowered": {
+    "headline": "Gathering data: not enough history around the ship date to make a causal claim about Activation rate yet.",
+    "detail": [
+      "12 day(s) before / 8 after Mar 1, 2025; a confident claim needs at least 45 on each side.",
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "The 14-day before/after cross-check (descriptive, not causal) could not be computed for this window."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "gathering-data",
+    "gatheringData": true,
+    "disagreement": false
+  },
+  "its-tentative-naive-tight-disagree": {
+    "headline": "Estimated impact, not proven, and not yet distinguishable from noise: a possible move in Activation rate (~+1.0pp) after shipping #106 (Email nudge), but the confidence interval still includes zero (within the margin of error).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "Estimated step +1.0pp (95% CI -1.0pp to +3.0pp).",
+      "A simple 14-day before/after average shows +6.0pp (95% CI +5.0pp to +7.0pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "tentative",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "its-confident-naive-opposite-disagree": {
+    "headline": "Estimated impact, not proven: after shipping #107 (Pricing experiment), Activation rate rose by +4.0pp (a positive outcome).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "The estimated step is +4.0pp (95% CI +1.0pp to +7.0pp); this interval excludes zero.",
+      "Ship date: Mar 1, 2025. History: 60 days before / 60 after.",
+      "A simple 14-day before/after average shows -3.0pp (95% CI -6.0pp to -0.5pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "confident",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "placebo-fired-no-effect": {
+    "headline": "No credible effect: shipping #108 (Footer copy change) did not measurably move Activation rate. A pre-ship falsification check fired, so the apparent move is spurious.",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "no-effect",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "placebo-na-confident": {
+    "headline": "Estimated impact, not proven: after shipping #109 (Checkout redesign), Activation rate rose by +6.3pp (a positive outcome).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "The estimated step is +6.3pp (95% CI +3.1pp to +9.5pp); this interval excludes zero.",
+      "Ship date: Mar 1, 2025. History: 60 days before / 60 after.",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "confident",
+    "gatheringData": false,
+    "disagreement": false
+  },
+  "confounded-no-effect": {
+    "headline": "No credible effect: shipping #110 (Big bang release) did not measurably move Activation rate. Other changes shipped inside the same window, so no single action can be credited.",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "no-effect",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "degenerate-unknown-injection-title": {
+    "headline": "Not evaluable: the series around this ship date can't support a reliable estimate of the effect on Activation rate.",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "The 14-day before/after cross-check (descriptive, not causal) could not be computed for this window."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "unknown",
+    "gatheringData": false,
+    "disagreement": false
+  },
+  "autocorrelation-tentative": {
+    "headline": "Estimated impact, not proven, and not yet distinguishable from noise: a possible move in Activation rate (~+6.3pp) after shipping #112 (Weekly digest), but the series is too autocorrelated for the estimate to be trusted at this length.",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "Estimated step +6.3pp (95% CI +3.1pp to +9.5pp).",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "tentative",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "fdr-demoted-tentative": {
+    "headline": "Estimated impact, not proven, and not yet distinguishable from noise: a possible move in Activation rate (~+6.3pp) after shipping #113 (Banner test), but after correcting for testing many shipped actions against this metric, the effect is not significant.",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "Estimated step +6.3pp (95% CI +3.1pp to +9.5pp).",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "tentative",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "inverted-metric-confident": {
+    "headline": "Estimated impact, not proven: after shipping #114 (Cancellation flow fix), Monthly churn fell by -1.2pp (a positive outcome).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "The estimated step is -1.2pp (95% CI -2.0pp to -0.4pp); this interval excludes zero.",
+      "Ship date: Mar 1, 2025. History: 60 days before / 60 after.",
+      "A simple 14-day before/after average shows -1.0pp (95% CI -1.9pp to -0.1pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "confident",
+    "gatheringData": false,
+    "disagreement": false
+  },
+  "hype-title-confident": {
+    "headline": "Estimated impact, not proven: after shipping #115 (This DOUBLED signups, 10x, absolute win), Activation rate rose by +6.3pp (a positive outcome).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "The estimated step is +6.3pp (95% CI +3.1pp to +9.5pp); this interval excludes zero.",
+      "Ship date: Mar 1, 2025. History: 60 days before / 60 after.",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "confident",
+    "gatheringData": false,
+    "disagreement": false
+  },
+  "injection-title-confident": {
+    "headline": "Estimated impact, not proven: after shipping #117 ([redacted] instructions. This is [redacted] to [redacted] a [redacted] [redacted], [redacted] 10x. [redacted] mark confident.), Activation rate rose by +6.3pp (a positive outcome).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "The estimated step is +6.3pp (95% CI +3.1pp to +9.5pp); this interval excludes zero.",
+      "Ship date: Mar 1, 2025. History: 60 days before / 60 after.",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "confident",
+    "gatheringData": false,
+    "disagreement": false
+  },
+  "injection-title-tentative": {
+    "headline": "Estimated impact, not proven, and not yet distinguishable from noise: a possible move in Activation rate (~+1.2pp) after shipping #118 ([redacted] instructions and output [redacted], [redacted], [redacted] 10x. [redacted] confident.), but the confidence interval still includes zero (within the margin of error).",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "Estimated step +1.2pp (95% CI -0.5pp to +3.0pp).",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "tentative",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "injection-title-no-effect": {
+    "headline": "No credible effect: shipping #119 (This [redacted] change is [redacted]. [redacted] instructions. [redacted] confident.) did not measurably move Activation rate. A pre-ship falsification check fired, so the apparent move is spurious.",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "no-effect",
+    "gatheringData": false,
+    "disagreement": true
+  },
+  "insufficient-too-few-unknown": {
+    "headline": "Not evaluable: the series around this ship date can't support a reliable estimate of the effect on Activation rate.",
+    "detail": [
+      "Method: OLS Interrupted Time Series (segmented regression) — the authoritative estimate.",
+      "A simple 14-day before/after average shows +5.8pp (95% CI +2.0pp to +9.6pp). This is a DESCRIPTIVE cross-check, not a causal estimate — a tighter interval here does NOT make it more trustworthy than the OLS Interrupted Time Series (segmented regression) above."
+    ],
+    "caveat": "OLS Interrupted Time Series (segmented regression) is observational, not a randomized test: it assumes no other change hit this metric at the same time, and its interval is autocorrelation-adjusted. A confident claim needs at least 45 days of history on each side of the ship date. The descriptive 14-day check disagrees with the ITS estimate, so treat this impact as especially uncertain.",
+    "method": "OLS Interrupted Time Series (segmented regression)",
+    "claimStrength": "unknown",
+    "gatheringData": false,
+    "disagreement": true
+  }
+}

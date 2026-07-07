@@ -1,0 +1,394 @@
+"""Seed a realistic Causent demo dataset into local Supabase — then materialize
+the decision graph through the REAL engine bridge.
+
+Why this exists
+---------------
+The v1 UI (app/(dashboard)/*) currently renders from lib/seed.ts (deterministic
+demo data). This script stands up the SAME demo semantics inside Postgres so the
+UI can be wired to RLS-scoped Supabase reads that carry REAL engine output:
+honest ITS causal readouts, not hand-authored impact cells.
+
+It seeds exactly one tenant that mirrors lib/seed.ts:
+  org "Causent" -> project "Orbit" -> workspace "Gummy Alpha"
+  5 metrics: ARR, Activation Rate, Churn Rate, Gross Profit, Support Tickets
+  210 DAILY metric_observations per metric, ending 2025-05-23
+  actions as shipped GitHub PRs (#8324..#8421 = the lib/seed.ts May cohort)
+
+The product boundary it demonstrates (docs: FLOOR_CONFIDENT=45)
+--------------------------------------------------------------
+A confident causal claim (belief 1.0) needs >= 45 daily points on EACH side of a
+ship date. The May-2025 cohort ships in the trailing 17 days of the series, so
+every one of them has < 45 post-ship points -> the engine withholds belief with
+reason INSUFFICIENT_HISTORY ("gathering data"). That is the HONEST reality of
+freshly shipped work and is the whole point of the product.
+
+To ALSO exercise the confident path (belief 1.0), two earlier "landmark" PRs ship
+in Feb/Mar 2025 with >= 45 points on each side and a clean, strong injected level
+step on their primary metric:
+  PR #8107 "Billing Retry Logic"   ships 2025-02-03, big +step on ARR
+  PR #8256 "Signup Funnel Rebuild" ships 2025-03-05, big +step on Activation Rate
+These two are > 14 days apart from each other and from the May cohort, so they
+stay LONE actions (no cluster collision) and each earns its own confident edge.
+
+Design choices for a GUARANTEED confident edge:
+  - ARR and Activation are built as (flat level + tiny drift + one strong step +
+    IID gaussian noise). IID residuals => Durbin-Watson ~ 2 => the belief engine's
+    AUTOCORRELATION cap does not fire; the step is ~30+ noise-sigmas => the ITS
+    p-value is astronomically small => it survives BH-FDR across the metric family
+    => belief 1.0 / POSITIVE. The step is the ONLY structure, so the in-time
+    placebo reads ~0 elsewhere and does not fire.
+  - The other three metrics (Churn, Gross Profit, Support Tickets) are organic
+    mean-reverting series with soft nudges at the May cohort's dates. Their
+    readouts land wherever the engine honestly puts them (mostly INCONCLUSIVE /
+    INSUFFICIENT_HISTORY) — the demo only needs AT LEAST ONE confident edge.
+
+Idempotent + re-runnable
+------------------------
+All rows hang off a single deterministic demo org UUID; every domain table
+FK-cascades from workspaces -> projects -> orgs on delete, so teardown is just
+"delete the demo org (+ the demo auth user)". Each run = full teardown + fresh
+seed + fresh bridge materialization, so evidence never accumulates across runs
+and the result is byte-stable.
+
+Seeding is done as the postgres superuser (bypassrls). The graph materialization
+is run AS THE DEMO USER over an RLS-scoped connection (SET ROLE authenticated +
+request.jwt.claims sub=<user>), exactly like production and the E2E gate — so RLS
+is actually exercised, not bypassed.
+
+Run:
+    cd engine && .venv/bin/python persistence/seed_demo.py
+    # honors $DATABASE_URL; defaults to the local stack DSN below.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import uuid
+from datetime import date, timedelta
+
+import numpy as np
+import psycopg
+
+# Make the engine root importable whether invoked as `python persistence/seed_demo.py`
+# (script dir on path) or `python -m persistence.seed_demo` (engine root on path).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from persistence.bridge import persist_metric_readouts  # noqa: E402
+
+DSN = os.environ.get(
+    "DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+)
+
+# --- Deterministic demo UUIDs (all namespaced under the demo org for exact teardown) --
+ORG = uuid.UUID("ca5e0000-0000-0000-0000-0000000000d1")
+PROJ = uuid.UUID("ca5e0000-0000-0000-0000-0000000000d2")
+SCOPE = uuid.UUID("ca5e0000-0000-0000-0000-0000000000d3")  # workspace = operating level
+USER = uuid.UUID("ca5e1111-0000-0000-0000-0000000000d9")   # OWNER of the demo org
+
+
+def _metric_uuid(slug_n: int) -> uuid.UUID:
+    return uuid.UUID(f"ca5e0000-0000-0000-0000-0000000a{slug_n:04d}")
+
+
+def _action_uuid(pr: int) -> uuid.UUID:
+    return uuid.UUID(f"ca5e0000-0000-0000-0000-0000000{pr:05d}")
+
+
+# --- Time axis: 210 daily points ending 2025-05-23 (mirrors lib/seed.ts) --------------
+END_DATE = date(2025, 5, 23)
+SERIES_DAYS = 210
+DATES = [END_DATE - timedelta(days=SERIES_DAYS - 1 - i) for i in range(SERIES_DAYS)]
+START_DATE = DATES[0]  # 2024-10-26
+
+
+def _idx(d: date) -> int:
+    return (d - START_DATE).days
+
+
+# --- Metric definitions ---------------------------------------------------------------
+# id order matches lib/seed.ts. (uuid, name, source, unit)
+METRICS = [
+    (_metric_uuid(1), "ARR", "csv", "USD"),
+    (_metric_uuid(2), "Activation Rate", "csv", "percent"),
+    (_metric_uuid(3), "Churn Rate", "csv", "percent"),
+    (_metric_uuid(4), "Gross Profit", "csv", "USD"),
+    (_metric_uuid(5), "Support Tickets", "csv", "count"),
+]
+M_ARR, M_ACTIVATION, M_CHURN, M_GP, M_SUPPORT = (m[0] for m in METRICS)
+
+# --- Landmark (confident-capable) ship dates ------------------------------------------
+ARR_STEP_DATE = date(2025, 2, 3)        # PR #8107 -> clean +step on ARR
+ACTIVATION_STEP_DATE = date(2025, 3, 5)  # PR #8256 -> clean +step on Activation
+
+
+# --- Series builders ------------------------------------------------------------------
+def _clean_step_series(base: float, drift_per_day: float, step: float,
+                       step_date: date, noise_sd: float, seed: int) -> list[float]:
+    """flat level + tiny linear drift + ONE strong level step + IID gaussian noise.
+
+    IID residuals keep Durbin-Watson ~ 2 (no autocorrelation cap) and the step is
+    many noise-sigmas, so the ITS reads an unambiguous, BH-FDR-surviving effect ->
+    belief 1.0 on the action at `step_date`."""
+    rng = np.random.default_rng(seed)
+    si = _idx(step_date)
+    out = []
+    for i in range(SERIES_DAYS):
+        v = base + drift_per_day * i + (step if i >= si else 0.0)
+        v += float(rng.normal(0.0, noise_sd))
+        out.append(v)
+    return out
+
+
+def _organic_series(base: float, drift_per_day: float, noise_frac: float,
+                    nudges: list[tuple[date, float]], seed: int,
+                    floor: float = 0.0) -> list[float]:
+    """Mean-reverting organic wander with small step nudges at the May cohort's
+    dates. Honest-but-noisy: the engine reads these however it reads them."""
+    rng = np.random.default_rng(seed)
+    nudge_by_idx: dict[int, float] = {}
+    for d, delta in nudges:
+        nudge_by_idx[_idx(d)] = nudge_by_idx.get(_idx(d), 0.0) + delta
+    span = abs(base) or 1.0
+    wander = 0.0
+    accum = 0.0
+    out = []
+    for i in range(SERIES_DAYS):
+        accum += nudge_by_idx.get(i, 0.0)
+        wander += (rng.random() - 0.5) * noise_frac * span * 0.35
+        wander *= 0.9  # mean-reverting so it never runs away
+        v = base + drift_per_day * i + accum + wander
+        v += (rng.random() - 0.5) * noise_frac * span
+        out.append(max(floor, v))
+    return out
+
+
+def _build_series() -> dict[uuid.UUID, list[float]]:
+    # May cohort ship dates (nudge points for organic metrics).
+    may = [date(2025, 5, d) for d in (6, 8, 10, 13, 15, 18, 21, 23)]
+    return {
+        # CONFIDENT target #1: ARR jumps ~ +$260K on 2025-02-03 (noise sd ~$7K -> ~37 sigma).
+        M_ARR: _clean_step_series(
+            base=1_920_000.0, drift_per_day=120.0, step=260_000.0,
+            step_date=ARR_STEP_DATE, noise_sd=7_000.0, seed=101,
+        ),
+        # CONFIDENT target #2: Activation jumps +5.5pp on 2025-03-05 (noise sd ~0.35pp).
+        M_ACTIVATION: _clean_step_series(
+            base=33.5, drift_per_day=0.004, step=5.5,
+            step_date=ACTIVATION_STEP_DATE, noise_sd=0.35, seed=202,
+        ),
+        # Organic supporting metrics (mix of INCONCLUSIVE / INSUFFICIENT_HISTORY).
+        M_CHURN: _organic_series(
+            base=3.3, drift_per_day=-0.0015, noise_frac=0.04,
+            nudges=[(may[3], 0.10), (may[5], -0.06)], seed=303, floor=0.1,
+        ),
+        M_GP: _organic_series(
+            base=980_000.0, drift_per_day=380.0, noise_frac=0.02,
+            nudges=[(may[0], 9_000.0), (may[6], 14_000.0)], seed=404,
+        ),
+        M_SUPPORT: _organic_series(
+            base=11_100.0, drift_per_day=-6.0, noise_frac=0.05,
+            nudges=[(date(2025, 5, 13), -1_600.0)], seed=505, floor=0.0,
+        ),
+    }
+
+
+# --- Actions --------------------------------------------------------------------------
+# (pr, title, ship_date, primary_metric, hypothesis). The two landmarks ship early
+# (>= 45 pts each side -> confident); the #8324..#8421 cohort ships in May (< 45 post
+# -> INSUFFICIENT_HISTORY / "gathering data").
+ACTIONS = [
+    (8107, "Billing Retry Logic", ARR_STEP_DATE, M_ARR,
+     "Automatic dunning retries recover involuntary churn and lift ARR."),
+    (8256, "Signup Funnel Rebuild", ACTIVATION_STEP_DATE, M_ACTIVATION,
+     "A shorter signup funnel raises the share of new users who activate."),
+    (8324, "In-App Guidance", date(2025, 5, 6), M_ACTIVATION,
+     "Contextual guidance nudges new users to their first success."),
+    (8338, "Annual Discount Test", date(2025, 5, 8), M_ARR,
+     "An annual-plan discount trades margin for expansion — watch ARR + churn."),
+    (8351, "Plan Selector UX", date(2025, 5, 10), M_ARR,
+     "A clearer plan selector reduces checkout drop-off."),
+    (8367, "Support Deflection v1", date(2025, 5, 13), M_SUPPORT,
+     "A help-center deflection widget cuts inbound support tickets."),
+    (8383, "Email Nudge Timing", date(2025, 5, 15), M_ACTIVATION,
+     "Re-timed onboarding emails re-engage stalled signups."),
+    (8392, "Paywall Copy Test", date(2025, 5, 18), M_ARR,
+     "Rewritten paywall copy improves paid conversion."),
+    (8410, "Onboarding Flow Revamp", date(2025, 5, 21), M_ACTIVATION,
+     "A revamped onboarding flow shortens time-to-value."),
+    (8421, "Pricing Experiment v2", date(2025, 5, 23), M_ARR,
+     "Simplifying the pricing page increases paid conversion."),
+]
+
+
+def _rationale(hypothesis: str, expected_metric: str) -> dict:
+    """Minimal TipTap-style rich-text doc for actions.rationale_richtext (jsonb)."""
+    return {
+        "type": "doc",
+        "content": [
+            {"type": "paragraph",
+             "content": [{"type": "text", "text": hypothesis}]},
+        ],
+        "meta": {"expected_metric": expected_metric},
+    }
+
+
+# --- Seed / teardown ------------------------------------------------------------------
+def _teardown(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cur:
+        # FK cascade from workspaces->projects->orgs removes every domain row.
+        cur.execute("delete from public.orgs where org_id = %s", (ORG,))
+        cur.execute("delete from auth.users where id = %s", (USER,))
+
+
+def _seed(conn: psycopg.Connection, series: dict[uuid.UUID, list[float]]) -> None:
+    with conn.cursor() as cur:
+        cur.execute("insert into auth.users (id) values (%s)", (USER,))
+        cur.execute("insert into public.orgs (org_id, name) values (%s,%s)", (ORG, "Causent"))
+        cur.execute(
+            "insert into public.projects (project_id, org_id, name) values (%s,%s,%s)",
+            (PROJ, ORG, "Orbit"),
+        )
+        cur.execute(
+            "insert into public.workspaces (workspace_id, project_id, name) values (%s,%s,%s)",
+            (SCOPE, PROJ, "Gummy Alpha"),
+        )
+        cur.execute(
+            "insert into public.memberships (user_id, org_id, role) values (%s,%s,'owner')",
+            (USER, ORG),
+        )
+
+        for metric_id, name, source, unit in METRICS:
+            cur.execute(
+                "insert into public.metrics (metric_id, scope_id, name, source, granularity, unit) "
+                "values (%s,%s,%s,%s,'daily',%s)",
+                (metric_id, SCOPE, name, source, unit),
+            )
+            cur.executemany(
+                "insert into public.metric_observations (metric_id, obs_date, value) values (%s,%s,%s)",
+                [(metric_id, d, round(float(v), 4)) for d, v in zip(DATES, series[metric_id])],
+            )
+
+        for pr, title, ship, primary_metric, hypothesis in ACTIONS:
+            primary_name = next(m[1] for m in METRICS if m[0] == primary_metric)
+            cur.execute(
+                "insert into public.actions "
+                "(action_id, scope_id, source, external_ref, ship_ts, effective_date, "
+                " status, rationale_richtext) "
+                "values (%s,%s,'github_pr',%s,%s,%s,'merged',%s)",
+                (_action_uuid(pr), SCOPE, f"PR #{pr}",
+                 f"{ship.isoformat()}T12:00:00+00:00", ship,
+                 json.dumps({"title": title, **_rationale(hypothesis, primary_name)})),
+            )
+
+
+# --- Bridge materialization AS THE DEMO USER (RLS-scoped, never the service role) -----
+def _materialize_as_user(scope_id: uuid.UUID, metric_id: uuid.UUID) -> None:
+    conn = psycopg.connect(DSN)
+    conn.autocommit = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set role authenticated")
+            claims = json.dumps({"sub": str(USER), "role": "authenticated"})
+            cur.execute("select set_config('request.jwt.claims', %s, false)", (claims,))
+        persist_metric_readouts(conn, scope_id, metric_id)  # commits internally
+    finally:
+        conn.close()
+
+
+# --- Verification ---------------------------------------------------------------------
+def _verify(conn: psycopg.Connection) -> dict:
+    cur = conn.cursor()
+
+    def scalar(sql, params=()):
+        cur.execute(sql, params)
+        return cur.fetchone()[0]
+
+    counts = {
+        "orgs": scalar("select count(*) from public.orgs where org_id=%s", (ORG,)),
+        "projects": scalar("select count(*) from public.projects where org_id=%s", (ORG,)),
+        "workspaces": scalar("select count(*) from public.workspaces where project_id=%s", (PROJ,)),
+        "memberships": scalar("select count(*) from public.memberships where org_id=%s", (ORG,)),
+        "metrics": scalar("select count(*) from public.metrics where scope_id=%s", (SCOPE,)),
+        "metric_observations": scalar(
+            "select count(*) from public.metric_observations mo "
+            "join public.metrics m on m.metric_id=mo.metric_id where m.scope_id=%s", (SCOPE,)),
+        "actions": scalar("select count(*) from public.actions where scope_id=%s", (SCOPE,)),
+        "clusters": scalar("select count(*) from public.clusters where scope_id=%s", (SCOPE,)),
+        "nodes": scalar("select count(*) from public.nodes where scope_id=%s", (SCOPE,)),
+        "causal_edges": scalar("select count(*) from public.causal_edges where scope_id=%s", (SCOPE,)),
+        "evidence_objects": scalar(
+            "select count(*) from public.evidence_objects where scope_id=%s", (SCOPE,)),
+    }
+
+    confident = scalar(
+        "select count(*) from public.causal_edges "
+        "where scope_id=%s and belief_score=1.0 and direction='POSITIVE'", (SCOPE,))
+    insufficient = scalar(
+        "select count(*) from public.causal_edges "
+        "where scope_id=%s and belief_reason='INSUFFICIENT_HISTORY'", (SCOPE,))
+
+    # Named breakdown of the ACTION->METRIC edges for a human-readable readout.
+    cur.execute(
+        "select a.external_ref, m.name, ce.direction, ce.belief_score, ce.belief_reason "
+        "from public.causal_edges ce "
+        "join public.nodes sn on sn.node_id=ce.source_node_id and sn.type='ACTION' "
+        "join public.actions a on a.action_id=sn.semantic_ref "
+        "join public.nodes tn on tn.node_id=ce.target_node_id and tn.type='METRIC' "
+        "join public.metrics m on m.metric_id=tn.semantic_ref "
+        "where ce.scope_id=%s "
+        "order by a.effective_date, m.name", (SCOPE,))
+    edges = cur.fetchall()
+
+    return {"counts": counts, "confident_edges": confident,
+            "insufficient_edges": insufficient, "edges": edges}
+
+
+def main() -> int:
+    conn = psycopg.connect(DSN)
+    conn.autocommit = True
+    try:
+        _teardown(conn)                 # idempotent: wipe any prior demo tenant
+        series = _build_series()
+        _seed(conn, series)             # base data as superuser (bypassrls)
+    finally:
+        conn.close()
+
+    for metric_id, name, *_ in METRICS:  # materialize the graph AS THE USER, per metric
+        _materialize_as_user(SCOPE, metric_id)
+
+    conn = psycopg.connect(DSN)
+    conn.autocommit = True
+    try:
+        result = _verify(conn)
+    finally:
+        conn.close()
+
+    c = result["counts"]
+    print("=== Causent demo seed — row counts (scope: Causent/Orbit/Gummy Alpha) ===")
+    for k, v in c.items():
+        print(f"  {k:22s} {v}")
+    print(f"\n  confident edges (belief=1.0 POSITIVE) : {result['confident_edges']}")
+    print(f"  INSUFFICIENT_HISTORY edges            : {result['insufficient_edges']}")
+
+    print("\n=== ACTION -> METRIC edges (real engine readouts) ===")
+    print(f"  {'action':9s} {'metric':16s} {'direction':13s} {'belief':7s} reason")
+    for ref, metric, direction, belief, reason in result["edges"]:
+        bstr = "—" if belief is None else f"{belief:.2f}"
+        print(f"  {ref:9s} {metric:16s} {direction:13s} {bstr:7s} {reason or ''}")
+
+    ok = (
+        c["metrics"] == 5
+        and c["metric_observations"] == 5 * SERIES_DAYS
+        and c["actions"] == len(ACTIONS)
+        and result["confident_edges"] >= 1
+        and result["insufficient_edges"] >= 1
+    )
+    print("\nRESULT:", "PASS — both confident and gathering-data paths present"
+          if ok else "FAIL — required demo invariants not met")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,36 @@
+[
+  {
+    "number": 8256,
+    "title": "PR returned by the issues endpoint (should be skipped)",
+    "body": "The /issues endpoint returns PRs too; this one carries a pull_request field.",
+    "html_url": "https://github.com/acme/orbit/pull/8256",
+    "state": "closed",
+    "state_reason": "completed",
+    "closed_at": "2025-03-05T12:00:00Z",
+    "updated_at": "2025-03-06T08:00:00Z",
+    "pull_request": { "url": "https://api.github.com/repos/acme/orbit/pulls/8256" },
+    "user": { "login": "arya" }
+  },
+  {
+    "number": 412,
+    "title": "Fix onboarding email deliverability",
+    "body": "SPF/DKIM misconfig dropped welcome emails.\n\nResolved by correcting DNS.",
+    "html_url": "https://github.com/acme/orbit/issues/412",
+    "state": "closed",
+    "state_reason": "completed",
+    "closed_at": "2025-02-20T16:45:00Z",
+    "updated_at": "2025-02-20T16:45:00Z",
+    "user": { "login": "cy" }
+  },
+  {
+    "number": 398,
+    "title": "Investigate flaky checkout (won't fix)",
+    "body": "Cannot reproduce; closing as not planned.",
+    "html_url": "https://github.com/acme/orbit/issues/398",
+    "state": "closed",
+    "state_reason": "not_planned",
+    "closed_at": "2025-02-18T10:00:00Z",
+    "updated_at": "2025-02-18T10:00:00Z",
+    "user": { "login": "cy" }
+  }
+]
