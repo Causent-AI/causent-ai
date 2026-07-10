@@ -175,8 +175,14 @@ and verified locally** on `overnight/wire-up`. What remains:
 
 ## Open risks / TODO
 
-- CI's first cloud run not yet confirmed green (local venv is Python 3.14, CI pins 3.12 —
-  likely fine; watch the first Actions run).
+- ~~CI's first cloud run not yet confirmed green~~ — **RESOLVED 2026-07-09 (PR #3).** The first
+  cloud run was red, but not for the Python-version reason guessed here. Two causes, both fixed:
+  (a) the schema relied on Supabase's *implicit* default privileges — `setup-cli@latest` in CI
+  doesn't grant them to user-migration tables, so every RLS/bridge test hit `permission denied`;
+  fixed by an explicit-GRANT migration (`20260709000000_grant_base_privileges.sql`). (b) two
+  engine adversarial tests flipped on ~1e-14 float dust from zero-residual fits (nondeterministic
+  across BLAS/numpy builds); fixed with a scale-relative dead-zone in the direction/placebo
+  classifiers. CI now green (engine + RLS + bridge, 3m28s).
 - `owner` role enforced server-side (no DB policy depends on it); hierarchy creation is
   service_role-only — see `supabase/SCHEMA_REPORT.md` residual risk.
 - `nodes.semantic_ref` is polymorphic (no FK) — app-enforced integrity.
