@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { Action, Metric } from "@/lib/types";
 import { getMetricDelta } from "@/lib/derive";
 import { formatLongDate, formatShortDate } from "@/lib/format";
@@ -132,9 +133,12 @@ export function CoreMetricsDrawer({
               <h3 className="text-[13px] font-semibold text-[var(--text)]">
                 Core Metrics Summary
               </h3>
-              <button className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-blue)]">
+              <Link
+                href="/data-workshop"
+                className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-blue)] hover:underline"
+              >
                 <PlusIcon size={13} /> Add / Layer Metric
-              </button>
+              </Link>
             </div>
 
             <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 text-[10px] font-medium uppercase tracking-wide text-[var(--text-subtle)]">
