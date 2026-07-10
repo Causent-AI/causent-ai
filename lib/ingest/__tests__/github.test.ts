@@ -9,6 +9,7 @@ import { join } from "node:path";
 
 import {
   GitHubRequestError,
+  MAX_RATIONALE_LINE_CHARS,
   ingestActions,
   parseIssueToAction,
   parsePullRequestToAction,
@@ -256,4 +257,26 @@ test("upsertActions skips refs that already exist", async () => {
   const b = await upsertActions(store, [row], SCOPE);
   assert.deepEqual(a, { inserted: 1, skipped: 0 });
   assert.deepEqual(b, { inserted: 0, skipped: 1 });
+});
+
+test("upsertActions dedups duplicate external_refs within one run (batch never poisoned)", async () => {
+  const store = new InMemoryStore();
+  const row = parsePullRequestToAction(PULLS.find((p) => p.number === 8256)!, SCOPE)!;
+  const dupe = { ...row }; // same external_ref, same run
+  const result = await upsertActions(store, [row, dupe], SCOPE);
+  assert.deepEqual(result, { inserted: 1, skipped: 1 });
+  assert.equal(store.rows.size, 1);
+});
+
+test("rationale caps per-line length (a huge single-line body stays bounded)", () => {
+  const merged = PULLS.find((p) => p.number === 8256)!;
+  const huge = { ...merged, body: "x".repeat(2_000_000) };
+  const row = parsePullRequestToAction(huge, SCOPE)!;
+  const text = (
+    row.rationale_richtext.content[0] as {
+      content: Array<{ text: string }>;
+    }
+  ).content[0].text;
+  assert.equal(text.length, MAX_RATIONALE_LINE_CHARS + 1); // +1 for the ellipsis
+  assert.ok(text.endsWith("…"));
 });

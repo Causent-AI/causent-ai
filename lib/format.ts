@@ -1,17 +1,22 @@
 import type { MetricFormat } from "@/lib/types";
 
-/** Trim trailing zero decimals: "50.0" → "50", "2.40" → "2.4" (leaves "2.42"). */
-function trimZeros(s: string): string {
-  return s.includes(".") ? s.replace(/\.?0+$/, "") : s;
-}
-
-/** Compact currency, e.g. 2_420_000 → "$2.42M", 8700 → "$8.7K", 50_000 → "$50K". */
+/** Compact currency, e.g. 2_420_000 → "$2.42M", 8700 → "$8.7K". */
 export function formatCurrencyCompact(value: number): string {
   const abs = Math.abs(value);
   const sign = value < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}$${trimZeros((abs / 1_000_000).toFixed(2))}M`;
-  if (abs >= 1_000) return `${sign}$${trimZeros((abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1))}K`;
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1)}K`;
   return `${sign}$${abs.toFixed(0)}`;
+}
+
+/**
+ * Axis-tick variant of formatCurrencyDelta: trims trailing zero decimals
+ * ("+$50.0K" → "+$50K") so round-number ticks read clean. Kept separate from
+ * formatCurrencyCompact, whose exact output is locked by the summary layer's
+ * golden regression baseline (lib/summary/__tests__).
+ */
+export function formatCurrencyTick(value: number): string {
+  return formatCurrencyDelta(value).replace(/\.0+(?=[KM]$)/, "");
 }
 
 /** Signed compact currency for deltas, e.g. 212000 → "+$212K". */

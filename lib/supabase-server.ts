@@ -23,6 +23,12 @@
 //       return createServerClient(URL, ANON_KEY, { cookies: { ... } });
 //     }
 
+// Build-time guard: `server-only` makes a client-bundle import fail at build
+// time (defense-in-depth on top of the runtime guard below). Note for plain-
+// Node consumers (lib/ingest/cli.ts under tsx): run with
+// NODE_OPTIONS="--conditions react-server" or the import throws by design.
+import "server-only";
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 if (typeof window !== "undefined") {

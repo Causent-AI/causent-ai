@@ -1,5 +1,5 @@
 import type { Metric, MetricImpact } from "@/lib/types";
-import { formatCurrencyDelta } from "@/lib/format";
+import { formatCurrencyTick } from "@/lib/format";
 
 // Horizontal diverging bar chart: each metric's net impact, positive to the
 // right (teal) and negative to the left (red). Direction is reinforced by the
@@ -100,7 +100,7 @@ export function ImpactBar({
               className="absolute -translate-x-1/2 text-[10px] text-[var(--text-subtle)] tabular-nums"
               style={{ left: `${frac(t)}%` }}
             >
-              {formatCurrencyDelta(t)}
+              {formatCurrencyTick(t)}
             </span>
           ))}
         </div>

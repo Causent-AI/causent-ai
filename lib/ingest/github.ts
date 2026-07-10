@@ -27,6 +27,9 @@
 export const DEFAULT_WINDOW_DAYS = 90;
 /** Hard cap on how many action rows one ingest run yields (newest first). */
 export const DEFAULT_MAX_ITEMS = 200;
+
+/** Per-line cap inside a rationale document (body text is untrusted). */
+export const MAX_RATIONALE_LINE_CHARS = 500;
 /** GitHub REST page size (max the API allows). */
 export const DEFAULT_PER_PAGE = 100;
 const DAY_MS = 86_400_000;
@@ -242,7 +245,10 @@ function buildRationale(
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
-    .slice(0, 8); // keep it bounded; the body is untrusted, unbounded text
+    .slice(0, 8) // keep it bounded; the body is untrusted, unbounded text
+    // …bounded per line too: a single multi-MB line would otherwise become
+    // multi-MB jsonb in the actions row.
+    .map((l) => (l.length > MAX_RATIONALE_LINE_CHARS ? `${l.slice(0, MAX_RATIONALE_LINE_CHARS)}…` : l));
   const paragraphs = lines.length > 0 ? lines : [title];
   return {
     type: "doc",
@@ -347,8 +353,15 @@ export async function upsertActions(
   scopeId: string,
 ): Promise<{ inserted: number; skipped: number }> {
   if (rows.length === 0) return { inserted: 0, skipped: 0 };
-  const existing = await store.existingRefs(scopeId, rows.map((r) => r.external_ref));
-  const fresh = rows.filter((r) => !existing.has(r.external_ref));
+  // Within-run dedup first: a duplicate external_ref inside one batch would
+  // trip the (scope_id, external_ref) unique index and poison the whole
+  // insert. Keep the first occurrence (rows arrive newest-first).
+  const seen = new Set<string>();
+  const unique = rows.filter((r) =>
+    seen.has(r.external_ref) ? false : (seen.add(r.external_ref), true),
+  );
+  const existing = await store.existingRefs(scopeId, unique.map((r) => r.external_ref));
+  const fresh = unique.filter((r) => !existing.has(r.external_ref));
   const inserted = fresh.length > 0 ? await store.insert(fresh) : 0;
   return { inserted, skipped: rows.length - fresh.length };
 }
