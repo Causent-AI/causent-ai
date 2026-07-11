@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Action, Metric } from "@/lib/types";
 import { formatShortDate } from "@/lib/format";
 import { Delta } from "@/components/ui/Delta";
@@ -41,9 +42,12 @@ export function ActionsTable({
                 <td className="py-2.5 pr-3">
                   <div className="flex items-center gap-2 whitespace-nowrap">
                     <GitHubIcon size={16} className="shrink-0 text-[var(--text-subtle)]" />
-                    <a className="max-w-[190px] truncate font-medium text-[var(--brand-blue)] hover:underline">
+                    <Link
+                      href={`/actions?selected=${a.id}`}
+                      className="max-w-[190px] truncate font-medium text-[var(--brand-blue)] hover:underline"
+                    >
                       {a.title}
-                    </a>
+                    </Link>
                     <span className="text-[var(--text-subtle)] tabular-nums">
                       #{a.pr}
                     </span>

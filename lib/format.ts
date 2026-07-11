@@ -9,6 +9,16 @@ export function formatCurrencyCompact(value: number): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
+/**
+ * Axis-tick variant of formatCurrencyDelta: trims trailing zero decimals
+ * ("+$50.0K" → "+$50K") so round-number ticks read clean. Kept separate from
+ * formatCurrencyCompact, whose exact output is locked by the summary layer's
+ * golden regression baseline (lib/summary/__tests__).
+ */
+export function formatCurrencyTick(value: number): string {
+  return formatCurrencyDelta(value).replace(/\.0+(?=[KM]$)/, "");
+}
+
 /** Signed compact currency for deltas, e.g. 212000 → "+$212K". */
 export function formatCurrencyDelta(value: number): string {
   if (value === 0) return "$0";

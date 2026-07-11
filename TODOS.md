@@ -21,9 +21,11 @@ Full evidence per item in `docs/OVERNIGHT_REPORT_2.md`. None are code-blocked.
   `GITHUB_TOKEN` stand-in in `lib/ingest/github-transport.ts` with a per-connection token
   encrypted in Vault, decoupled from login, 401/403 → reconnect on non-rate-limit auth failure.
   Run under a trusted job identity via `lib/ingest/cli.ts` (needs `tsx`/Next runtime for `@/*`).
-- **Vercel creds** → deploy `api/engine.py` per `api/DEPLOY.md`; set `CAUSENT_ENGINE_SECRET`
-  (`openssl rand -hex 32`) on preview+prod AND make the same value available to the Next.js
-  caller for the `x-causent-engine-secret` header (fn fails closed 401 until set).
+- ~~**Vercel creds** → deploy `api/engine.py`~~ ✅ DONE 2026-07-11: LIVE at
+  `https://causent-engine.vercel.app/api/engine` as standalone project `causent-engine`
+  (`scripts/deploy-engine.sh --prod`); `CAUSENT_ENGINE_SECRET` on prod+preview+`.env.local`;
+  smoke-tested (405 / fail-closed 401 / 200 with honest AUTOCORRELATION cap). See
+  `api/DEPLOY.md` for the split-project rationale + preview SSO-wall gotcha.
 - **Effort:** M (human, mostly ops) → S (CC). **Priority:** P1.
 
 ### P2 — Per-request freshness + RLS-scoped server client
@@ -38,39 +40,45 @@ Full evidence per item in `docs/OVERNIGHT_REPORT_2.md`. None are code-blocked.
   Aggregated-Impact subtitle was corrected the same way. Both `page.tsx:20` and
   `AggregatedImpact.tsx` no longer claim a fabricated period-over-period comparison.
 
-### P2 — Wire up in-app navigation (buttons + cross-links)
-- **What:** Most chrome buttons are inert placeholders. Tie them to destinations. Highest-value
-  link first: the **Actions table on `/impact`** should deep-link each row to that action in
-  **`/actions`** (select it in the list + editor). Also: header "Create Report" / "New Project" /
-  "Settings" / account menu, and the drawer/tab affordances.
-- **Where:** `components/impact/ActionsTable.tsx` → `next/link` to `/actions?selected=<id>`;
-  have `ActionsPageClient` read `?selected` (via `useSearchParams`) to seed `selectedId`.
-- **Effort:** S–M (human) → S (CC). **Priority:** P2.
+### ~~P2 — Wire up in-app navigation (buttons + cross-links)~~ ✅ MOSTLY DONE 2026-07-10 (overnight/ui-polish)
+- Done: Impact actions table deep-links to `/actions?selected=<id>` (ActionsPageClient
+  seeds + re-syncs from the param, Suspense-wrapped); drawer "Add / Layer Metric" →
+  `/data-workshop`; account chip is now a real dropdown (AccountMenu, honest disabled
+  sign-out pending SEC2).
+- **Still inert (intentionally — no destinations exist yet):** header "New Project" /
+  "Settings"; "Connect GitHub" (credentialed P1 flow) / "Add manual action"; the
+  DecisionEditor toolbar (rich-text mock). Wire these when their flows land.
 
-### P2 — DB-path parity for the 2026-07-09 UI changes
-- **Objective document:** `DashboardData.objective` is seed-only; the DB path returns `null`
-  (no schema row yet). Add a project-level `objectives` row + `lib/data` getter so the North
-  Star renders from Supabase, not just seed. (`lib/data/dashboard.ts` has the TODO.)
-- **Aggregated-Impact strip:** the new strip (metric count + improvement rate + top-4 metric
-  impacts) is driven by `impactByMetric` + `metrics` + the improvement-rate stat, so the DB
-  path already feeds it — but `getAggregatedImpact()` still computes the old 6-tile set; trim
-  it to just the improvement-rate figure it now needs (`lib/data/impact.ts`).
-- **Effort:** S (human) → S (CC). **Priority:** P2. **Depends on:** SEC2 auth / live DB.
+### ~~P2 — DB-path parity for the 2026-07-09 UI changes~~ ✅ DONE 2026-07-10 (overnight/ui-polish)
+- `objectives` table (migration `20260710000000`), `lib/data/objective.ts` getter,
+  seed_demo.py row, RLS-isolation coverage; `getAggregatedImpact()` trimmed to the
+  improvement-rate figure. Verified live: North Star renders from Supabase; reports
+  remain seed-only (DB `reports` table still TODO — see dashboard.ts).
 
 ### P3 — Ingestion + summary hardening (fail-safe today)
-- **Ingest (LOW, from C-verify):** dedup capped rows by `external_ref` before insert (a
-  within-run duplicate can currently poison a single insert batch, though never duplicates);
-  CLI missing-flag value yields NaN window / undefined scope and silently ingests nothing;
-  `buildRationale` caps paragraph count but not per-line length (multi-MB line → multi-MB jsonb).
-- **Defense-in-depth:** install the `server-only` npm package so an errant client import of
-  `lib/supabase-server.ts` fails at build time, not request time (no leak today, runtime guard
-  holds). Optionally add the two unreachable summary clamps (CONFOUNDED+belief-1.0, non-finite
-  nPre) to `resolveStrength` if the engine↔summary contract is ever loosened.
-- **Demo polish:** tune the `seed_demo.py` Gross Profit generator — its organic noise produces
-  2 incidental confident-NEGATIVE readouts at the landmark dates (honest engine output, but off
-  the intended narrative). Optionally filter Phase-B UI edges to an action's `expected_metric`
-  (the bridge scores every action × every in-range metric by design).
-- **Effort:** S–M (human) → S (CC). **Priority:** P3.
+- ~~**Ingest (LOW, from C-verify)**~~ ✅ DONE 2026-07-10 (overnight/ui-polish): within-run
+  dedup on `external_ref`; `parseArgs` (now `lib/ingest/cli-args.ts`) fails loudly on
+  missing/invalid flag values; `buildRationale` per-line cap (500 chars). +8 tests.
+- ~~**Defense-in-depth (`server-only`)**~~ ✅ DONE 2026-07-10: installed + imported in
+  `lib/supabase-server.ts`. Note: the ingest CLI now needs
+  `NODE_OPTIONS="--conditions react-server"` under tsx (documented in cli.ts).
+  Still optional: the two unreachable summary clamps (CONFOUNDED+belief-1.0, non-finite
+  nPre) in `resolveStrength` if the engine↔summary contract is ever loosened.
+- **Demo polish (still open):** tune the `seed_demo.py` Gross Profit generator — its organic
+  noise produces 2 incidental confident-NEGATIVE readouts at the landmark dates (honest engine
+  output, but off the intended narrative). Deliberately NOT done overnight: changing the
+  generator invalidates the documented cell-for-cell verification figures (Net +$249K etc.).
+  Optionally filter Phase-B UI edges to an action's `expected_metric`.
+- **Effort:** S (human) → S (CC). **Priority:** P3.
+
+### P3 — Design-review deferrals (2026-07-10 audit, fixed: 2 HIGH mobile + ticks + account menu)
+- **LineTimeSeries x-axis tick density** isn't viewport-aware — labels crowd at 375px
+  (`components/charts/LineTimeSeries.tsx`).
+- **Duplicate "Core Metrics Summary"** heading on `/data-workshop` when the drawer is open
+  (page panel + drawer panel both use it) — rename one or fold the page panel.
+- **Header touch targets** are 32–36px (< 44px) — fine desktop-first; revisit if mobile
+  becomes a real surface.
+- **Effort:** S (human) → S (CC). **Priority:** P3.
 
 ## P3 — Full-history GitHub backfill worker
 - **What:** Background worker to backfill a repo's entire PR/issue history beyond
