@@ -312,17 +312,27 @@ def _seed(conn: psycopg.Connection) -> float:
                 (decision_id, WS, title,
                  json.dumps({"meta": {"mechanism_category": "conversion-funnel"}})))
 
+        # An action is a lever iff it has a levers row (C1/#14); decision_actions
+        # keeps the plain decision->action linkage.
         links = [
             (D_CONF, ACT_LEVER, True), (D_DIR, ACT_LEVER, True), (D_REF, ACT_LEVER, True),
             (D_INC, ACT_FLAT, True), (D_GATH, ACT_LATE, True), (D_VOID, ACT_NEVER, True),
             (D_UNATTR, ACT_FLAT, False),               # mapped but NOT a lever
-            (D_DUP, ACT_LEVER, True), (D_DUP, ACT_FLAT, True),  # invariant broken
+            (D_DUP, ACT_LEVER, True), (D_DUP, ACT_FLAT, True),  # same-metric multi-lever
         ]
-        for decision_id, action_id, is_lever in links:
+        for i, (decision_id, action_id, as_lever) in enumerate(links):
             cur.execute(
-                "insert into public.decision_actions (decision_id, action_id, is_lever) "
-                "values (%s,%s,%s)",
-                (decision_id, action_id, is_lever))
+                "insert into public.decision_actions (decision_id, action_id) "
+                "values (%s,%s)",
+                (decision_id, action_id))
+            if as_lever:
+                shipped = action_id != ACT_NEVER
+                cur.execute(
+                    "insert into public.levers (scope_id, decision_id, action_id, "
+                    "metric_id, provenance_token, target_source, status) "
+                    "values (%s,%s,%s,%s,%s,'github',%s)",
+                    (WS, decision_id, action_id, METRIC, f"resolve-lever-{i}",
+                     "SHIPPED" if shipped else "CREATED"))
 
     # Oracle: the engine's own readout of the DB-roundtripped series, so the
     # CONFIRMED magnitude is dead-center in the measured CI by construction.

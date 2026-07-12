@@ -38,12 +38,10 @@ verdicts are terminal: a re-run is a no-op.
 Honesty rules honored here:
   - Elicit-not-assert: this module only ever MEASURES a human-authored
     prediction; nothing in it generates or pre-fills a prospective number.
-  - One lever per (decision, metric): the lever lookup resolves "the lever for
-    this prediction's metric" (today: the decision's single is_lever action;
-    a future decision_actions.lever_metric_id slots into _levers_for without
-    touching the verdict machine). Two levers for one (decision, metric) raise
-    LeverConflictError loudly BEFORE any write — that raise is the seam where
-    multi-lever support would land.
+  - One lever per (decision, metric): the lever lookup resolves "the lever(s)
+    for this prediction's metric" from the public.levers table (C1/#14). Two
+    levers for one (decision, metric) raise LeverConflictError loudly BEFORE
+    any write — that raise is the seam where multi-lever support (C4) lands.
 
 The connection contract mirrors the bridge: `conn` must be an INJECTED,
 RLS-scoped psycopg connection (the caller's identity — never the service
@@ -97,6 +95,7 @@ class Lever:
     action_id: UUID
     ref: str                      # display: external_ref, else source
     effective_date: date | None   # None = never shipped
+    status: str = "SHIPPED"       # levers lifecycle (DRAFTED..SHIPPED/DROPPED/TIMED_OUT)
 
 
 @dataclass(frozen=True)
@@ -201,25 +200,21 @@ def pre_window_mean_for(series_values: np.ndarray, split: int) -> float | None:
 
 
 def _levers_for(conn: Connection, decision_id: Id, metric_id: Id) -> list[Lever]:
-    """The lever(s) for THIS PREDICTION'S METRIC among the decision's actions.
-
-    v1: every is_lever action levers all of the decision's predictions, so this
-    is the decision's lever set. Forward-compat: when decision_actions gains
-    lever_metric_id, this WHERE clause gains
-        and (da.lever_metric_id is null or da.lever_metric_id = %(metric)s)
-    and nothing above this function changes. metric_id is accepted (and unused
-    today) precisely so callers already pass the future key.
-    """
-    del metric_id  # unused in v1 — see docstring
+    """The lever(s) for THIS PREDICTION'S METRIC: the decision's rows in
+    public.levers for that metric. C1 (#14) moved the lever mark off the old
+    decision_actions boolean — an action is a lever iff it has a levers row,
+    and levers are metric-scoped, so the WHERE clause is the (decision, metric)
+    key directly."""
     rows = conn.execute(
-        "select a.action_id, coalesce(a.external_ref, a.source), a.effective_date "
-        "from public.decision_actions da "
-        "join public.actions a on a.action_id = da.action_id "
-        "where da.decision_id = %s and da.is_lever "
-        "order by a.action_id",
-        (decision_id,),
+        "select l.action_id, coalesce(a.external_ref, a.source), a.effective_date, "
+        "l.status "
+        "from public.levers l "
+        "join public.actions a on a.action_id = l.action_id "
+        "where l.decision_id = %s and l.metric_id = %s "
+        "order by a.effective_date nulls last, a.action_id",
+        (decision_id, metric_id),
     ).fetchall()
-    return [Lever(action_id, ref, eff) for action_id, ref, eff in rows]
+    return [Lever(action_id, ref, eff, status) for action_id, ref, eff, status in rows]
 
 
 def _load_edge_state(
