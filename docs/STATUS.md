@@ -1,21 +1,24 @@
 # Causent — Build Status & Resume Guide
 
-Last updated: 2026-07-10. Single source of truth for "where are we and how do I pick up."
-Product: **"Did-It-Ship, Did-It-Work"** — connect GitHub, tie each shipped action to a
-business metric, produce an honest causal readout on a scoped causal graph.
+Last updated: 2026-07-12. Single source of truth for "where are we and how do I pick up."
+Product: **dual cold-start on one causal graph** — the retrospective wedge ("Did-It-Ship,
+Did-It-Work": tie each shipped action to a metric, honest ITS readout) PLUS the prospective
+on-ramp (human pre-registered prediction → drift watch → engine-measured resolution). See
+`docs/designs/prospective-prediction-loop.md` (approved 2026-07-11).
 
 ## TL;DR
 
-The **full product loop is now closed end-to-end (locally, adversarially verified)** and is
-**merged to `main`** (PR #1 `overnight/wire-up` → `main`, landed 2026-07-08). Seeded GitHub-PR
-→ metric data flows through the **real** persistence bridge into `causal_edges` + append-only
-`evidence_objects`, and the Next.js dashboard renders those engine-derived readouts **directly
-from Supabase** (not seed), honoring the 45/45 confident-vs-gathering-data boundary. GitHub
-ingestion, the honest AI-summary layer, and a deployable engine function are all built +
-tested. The **live summary guardrail is now proven against the real model** (19/19 vs
-`claude-opus-4-8`, 2026-07-04). **Everything else that remains is credentialed, not
-code-blocked:** a GitHub token/OAuth (live ingestion) and Vercel creds (engine deploy). See
-`docs/OVERNIGHT_REPORT_2.md` for the phase-by-phase evidence.
+**Both loops are on `main`.** The retrospective loop closed 2026-07-08 (PR #1) and the
+**prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
+all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
+`predictions`/`prediction_revisions`/`transition_events`), the 8-state resolution verdict
+machine + CLI runner (`engine/persistence/resolve.py` + `run_resolution.py`), on-the-fly
+reference-class priors (`lib/priors.ts` + `lib/data/priors.ts`), a decisions-first Actions &
+Decisions tab (elicit-not-assert capture, lever mapping, reason-gated revisions, caveat-first
+readout), and seed exercising all six target verdicts through the REAL engine. Evidence:
+`docs/OVERNIGHT_REPORT_3.md`. **Tranche 2 (connector) and Tranche 3 (drift detector) are
+gated on the zero-code design-partner mechanism-mapping test — that conversation, not code,
+is the critical path.** Remaining credential: a GitHub token (live ingestion).
 
 ```
 ✓ Plan     office-hours → CEO → Eng → Design reviews (all CLEARED)
@@ -35,6 +38,10 @@ code-blocked:** a GitHub token/OAuth (live ingestion) and Vercel creds (engine d
            ingest hardening (2026-07-10, branch overnight/ui-polish)
 ✓ ENGINE   LIVE at https://causent-engine.vercel.app/api/engine (2026-07-11, standalone
            Vercel project via scripts/deploy-engine.sh; secret set; smoke-tested 405/401/200)
+✓ PIVOT    prospective-prediction-loop design approved + docs on main (2026-07-11)
+✓ PROSPECT Foundations tranche MERGED (PR #12, 2026-07-12): intent schema + verdict
+           machine + priors + decisions-first Actions tab + seed (1110 pytest, 245 lib)
+☐ PARTNER  zero-code mechanism-mapping test  ← gates Tranche 2 (connector) + 3 (drift)
 ☐ LIVE     GitHub token (ingest)  ← the one remaining credential
 ```
 
@@ -180,6 +187,39 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   horizontal lockup (`components/shell/Logo.tsx`).
 - Note: `unstable_instant` (Next 16 route hint) was NOT used — it needs `cacheComponents`
   enabled and throws in Client Components. Revisit if enabling Cache Components.
+
+## Prospective layer — as built (2026-07-12, PR #12)
+
+- **Schema** — migration `20260711000000_prospective_layer.sql`: `decisions`,
+  `decision_actions(is_lever)`, `predictions` (incl. `resolution_tuple` jsonb = the memory
+  tuple priors read), `prediction_revisions` (append-only), `transition_events` (created
+  now, WRITTEN only in Tranche 3). RLS via `has_scope_access()` + scope resolvers mirroring
+  `metric_scope()`; explicit grants; `actions.source` gained `'jira'`. Isolation gate covers
+  all 5 tables.
+- **Verdict machine** — `engine/persistence/resolve.py`: maps the lever edge's ITS
+  belief-table state to CONFIRMED / DIRECTION_CONFIRMED / REFUTED / INCONCLUSIVE /
+  GATHERING (auto-extends `resolution_date` +14d, non-terminal) / UNRESOLVABLE / VOIDED /
+  UNATTRIBUTED. Scoring is sign-primary + magnitude-in-CI bonus in NATIVE units:
+  `predicted_native = magnitude_pct_mean/100 × the exact ITS pre-window mean` (one
+  denominator, no commit-vs-resolution drift; the commit-time native snapshot is
+  display-only). Duplicate levers raise `LeverConflictError` before any write. Manual/dev
+  runner: `run_resolution.py` (`--today` for the in-the-past demo); cron is Tranche 3.
+- **Priors** — pure `lib/priors.ts` (`computePriors`: REFUTED+INCONCLUSIVE included,
+  belief-weighted, honest nulls, `hasPrecedent:false` on an empty class) + RLS wrapper
+  `lib/data/priors.ts` over terminally-resolved `resolution_tuple`s.
+- **UI** — Actions & Decisions tab is decisions-first (`DecisionList`/`DecisionDetail`/
+  `PredictionCapture`/`ActionDetail`/`VerdictBadge`; `DecisionEditor` retired; rationale
+  lives on the decision). Elicit-not-assert is structural: the magnitude input is never
+  pre-filled; the precedent panel only describes. Lever proposal = deterministic
+  primary-metric heuristic behind a documented seam (LLM version later, off-by-default like
+  lib/summary). Revisions require a logged reason. `/actions` is `force-dynamic` (it
+  writes); `?selected=<actionId>` deep-links resolve to the parent decision.
+  `Action.shippedAt` is now nullable (unshipped VOIDED lever #8440).
+- **Seed** — `seed_demo.py` seeds 6 decisions + predictions and resolves them AS THE USER
+  through the real machine: all 6 target verdicts verified live (CONFIRMED lands in-CI at
+  13.5% of ARR mean). New actions: churn probe #8290 (INCONCLUSIVE), unshipped #8440
+  (VOIDED) → 12 actions total. `lib/seed.ts` mirrors the story (incl. landmarks #8107/#8256,
+  which the TS seed previously lacked).
 
 ## Next (priority order)
 
