@@ -85,11 +85,11 @@ export async function parsePasteWithLLM(
                   enum: ["activation", "monetization", "retention", "other"],
                 },
                 mechanism_summary: { type: "string" },
+                // 2-3 enforced by the prompt + clamped/padded in mapCardResponse
+                // (the API rejects minItems > 1, so the schema stays loose).
                 questions: {
                   type: "array",
                   items: { type: "string" },
-                  minItems: 2,
-                  maxItems: 3,
                 },
               },
               required: [
