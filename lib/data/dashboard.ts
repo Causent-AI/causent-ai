@@ -11,6 +11,7 @@
 import { cache } from "react";
 import type {
   Action,
+  Decision,
   ImpactStat,
   Metric,
   MetricImpact,
@@ -21,6 +22,7 @@ import type {
 import { getScope } from "@/lib/data/scope";
 import { getMetrics } from "@/lib/data/metrics";
 import { getActions } from "@/lib/data/actions";
+import { getDecisions } from "@/lib/data/decisions";
 import { getImpactByMetric, getAggregatedImpact } from "@/lib/data/impact";
 import { getObjective } from "@/lib/data/objective";
 import * as seed from "@/lib/seed";
@@ -33,6 +35,8 @@ export type DashboardData = {
   scope: Scope;
   metrics: Metric[];
   actions: Action[];
+  /** The intent layer: decisions parenting actions + their predictions. */
+  decisions: Decision[];
   aggregatedImpact: ImpactStat[];
   impactByMetric: MetricImpact[];
   impactWindow: ImpactWindow;
@@ -62,6 +66,7 @@ function seedData(): DashboardData {
     scope: seed.scope,
     metrics: seed.metrics,
     actions: seed.actions,
+    decisions: seed.decisions,
     aggregatedImpact: seed.aggregatedImpact,
     impactByMetric: seed.impactByMetric,
     impactWindow: { start: seed.impactWindow.start, end: seed.impactWindow.end },
@@ -87,11 +92,12 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
   if (seedForced()) return seedData();
 
   try {
-    const [scope, metrics, actions, aggregatedImpact, impactByMetric, objective] =
+    const [scope, metrics, actions, decisions, aggregatedImpact, impactByMetric, objective] =
       await Promise.all([
         getScope(),
         getMetrics(),
         getActions(),
+        getDecisions(),
         getAggregatedImpact(),
         getImpactByMetric(),
         getObjective(),
@@ -100,6 +106,7 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
       scope,
       metrics,
       actions,
+      decisions,
       aggregatedImpact,
       impactByMetric,
       impactWindow: deriveImpactWindow(metrics),
