@@ -49,9 +49,11 @@ that conversation, not code, is the critical path.** Remaining credential: a Git
            scaffolding MERGED (PR #21, 2026-07-13); prod stays open via CAUSENT_LOCAL_DEMO=1
 ✓ DRIFT    baseline-metric drift DEMO beat MERGED (PR #22, 2026-07-13): change-point detector
            (segmented_ols reuse) + calm assert-fact notice + stub Restate; seeded, 1147 pytest
-☐ PARTNER  zero-code mechanism-mapping test  ← gates T2 connector completion + #18 webhook lever-drift
+✓ FUNNEL   #15 onboarding funnel CLOSED (PR #23, 2026-07-13): Step-1 auth wired + instrumentation
+           + E2E-under-auth; #18 ship-state + resolution scorecard shipped (drift-alert deferred)
+☐ PARTNER  zero-code mechanism-mapping test  ← gates T2 connector completion + #18 drift-alert surface
 ☐ LIVE     GitHub App + fine-grained PAT  ← the remaining credentials (#16 goes live)
-☐ OPEN     #15 onboarding funnel polish · #16 connector live · #18 webhook lever-drift alert · #19 Jira
+☐ OPEN     #16 connector live · #18 drift-alert surface (gated) · #19 Jira parity
 ```
 
 ## What's built (all on `main`, verified against live evidence)
@@ -259,6 +261,22 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 - **Not yet live:** the detector runs on SEEDED data (compute-on-read). Live detection needs a real
   connected metric, and the level-shift threshold tuning is a documented open question. The notice +
   Restate are demoable now. Design doc: `~/.gstack/projects/adam-causent-causent-ai/adamowens-main-design-20260712-220650.md`.
+
+## Funnel finish + ship-state/scorecard — as built (2026-07-13, PR #23)
+
+- **PR #23 (closes #15, progresses #18)** — **#15 closed:** Step-1 auth wired into the funnel
+  (real Supabase session from #5, `CAUSENT_LOCAL_DEMO=1` dev-session fallback kept), funnel
+  instrumentation (`funnel_events` table + `SCORECARD_VIEW` resolution-return signal;
+  migration `20260713144706_funnel_events.sql`), and an E2E-under-auth walk. **#18 ungated
+  slice:** `components/onboarding/ShipState.tsx` (Step-7 confirmation) + `components/reports/Scorecard.tsx`
+  + `lib/scorecard.ts` (predicted-vs-measured, all 7 verdicts incl. `UNMEASURABLE_NO_METRIC`
+  connect/self-report prompt + `GATHERING` auto-extend), a `/api/cron/resolve` trigger +
+  `vercel.json` cron, and a calm mid-window "still on track" touch. Integrated into
+  `DecisionDetail` alongside `DriftNotice` + `MechanismChain`. Gates: engine 1147 (no
+  regression), lib 288, tsc/build clean, 9 browse-QA shots (`docs/overnight-7-qa/`).
+  Evidence: `docs/OVERNIGHT_REPORT_7.md`.
+- **Deferred (gated):** `#18`'s **drift-alert surface** (the `LEVER_DROPPED` assert-fact alert)
+  stays behind the mechanism-mapping test + #16 live detection — verified NOT built this run.
 
 ## Next (priority order)
 
