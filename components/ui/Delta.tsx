@@ -16,14 +16,19 @@ export function Delta({
   good,
   size = "sm",
   className = "",
+  tone = "auto",
 }: {
   direction: Direction;
   label: string;
   good: boolean;
   size?: "xs" | "sm" | "md";
   className?: string;
+  // "neutral" forces the neutral/slate color while keeping the directional glyph
+  // (▲/▼) — for a FACT that is neither win nor loss (a baseline move, C5/#18). The
+  // glyph + label still carry the direction; only the hue is held neutral.
+  tone?: "auto" | "neutral";
 }) {
-  const isNeutral = direction === "neutral";
+  const isNeutral = direction === "neutral" || tone === "neutral";
   const color = isNeutral
     ? "text-[var(--neutral)]"
     : good
