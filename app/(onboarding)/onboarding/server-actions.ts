@@ -26,10 +26,31 @@ import {
 } from "@/lib/onboarding/commit";
 import { getPriorsForReferenceClass } from "@/lib/data/priors";
 import type { ReferenceClassPriors } from "@/lib/priors";
+import { recordFunnelEvent, type RecordFunnelEventInput } from "@/lib/data/funnel";
 import { draftLeverFromDecision } from "@/lib/levers/draft";
 import { detectLever, markLeverCreated, parseIssueUrl } from "@/lib/levers/detect";
 import { draftTicketCopy } from "@/lib/levers/llm";
 import { issueExternalRef } from "@/lib/connectors/github";
+
+/** Funnel instrumentation (C2/#15 DoD). Best-effort by contract: an insert
+ *  failure must never break the funnel, so this swallows errors and always
+ *  resolves — the client fires it and forgets. The server clock stamps the row;
+ *  the client only measures ms_since_start (landing -> first keystroke). */
+export async function recordOnboardingEvent(
+  input: RecordFunnelEventInput,
+): Promise<void> {
+  try {
+    const session = await getSession();
+    await recordFunnelEvent(
+      await getServerSupabase(),
+      session.workspaceId,
+      session.userId,
+      input,
+    );
+  } catch {
+    // Instrumentation is non-critical; never surface to the funnel.
+  }
+}
 
 /** Step 2 -> 3: structure the paste into a decision card + interrogation.
  *  Fail-safe by construction — garbage or model trouble yields the fallback
