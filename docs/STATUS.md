@@ -16,9 +16,11 @@ machine + CLI runner (`engine/persistence/resolve.py` + `run_resolution.py`), on
 reference-class priors (`lib/priors.ts` + `lib/data/priors.ts`), a decisions-first Actions &
 Decisions tab (elicit-not-assert capture, lever mapping, reason-gated revisions, caveat-first
 readout), and seed exercising all six target verdicts through the REAL engine. Evidence:
-`docs/OVERNIGHT_REPORT_3.md`. **Tranche 2 (connector) and Tranche 3 (drift detector) are
-gated on the zero-code design-partner mechanism-mapping test — that conversation, not code,
-is the critical path.** Remaining credential: a GitHub token (live ingestion).
+`docs/OVERNIGHT_REPORT_3.md`. **The baseline-metric-drift DEMO beat shipped (PR #22, 2026-07-13)** —
+reconciled through office-hours + CEO/Eng/Design review as the demo showcase (a change-point detector
+over the metric's own series), distinct from the still-gated webhook lever-descope drift (#18).
+**The connector completion and #18 stay gated on the zero-code design-partner mechanism-mapping test —
+that conversation, not code, is the critical path.** Remaining credential: a GitHub token (live ingestion).
 
 ```
 ✓ Plan     office-hours → CEO → Eng → Design reviews (all CLEARED)
@@ -45,9 +47,11 @@ is the critical path.** Remaining credential: a GitHub token (live ingestion).
            is_lever), declared metric + UNMEASURABLE_NO_METRIC, cluster-resolution path
 ✓ AUTH     #5 invite-only Google-OAuth allowlist + create-from-decision GitHub connector
            scaffolding MERGED (PR #21, 2026-07-13); prod stays open via CAUSENT_LOCAL_DEMO=1
-☐ PARTNER  zero-code mechanism-mapping test  ← gates T2 connector completion + T3 drift
+✓ DRIFT    baseline-metric drift DEMO beat MERGED (PR #22, 2026-07-13): change-point detector
+           (segmented_ols reuse) + calm assert-fact notice + stub Restate; seeded, 1147 pytest
+☐ PARTNER  zero-code mechanism-mapping test  ← gates T2 connector completion + #18 webhook lever-drift
 ☐ LIVE     GitHub App + fine-grained PAT  ← the remaining credentials (#16 goes live)
-☐ OPEN     #15 onboarding funnel polish · #16 connector live · #18 drift surface · #19 Jira
+☐ OPEN     #15 onboarding funnel polish · #16 connector live · #18 webhook lever-drift alert · #19 Jira
 ```
 
 ## What's built (all on `main`, verified against live evidence)
@@ -82,7 +86,7 @@ is the critical path.** Remaining credential: a GitHub token (live ingestion).
 # DB-backed tests need the local Supabase stack (Docker must be running):
 supabase start            # or: supabase db reset  (clean-slate migration apply)
 
-# Full suite (1058 tests: engine + RLS isolation + bridge E2E):
+# Full suite (1147 tests: engine + RLS isolation + bridge E2E):
 cd engine && .venv/bin/python -m pytest -q
 
 # Engine-only (no DB): the non-test_rls_/test_bridge_ files.
@@ -241,7 +245,30 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   the live GitHub App + PAT land. Gates green at merge: 1128 pytest, 262 lib tests.
   Evidence: `docs/OVERNIGHT_REPORT_5.md`, QA shots `docs/qa/auth-connector-20260712/`.
 
+## Baseline-drift beat — as built (2026-07-13, PR #22)
+
+- **PR #22 (merged, `26efd3c`)** — the demo showcase from this session's office-hours + CEO/Eng/Design
+  reviews. A **change-point detector** (`lib/drift.ts` + `lib/data/drift.ts`) that reuses the engine's
+  `segmented_ols`/`step_ci` level-shift fit, scanning the **pre-intervention window only** (so a working
+  lever is never mistaken for drift), with a guard (min points + magnitude floor + declared/no-obs →
+  "no baseline yet"). A **calm assert-fact `DriftNotice`** on the prediction card — info surface not an
+  alarm, NEUTRAL/slate delta (a fact, not a verdict) — and a **stub Restate** over the existing
+  `prediction_revisions` table. Seeded on a dedicated **New-User Activation** metric (avoids corrupting a
+  core metric's action→metric graph). Gates: 1147 pytest, 269 lib, CI green; Restate DB-verified;
+  4 states screenshotted (`docs/screenshots/drift/`). Evidence: `docs/OVERNIGHT_REPORT_6.md`.
+- **Not yet live:** the detector runs on SEEDED data (compute-on-read). Live detection needs a real
+  connected metric, and the level-shift threshold tuning is a documented open question. The notice +
+  Restate are demoable now. Design doc: `~/.gstack/projects/adam-causent-causent-ai/adamowens-main-design-20260712-220650.md`.
+
 ## Next (priority order)
+
+**Critical path now (both human-only, no code):**
+- **Run the mechanism-mapping test with Jonathan** using the seeded baseline-drift beat as the prop —
+  show it, then ask how often a baseline shift actually hits his real metrics and what notification he'd
+  act on. Gates the connector completion + #18 webhook lever-drift, and tests whether drift is real
+  demand or a founder hypothesis.
+- **~45-min console setup** to make the demo LIVE: Google OAuth (consent screen + client + Supabase
+  provider) and the GitHub App + fine-grained PAT (`GITHUB_TOKEN`). Full steps: `docs/OVERNIGHT_REPORT_5.md`.
 
 The four items above (UI↔Supabase, ingestion, engine deploy, summary layer) are now **BUILT
 and verified locally** on `overnight/wire-up`. What remains:
