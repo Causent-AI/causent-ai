@@ -1,6 +1,9 @@
 // OAuth callback (#5). Google redirects back here with a `code`; we exchange it
-// for a Supabase session (setting the auth cookies) and send the user to
-// /impact. Two failure paths, both landing on /login with a friendly note:
+// for a Supabase session (setting the auth cookies) and send the user INTO the
+// cold-start funnel (/onboarding, Steps 2-4 — C2/#15): the authenticated session
+// now drives paste → interrogate → commit. `?next=` overrides the destination so
+// a returning partner can be sent to the dashboard. Two failure paths, both
+// landing on /login with a friendly note:
 //   - Google/Supabase returned an `error` (e.g. the Before-User-Created hook
 //     rejected a non-allowlisted email) → /login?error=not_allowed.
 //   - No code / exchange failed → /login?error=not_allowed as well (invite-only,
@@ -19,6 +22,13 @@ export async function GET(request: Request): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const oauthError = searchParams.get("error");
+  // Post-auth destination: the onboarding funnel by default (a fresh partner has
+  // no committed prediction yet). `?next=` lets a returning user land elsewhere;
+  // clamp to same-origin relative paths so it can't become an open redirect.
+  const nextParam = searchParams.get("next");
+  const dest = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+    ? nextParam
+    : "/onboarding";
 
   const denied = NextResponse.redirect(`${origin}/login?error=not_allowed`);
 
@@ -46,5 +56,5 @@ export async function GET(request: Request): Promise<NextResponse> {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) return denied;
 
-  return NextResponse.redirect(`${origin}/impact`);
+  return NextResponse.redirect(`${origin}${dest}`);
 }

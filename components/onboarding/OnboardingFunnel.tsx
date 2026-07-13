@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import type { DecisionCard } from "@/lib/onboarding/parse";
 import { MECHANISM_CATEGORIES } from "@/lib/onboarding/parse";
@@ -10,8 +10,10 @@ import {
   commitOnboardingPrediction,
   declareOnboardingMetric,
   fetchOnboardingPriors,
+  recordOnboardingEvent,
   structurePaste,
 } from "@/app/(onboarding)/onboarding/server-actions";
+import type { FunnelEventType } from "@/lib/funnel/events";
 
 // The cold-start wizard, Steps 2-4 (C2/#15).
 //
@@ -158,6 +160,50 @@ export function OnboardingFunnel() {
 
   const [committed, setCommitted] = useState<Committed | null>(null);
 
+  // Funnel instrumentation (C2/#15 DoD). A per-run session key ties this run's
+  // events together; landedAt anchors the client-measured time-to-first-type.
+  // All emits are fire-and-forget — instrumentation never blocks the funnel.
+  const sessionKeyRef = useRef<string | null>(null);
+  const landedAtRef = useRef<number | null>(null);
+  const firstTypedRef = useRef(false);
+
+  const emit = useCallback(
+    (eventType: FunnelEventType, extra?: { step?: string; msSinceStart?: number }) => {
+      const sessionKey = sessionKeyRef.current;
+      if (!sessionKey) return;
+      void recordOnboardingEvent({ sessionKey, eventType, ...extra });
+    },
+    [],
+  );
+
+  // Landed: mint the session key + landing clock once, then record LANDED.
+  useEffect(() => {
+    if (sessionKeyRef.current) return;
+    sessionKeyRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `run-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    landedAtRef.current = Date.now();
+    emit("LANDED", { step: "paste" });
+  }, [emit]);
+
+  // Drop-off: one STEP_VIEW per step the run reaches.
+  useEffect(() => {
+    if (!sessionKeyRef.current) return;
+    emit("STEP_VIEW", { step });
+  }, [step, emit]);
+
+  // Time-to-first-type: elapsed ms from landing to the first paste keystroke.
+  const onFirstType = useCallback(() => {
+    if (firstTypedRef.current) return;
+    firstTypedRef.current = true;
+    const landedAt = landedAtRef.current;
+    emit("FIRST_TYPE", {
+      step: "paste",
+      msSinceStart: landedAt ? Date.now() - landedAt : undefined,
+    });
+  }, [emit]);
+
   useEffect(() => {
     if (step !== "commit" || !declared) return;
     let stale = false;
@@ -194,7 +240,9 @@ export function OnboardingFunnel() {
   function structure() {
     setErrors([]);
     startTransition(async () => {
-      applyCard(await structurePaste(paste));
+      const c = await structurePaste(paste);
+      emit("STRUCTURED", { step: "card" });
+      applyCard(c);
     });
   }
 
@@ -254,6 +302,7 @@ export function OnboardingFunnel() {
         magnitudePct: Number(magnitude),
         resolutionDate,
       });
+      emit("COMMITTED", { step: "done" });
       setStep("done");
     });
   }
@@ -275,7 +324,10 @@ export function OnboardingFunnel() {
             autoFocus
             className={`${field} min-h-44`}
             value={paste}
-            onChange={(e) => setPaste(e.target.value)}
+            onChange={(e) => {
+              onFirstType();
+              setPaste(e.target.value);
+            }}
             placeholder="e.g. We're rebuilding the pricing page around usage tiers. Finance thinks it lifts expansion revenue; design worries it confuses small teams…"
           />
           <div className="flex items-center gap-3">
@@ -513,6 +565,15 @@ export function OnboardingFunnel() {
               type="button"
               className={ghostBtn}
               onClick={() => {
+                // A fresh funnel run: new session key + landing clock so its
+                // metrics don't fold into the just-committed run.
+                sessionKeyRef.current =
+                  typeof crypto !== "undefined" && "randomUUID" in crypto
+                    ? crypto.randomUUID()
+                    : `run-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+                landedAtRef.current = Date.now();
+                firstTypedRef.current = false;
+                emit("LANDED", { step: "paste" });
                 setPaste("");
                 setCard(null);
                 setDeclared(null);
