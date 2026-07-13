@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { Action, Decision, Metric, Prediction } from "@/lib/types";
 import { Delta } from "@/components/ui/Delta";
 import { VerdictBadge } from "@/components/actions/VerdictBadge";
+import { DriftNotice } from "@/components/actions/DriftNotice";
 import { presentVerdict } from "@/lib/verdicts";
 import { validateRevision } from "@/lib/predictions";
 import { revisePrediction, resolveNow } from "@/app/(dashboard)/actions/server-actions";
@@ -85,6 +86,9 @@ function PredictionRow({
             : `resolves ${prediction.resolutionDate}`}
         </span>
       </div>
+
+      {/* Baseline-drift notice — the hero signal, on the prediction card (C5/#18). */}
+      <DriftNotice prediction={prediction} metric={metric} />
 
       {prediction.revisions.length > 0 && (
         <ul className="mt-2 border-l-2 border-[var(--border)] pl-2 text-[11px] text-[var(--text-subtle)]">
