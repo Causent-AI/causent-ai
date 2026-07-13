@@ -5,6 +5,7 @@ import type { Action, Decision, Metric, Prediction } from "@/lib/types";
 import { Delta } from "@/components/ui/Delta";
 import { VerdictBadge } from "@/components/actions/VerdictBadge";
 import { DriftNotice } from "@/components/actions/DriftNotice";
+import { MechanismChain } from "@/components/actions/MechanismChain";
 import { presentVerdict } from "@/lib/verdicts";
 import { validateRevision } from "@/lib/predictions";
 import { revisePrediction, resolveNow } from "@/app/(dashboard)/actions/server-actions";
@@ -255,6 +256,7 @@ export function DecisionDetail({
           )}
         </div>
         {resolveMsg && <p className="text-[11px] text-[var(--text-subtle)]">{resolveMsg}</p>}
+        <MechanismChain decision={decision} actions={actions} metrics={metrics} />
         {decision.predictions.map((p) => (
           <PredictionRow key={p.id} prediction={p} metric={metricById.get(p.metricId)} />
         ))}
