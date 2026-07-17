@@ -1,6 +1,6 @@
 # Causent — Build Status & Resume Guide
 
-Last updated: 2026-07-13. Single source of truth for "where are we and how do I pick up."
+Last updated: 2026-07-16. Single source of truth for "where are we and how do I pick up."
 Product: **dual cold-start on one causal graph** — the retrospective wedge ("Did-It-Ship,
 Did-It-Work": tie each shipped action to a metric, honest ITS readout) PLUS the prospective
 on-ramp (human pre-registered prediction → drift watch → engine-measured resolution). See
@@ -51,8 +51,13 @@ that conversation, not code, is the critical path.** Remaining credential: a Git
            (segmented_ols reuse) + calm assert-fact notice + stub Restate; seeded, 1147 pytest
 ✓ FUNNEL   #15 onboarding funnel CLOSED (PR #23, 2026-07-13): Step-1 auth wired + instrumentation
            + E2E-under-auth; #18 ship-state + resolution scorecard shipped (drift-alert deferred)
+✓ DEPLOY   app LIVE at https://app.causent.ai (2026-07-16): Vercel project `causent-ai`
+           (git-connected, auto-deploys main), invite-only Google OAuth ARMED (allowlist
+           hook + owner invited), cloud Supabase seeded via seed_demo.py — all 7 verdicts
+           + drift beat live; Google OAuth + GitHub App + fine-grained PAT all configured
 ☐ PARTNER  zero-code mechanism-mapping test  ← gates T2 connector completion + #18 drift-alert surface
-☐ LIVE     GitHub App + fine-grained PAT  ← the remaining credentials (#16 goes live)
+☐ CONNECT  SUPABASE_SERVICE_ROLE_KEY deliberately withheld from Vercel → webhook auto-detect
+           + reconcile cron return 500 (paste-URL attribution works; deliberate, reversible)
 ☐ OPEN     #16 connector live · #18 drift-alert surface (gated) · #19 Jira parity
 ```
 
@@ -278,15 +283,45 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 - **Deferred (gated):** `#18`'s **drift-alert surface** (the `LEVER_DROPPED` assert-fact alert)
   stays behind the mechanism-mapping test + #16 live detection — verified NOT built this run.
 
+## Production deployment — as built (2026-07-16)
+
+- **THE app project is Vercel `causent-ai`** (git-connected to this repo, auto-deploys `main`),
+  live at **https://app.causent.ai** (Cloudflare CNAME `app` → Vercel; apex `causent.ai` is the
+  separate Astro marketing site). A second Vercel project `causent` (created 7/10 via CLI link)
+  is redundant — the repo is re-linked to `causent-ai`; check `.vercel/project.json` before
+  `vercel env` commands.
+- **Prod env (causent-ai)**: `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` (current publishable),
+  `ANTHROPIC_API_KEY`, `CAUSENT_ENGINE_SECRET`, `CAUSENT_DEMO_TODAY=2025-05-23`,
+  `GITHUB_TOKEN` + `GITHUB_WEBHOOK_SECRET` + `CRON_SECRET`. **`SUPABASE_SERVICE_ROLE_KEY`
+  deliberately withheld** — its only consumers are the webhook receiver + reconcile cron (both
+  fail-closed-guarded); until it's added, auto-detection is off and the paste-URL fallback is
+  the detection path. `CAUSENT_LOCAL_DEMO` must stay UNSET in prod (its absence arms the wall;
+  NB the open-demo escape hatch requires the service key).
+- **Cloud Supabase `royftsqyawtyfjolfabd`**: all migrations applied; seeded 2026-07-16 through
+  the real bridge (`DATABASE_URL=<session-pooler aws-1-us-east-1, user postgres.<ref>>
+  seed_demo.py`, password via `PGPASSWORD` — never in the URL). Seed is teardown-then-reseed
+  under the demo-org UUID: safe to re-run, can't touch real users. Invite-only auth live:
+  Google provider + Before-User-Created hook (`enforce_allowlist`) + `scripts/invite.ts`
+  (service key inline-only). Data API rejects key-only anonymous requests (401) while
+  session-authenticated RLS reads work — stricter than default, keep it.
+- **Known prod limits**: the resolve cron + drift detector spawn local Python — the engine is
+  excluded from the app deploy, so on Vercel they no-op/error; run
+  `engine/persistence/run_resolution.py` locally against the cloud DB (porting resolution to
+  the deployed engine fn is the follow-up). `/login` is publicly reachable and currently
+  indexable (no robots.txt — the proxy redirects it; CT logs make the hostname discoverable);
+  add `app/robots.ts` + proxy exclusion if stealth matters.
+
 ## Next (priority order)
 
 **Critical path now (both human-only, no code):**
-- **Run the mechanism-mapping test with Jonathan** using the seeded baseline-drift beat as the prop —
-  show it, then ask how often a baseline shift actually hits his real metrics and what notification he'd
-  act on. Gates the connector completion + #18 webhook lever-drift, and tests whether drift is real
-  demand or a founder hypothesis.
-- **~45-min console setup** to make the demo LIVE: Google OAuth (consent screen + client + Supabase
-  provider) and the GitHub App + fine-grained PAT (`GITHUB_TOKEN`). Full steps: `docs/OVERNIGHT_REPORT_5.md`.
+- **Run the mechanism-mapping test with the design partner** using the seeded baseline-drift beat
+  as the prop — show it, then ask how often a baseline shift actually hits his real metrics and
+  what notification he'd act on. Gates the connector completion + #18 webhook lever-drift, and
+  tests whether drift is real demand or a founder hypothesis. **The live app at app.causent.ai
+  is now the demo surface** — invite the partner via `scripts/invite.ts` + Google test user.
+- ~~**~45-min console setup**~~ — **DONE 2026-07-15/16** (Google OAuth + GitHub App + PAT +
+  deploy; see "Production deployment" above). To arm connector automation: add
+  `SUPABASE_SERVICE_ROLE_KEY` to Vercel prod + redeploy.
 
 The four items above (UI↔Supabase, ingestion, engine deploy, summary layer) are now **BUILT
 and verified locally** on `overnight/wire-up`. What remains:
@@ -301,9 +336,9 @@ and verified locally** on `overnight/wire-up`. What remains:
      with the AUTOCORRELATION guard firing correctly on synthetic data. Redeploy via
      `scripts/deploy-engine.sh --prod`. (App itself still undeployed — needs cloud
      Supabase envs; the root project `causent` is linked and `.vercelignore`-scoped.)
-   - GitHub token → live ingestion via `lib/ingest/cli.ts` — **the one remaining
-     credential** (fine-grained PAT, Contents:Read on the target repo, as `GITHUB_TOKEN`
-     in `.env.local`; per SEC3/T-TOK the durable wiring is a per-connection Vault token).
+   - ~~GitHub token~~ — **DONE 2026-07-15**: fine-grained PAT live as `GITHUB_TOKEN` on
+     Vercel prod + `.env.local` (per SEC3/T-TOK the durable wiring is still a
+     per-connection Vault token, later).
 2. **Per-request freshness** — dashboard routes are statically prerendered (DB read at build
    time). Add `export const dynamic = "force-dynamic"` (or revalidation) when live freshness is
    needed. Swap the demo service-role server client for a per-request `@supabase/ssr` RLS client
