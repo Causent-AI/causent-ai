@@ -4,9 +4,12 @@
 # remote build's node_modules/.next into the function bundle (>225MB cap), so
 # api/ + engine/ are excluded here entirely. requirements.txt stays for local
 # tooling but is harmless to exclude from the app upload too.
+# NOTE: patterns are gitignore-style — root-anchored with a leading slash.
+# A bare `api` also matches app/api and silently strips every Next.js API
+# route (webhooks + crons 404'd in prod until 2026-07-16 because of this).
 .next
-api
-engine
+/api
+/engine
 requirements.txt
 **/__pycache__
 supabase
