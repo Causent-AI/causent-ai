@@ -55,12 +55,19 @@ that conversation, not code, is the critical path.** Remaining credential: a Git
            (git-connected, auto-deploys main), invite-only Google OAuth ARMED (allowlist
            hook + owner invited), cloud Supabase seeded via seed_demo.py — all 7 verdicts
            + drift beat live; Google OAuth + GitHub App + fine-grained PAT all configured
-↻ RESOLVE  resolution PORTED to a serverless fn (PR #24, OPEN): api/resolve.py stateful
-           sibling of the engine fn + cron rewired to HTTP-call it; verified against a
-           seeded local DB. Deploy `causent-resolve` + set CAUSENT_RESOLVE_URL to go live
-↻ JIRA     #19 Jira parity + write-scope auto-create for both trackers (PR #25, OPEN,
-           closes #19): read-only deep-link + scan-detect + canonical map + webhook +
-           write-scope issue-property/label create; 27 tests + 334 lib green, no migration
+✓ RESOLVE  resolution PORT MERGED (PR #24) + DEPLOYED 2026-07-18: api/resolve.py stateful
+           sibling of the engine fn LIVE at https://causent-resolve.vercel.app/api/resolve
+           (own Vercel project `causent-resolve`); CAUSENT_RESOLVE_SECRET set on both projects
+           + CAUSENT_RESOLVE_URL on the app; guards smoke-tested (GET 405, no/bad secret 401).
+           ☐ ONE STEP TO ARM: set DATABASE_URL (Supabase SESSION pooler DSN, :5432) on
+           causent-resolve, then REDEPLOY BOTH projects (Vercel env added post-deploy needs a
+           redeploy). Until then the cron 500s at the DB connect (auth passes).
+✓ JIRA     #19 Jira parity + write-scope auto-create MERGED (PR #25, closes #19): read-only
+           deep-link + scan-detect + canonical map + webhook + write-scope issue-property/label
+           create; 27 tests + 334 lib green, no migration. Code LIVE on main; route INERT until
+           armed. ☐ TO ARM: JIRA_BASE_URL/EMAIL/API_TOKEN/WEBHOOK_SECRET + GITHUB_WRITE_TOKEN
+           (Issues:R+W) on causent-ai + a Jira webhook → /api/webhooks/jira (deferred: no Jira
+           instance tonight). Read-only deep-link + paste works with zero creds now.
 ☐ PARTNER  zero-code mechanism-mapping test  ← gates T2 connector completion + #18 drift-alert surface
 ☐ CONNECT  SUPABASE_SERVICE_ROLE_KEY deliberately withheld from Vercel → webhook auto-detect
            + reconcile cron return 500 (paste-URL attribution works; deliberate, reversible)
@@ -310,11 +317,11 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   Google provider + Before-User-Created hook (`enforce_allowlist`) + `scripts/invite.ts`
   (service key inline-only). Data API rejects key-only anonymous requests (401) while
   session-authenticated RLS reads work — stricter than default, keep it.
-- **Known prod limits**: ~~the resolve cron spawns local Python~~ — **RESOLVED by PR #24
-  (OPEN)**: resolution is ported to its own serverless fn (`api/resolve.py` → project
-  `causent-resolve`) and the cron HTTP-calls it; deploy + set `CAUSENT_RESOLVE_URL` to arm
-  it (steps in `api/DEPLOY.md`). The drift detector still spawns local Python (same pattern,
-  not yet ported). `/login` is publicly reachable and currently
+- **Known prod limits**: ~~the resolve cron spawns local Python~~ — **PORTED + DEPLOYED
+  (PR #24 merged, `causent-resolve` live)**: the cron HTTP-calls the serverless fn; one env
+  step left to fully arm (`DATABASE_URL` on causent-resolve + redeploy both — see run-8 below).
+  The drift detector still spawns local Python (same pattern, not yet ported). `/login` is
+  publicly reachable and currently
   indexable (no robots.txt — the proxy redirects it; CT logs make the hostname discoverable);
   add `app/robots.ts` + proxy exclusion if stealth matters.
 
@@ -330,13 +337,24 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   deploy; see "Production deployment" above). To arm connector automation: add
   `SUPABASE_SERVICE_ROLE_KEY` to Vercel prod + redeploy.
 
-**Overnight run 8 (2026-07-18) — two PRs OPEN, awaiting review** (`docs/OVERNIGHT_REPORT_8.md`):
+**Overnight run 8 (2026-07-18) — MERGED + go-live started** (`docs/OVERNIGHT_REPORT_8.md`):
+PRs #24, #25, #26 all squash-MERGED to `main` (#19 CLOSED); app auto-deploys from main.
 - **PR #24 resolution port** — `api/resolve.py` (stateful sibling of the engine fn) + cron
-  rewired to HTTP-call it; makes the daily sweep actually run in prod. Verified vs a seeded
-  local DB. Go-live: `scripts/deploy-resolve.sh --prod` + `CAUSENT_RESOLVE_URL`/secret.
+  rewired to HTTP-call it. **DEPLOYED** to its own Vercel project `causent-resolve` →
+  `https://causent-resolve.vercel.app/api/resolve`. `CAUSENT_RESOLVE_SECRET` set on BOTH
+  projects; `CAUSENT_RESOLVE_URL` set on the app. Guards smoke-tested (405/401 fail-closed).
+  **Remaining to arm:** add `DATABASE_URL` (Supabase **session** pooler, `postgres.<ref>@…:5432`)
+  on causent-resolve, then **redeploy both** `causent-resolve` and `causent-ai` (Vercel env
+  added after a deploy only takes effect on the next deploy). To redeploy: `vercel --prod`
+  from a dir linked to each project, or re-trigger from the dashboard.
 - **PR #25 Jira parity (closes #19)** — Jira read-only + write-scope auto-create for both
-  trackers; 27 new tests, 334 lib green, no migration. Go-live: Jira webhook + basic-auth
-  token (`JIRA_*`) / `GITHUB_WRITE_TOKEN`; read-only deep-link works without them.
+  trackers; 27 new tests, 334 lib green, no migration. **Code LIVE on main; route INERT
+  until armed.** To arm (deferred — no Jira instance this session): set
+  `JIRA_BASE_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN`/`JIRA_WEBHOOK_SECRET` + `GITHUB_WRITE_TOKEN`
+  (Issues: Read+Write) on causent-ai, add a Jira webhook → `/api/webhooks/jira` with header
+  `x-causent-jira-secret`, then redeploy. Read-only deep-link + paste works with zero creds now.
+  NB the write lane reads `GITHUB_WRITE_TOKEN ?? GITHUB_TOKEN`; the existing `GITHUB_TOKEN`
+  is read-only, so a write-scoped PAT is required for GitHub auto-create.
 
 The four items above (UI↔Supabase, ingestion, engine deploy, summary layer) are now **BUILT
 and verified locally** on `overnight/wire-up`. What remains:
