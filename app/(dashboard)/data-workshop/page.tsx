@@ -81,7 +81,10 @@ export default async function DataWorkshopPage({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
         <div className="space-y-4">
           <Panel>
-            <CsvDropzone />
+            <CsvDropzone
+              enabled={Boolean(activeDecisionReport)}
+              metricName={activeDecisionReport?.metricProjection.metricName}
+            />
           </Panel>
           <Panel>
             <ConnectedMetrics metrics={metrics} connectionSummary={metricConnections} />

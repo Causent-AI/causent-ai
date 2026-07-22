@@ -51,7 +51,7 @@ export function CoreMetricsDrawer({
   const reportMetricNeedsData = Boolean(
     (reportMetricView &&
       (!reportMetricView.metric || reportMetricView.metric.series.length === 0)) ||
-      (projectMetricLabel && metrics.length === 0),
+      (projectMetricLabel && (metrics.length === 0 || metrics.every((metric) => metric.series.length === 0))),
   );
 
   const chartMetrics = visibleMetrics.slice(0, 3); // stacked hero charts

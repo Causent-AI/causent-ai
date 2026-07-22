@@ -1,6 +1,6 @@
 # Causent — Build Status & Resume Guide
 
-Last updated: 2026-07-21. Single source of truth for "where are we and how do I pick up."
+Last updated: 2026-07-22. Single source of truth for "where are we and how do I pick up."
 Product: **dual cold-start on one causal graph** — the retrospective wedge ("Did-It-Ship,
 Did-It-Work": tie each shipped action to a metric, honest ITS readout) PLUS the prospective
 on-ramp (human pre-registered prediction → drift watch → engine-measured resolution). See
@@ -17,11 +17,11 @@ metric relationship, and selected actions. Approved design:
 
 ## TL;DR
 
-**Both existing loops are on `main`; Decision Report Slices 1–6 are implemented on
+**Both existing loops are on `main`; Decision Report Slices 1–7 are implemented on
 `codex/ai-decision-report`. Bounded generation, durable report persistence, human-controlled
 metric/prediction/action activation, and the atomic Actions & Decisions handoff are
-live-validated. Report-native dashboard isolation and Reports-tab indexing are implemented.
-Metric creation/CSV ingestion, supplied-image handling,
+live-validated. Report-native dashboard isolation, Reports-tab indexing, and authenticated
+daily CSV ingestion into the activated report metric are implemented. Supplied-image handling,
 feature-flag rollout, and partner acceptance remain.**
 The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
@@ -88,11 +88,14 @@ delivery, or production automation.
 ☐ CONNECT  SUPABASE_SERVICE_ROLE_KEY deliberately withheld from Vercel → webhook auto-detect
            + reconcile cron return 500 (paste-URL attribution works; deliberate, reversible)
 ☐ OPEN     #16 connector live (creds) · #18 drift-alert surface (gated) · ~~#19 Jira parity~~ (PR #25)
-◐ ACTIVE   AI-assisted Decision Report partner wedge: Slices 1–6 complete. The 24.4s
+◐ ACTIVE   AI-assisted Decision Report partner wedge: Slices 1–7 complete. The 24.4s
            six-action baseline triggered a sparse three-proof/three-action contract; live
            re-benchmark passed in 13.9s. Durable explicit save/reload is now verified;
            explicit metric/prediction/action activation now materializes atomically and
-           hands the user to Actions & Decisions. Partner-input/acceptance work is next.
+           hands the user to Actions & Decisions. Data Workshop now imports a bounded
+           daily CSV into only that report's confirmed metric. Slice 8 is the private
+           supplied-image path; the implementation handoff is in
+           memory/2026-07-22-decision-report-slice-8-handoff.md.
 ```
 
 ## What's built (all on `main`, verified against live evidence)

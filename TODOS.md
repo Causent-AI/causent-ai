@@ -1,6 +1,6 @@
 # Causent active backlog
 
-Last reconciled: 2026-07-21. Completed historical work is documented in `docs/STATUS.md` and the overnight reports. This file contains only active or deliberately deferred work.
+Last reconciled: 2026-07-22. Completed historical work is documented in `docs/STATUS.md` and the overnight reports. This file contains only active or deliberately deferred work.
 
 ## P0 — AI-assisted Decision Report partner wedge
 
@@ -90,8 +90,6 @@ Acceptance: a saved reviewed Gummy Alpha report requires explicit human metric/p
 
 Non-goals: metric creation, CSV ingestion, source/assets/uploads, connectors, tracker ticket creation, lever selection, causal impact, Completion Outlook, and per-keystroke autosave.
 
-### Work after Slice 6
-
 ### Completed Slice 6 — report-native dashboard isolation and connector handoff
 
 Goal: make an activated Decision Report the visible project boundary throughout the dashboard and continue its plan into the existing tracker workflow.
@@ -106,8 +104,25 @@ Goal: make an activated Decision Report the visible project boundary throughout 
 
 Acceptance: after report activation, no deterministic study metric, objective, action, impact aggregate, or stakeholder-report fixture appears in the report project; the confirmed metric and selected planned actions remain visible across tabs; Reports shows the saved Decision Report; and Actions & Decisions offers the established GitHub/Jira lever flow.
 
-- Add private Storage handling for one size-capped PNG/JPEG: magic-byte validation, decode/re-encode, scoped read, deletion, and failure states.
-- Add a real metric-creation/CSV ingestion path in Data Workshop; Slice 6 isolates the confirmed metric but does not add ingestion writes.
+### Completed Slice 7 — report-native metric CSV ingestion
+
+Goal: turn the activated report's confirmed metric into a real daily series without opening an arbitrary metric-write surface.
+
+- [x] Replace the inert Data Workshop control with one-file `.csv` upload, drag/drop, pending, actionable error, and complete success-summary states.
+- [x] Parse bounded UTF-8 bytes on the server under an exact `date,value` daily contract; reject malformed headers, invalid dates/numbers, padded or quoted ambiguity, duplicates, binary/invalid encoding, more than 10,000 rows, and files above 256 KB. Any rejected row aborts the whole import.
+- [x] Derive the newest active report and confirmed metric from the authenticated workspace rather than accepting IDs from the browser.
+- [x] Add one checked database RPC that revalidates the scope/report/metric tuple, member access, daily granularity, and declared/CSV source under row locks before an atomic primary-key upsert.
+- [x] Define duplicate-date behavior explicitly: duplicates inside one file reject the import; a date already stored for this same metric is updated; dates not present in the file remain unchanged. Exact retries create no duplicate observations.
+- [x] Refresh Data Workshop and the shared dashboard layout after success so the report-native Core Metrics series is immediately visible, including metric names outside the legacy demo catalog.
+- [x] Cover parser edge cases, repository mapping, retry/idempotency, forged IDs, cross-workspace denial, member/viewer authorization, and real local Supabase writes.
+
+Acceptance: a signed-in member can upload one valid daily CSV only into the activated report's confirmed workspace metric, immediately see the real series and row count, retry safely, and understand exactly what was inserted or updated; malformed or foreign-target attempts write nothing.
+
+Non-goals: warehouse connectors, spreadsheet formats, file storage, background jobs, causal recomputation, arbitrary metric selection, and replacement of observations on dates absent from the uploaded file.
+
+### Next: Slice 8 — private supplied-image path
+
+- Add private Storage handling for one size-capped PNG/JPEG: magic-byte validation, decode/re-encode, scoped read, deletion, and failure states. Use `memory/2026-07-22-decision-report-slice-8-handoff.md` as the new-chat implementation brief.
 - Keep lever creation as a subsequent explicit action-selection step.
 - Feature-flag the new onboarding per user/workspace; preserve legacy onboarding as rollback.
 

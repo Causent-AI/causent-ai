@@ -731,6 +731,55 @@ def test_activation_table_is_read_only_to_authenticated(seeded):
             conn.rollback()
 
 
+# ============================================================================
+# GATE 8 — Slice 7 active-report metric CSV import authorization
+# ============================================================================
+def _import_active_metric(cur, scope_id, report_id, metric_id, actor_id, value=7):
+    cur.execute(
+        "select * from public.import_active_report_metric_csv_v1("
+        "%s,%s,%s,%s::jsonb,%s)",
+        (
+            scope_id,
+            report_id,
+            metric_id,
+            json.dumps([{"date": "2026-07-22", "value": value}]),
+            actor_id,
+        ),
+    )
+    return cur.fetchone()
+
+
+def test_active_report_metric_import_member_only_and_idempotent(seeded):
+    with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+        first = _import_active_metric(cur, WS_A, REPORT_A, METRIC_A, USER_A)
+        assert first[2:5] == (1, 1, 0)
+        retry = _import_active_metric(cur, WS_A, REPORT_A, METRIC_A, USER_A, value=8)
+        assert retry[2:5] == (1, 0, 1)
+        cur.execute(
+            "select count(*), max(value) from public.metric_observations "
+            "where metric_id=%s and obs_date=date '2026-07-22'",
+            (METRIC_A,),
+        )
+        assert cur.fetchone() == (1, 8)
+        conn.rollback()
+
+
+def test_active_report_metric_import_rejects_viewer_and_cross_workspace(seeded):
+    with as_user(USER_A_VIEWER, autocommit=False) as conn, conn.cursor() as cur:
+        with pytest.raises(pgerr.InsufficientPrivilege):
+            _import_active_metric(cur, WS_A, REPORT_A, METRIC_A, USER_A_VIEWER)
+        conn.rollback()
+    with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+        for scope_id, report_id, metric_id in (
+            (WS_A, REPORT_A, METRIC_B),
+            (WS_B, REPORT_B, METRIC_B),
+            (WS_A, REPORT_B, METRIC_A),
+        ):
+            with pytest.raises(pgerr.InsufficientPrivilege):
+                _import_active_metric(cur, scope_id, report_id, metric_id, USER_A)
+            conn.rollback()
+
+
 def test_actions_source_accepts_jira_rejects_unknown(seeded):
     # The widened CHECK admits 'jira' and still rejects a bogus value.
     with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:

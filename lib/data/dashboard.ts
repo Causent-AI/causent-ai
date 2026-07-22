@@ -114,12 +114,12 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
         getObjective(),
         getDecisionReports(),
       ]);
-    const metrics = metricRecords.map((record) => record.metric);
+    const allMetrics = metricRecords.map((record) => record.metric);
     const project = selectReportProjectView({
       reports: decisionReports,
       actions,
       decisions,
-      metrics,
+      metrics: allMetrics,
       metricUiIdByDbId: new Map(
         metricRecords.map((record) => [record.metricId, record.metric.id]),
       ),
@@ -128,7 +128,11 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
     });
     return {
       scope,
-      metrics: project.metrics,
+      // Unknown names are valid for report-native metrics, but the no-report
+      // dashboard remains the exact legacy configured catalog.
+      metrics: project.activeReport
+        ? project.metrics
+        : metricRecords.filter((record) => record.configured).map((record) => record.metric),
       actions: project.actions,
       decisions: project.decisions,
       aggregatedImpact: project.aggregatedImpact,
