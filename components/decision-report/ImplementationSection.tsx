@@ -8,12 +8,14 @@ export function ImplementationSection({
   implementation,
   onClaimChange,
   onActionTitleChange,
+  onActionSummaryChange,
   onActionOwnerChange,
   onDataClassificationChange,
 }: {
   implementation: DecisionReportV1["implementation"];
   onClaimChange: (claimId: string, text: string) => void;
   onActionTitleChange: (sourceItemId: string, title: string) => void;
+  onActionSummaryChange: (sourceItemId: string, text: string) => void;
   onActionOwnerChange: (sourceItemId: string, text: string) => void;
   onDataClassificationChange: (value: GovernanceValue) => void;
 }) {
@@ -21,7 +23,7 @@ export function ImplementationSection({
     <ReportSection
       number="3"
       title="Implementation"
-      description="A three-step action plan plus the people, assets, and governance needed to carry it out."
+      description="A three-step action plan plus optional ownership, audience, assets, and governance details."
     >
       <ClaimEditor
         claim={implementation.actionPlanSummary[0]}
@@ -65,25 +67,23 @@ export function ImplementationSection({
                   className="mt-0.5 w-full resize-y bg-transparent text-[12px] leading-5 text-[var(--text-muted)] outline-none"
                   rows={1}
                   value={action.summary[0]?.text ?? ""}
-                  onChange={(event) =>
-                    action.summary[0] && onClaimChange(action.summary[0].id, event.target.value)
-                  }
+                  onChange={(event) => onActionSummaryChange(action.sourceItemId, event.target.value)}
                 />
               </div>
               <div
                 className={`rounded-lg border px-2.5 py-1.5 ${
                   action.owner
                     ? "border-teal-200 bg-teal-50/40"
-                    : "border-dashed border-amber-300 bg-amber-50/40"
+                    : "border-dashed border-slate-300 bg-slate-50/60"
                 }`}
               >
                 <label
                   className={`text-[10px] font-semibold uppercase tracking-wide ${
-                    action.owner ? "text-teal-800" : "text-amber-800"
+                    action.owner ? "text-teal-800" : "text-slate-600"
                   }`}
                   htmlFor={`action-owner-${action.sourceItemId}`}
                 >
-                  {action.owner ? "Owner · confirmed by you" : "Owner · needs input"}
+                  {action.owner ? "Owner · confirmed by you" : "Owner · optional"}
                 </label>
                 <input
                   id={`action-owner-${action.sourceItemId}`}
@@ -96,6 +96,18 @@ export function ImplementationSection({
             </li>
           ))}
         </ol>
+        {implementation.actions.length === 0 ? (
+          <div
+            id="report-actions-empty"
+            className="rounded-xl border border-dashed border-amber-300 bg-amber-50/40 px-3 py-4 text-center outline-none focus:border-[var(--brand-teal)] focus:ring-2 focus:ring-teal-100"
+            tabIndex={-1}
+          >
+            <p className="text-[12px] font-semibold text-amber-900">First action needed</p>
+            <p className="mt-1 text-[11px] leading-5 text-amber-900/75">
+              Use the focused question below to add the first concrete implementation step.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -103,22 +115,24 @@ export function ImplementationSection({
           claims={implementation.customers}
           label="Customers"
           placeholder="Name the affected customer group."
+          optional
           onChange={onClaimChange}
         />
         <ClaimListEditor
           claims={implementation.stakeholders}
           label="Stakeholders"
           placeholder="Name the accountable stakeholders."
+          optional
           onChange={onClaimChange}
         />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/30 p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
-            Supplied mock-up
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+            Supplied mock-up · optional
           </p>
-          <div className="mt-3 flex min-h-28 items-center justify-center rounded-lg border border-dashed border-amber-200 bg-white/70 px-4 text-center">
+          <div className="mt-3 flex min-h-28 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/70 px-4 text-center">
             <p className="max-w-xs text-[12px] leading-5 text-[var(--text-muted)]">
               No mock-up supplied. This remains visible so the report never implies that one was generated or reviewed.
             </p>
@@ -127,10 +141,10 @@ export function ImplementationSection({
 
         <div className="rounded-xl border border-[var(--border)] p-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
-            Governance declarations
+            Governance declarations · optional
           </p>
           <label className="mt-3 block text-[11px] font-medium text-[var(--text-muted)]" htmlFor="data-classification">
-            Data visibility
+            Data visibility · optional
           </label>
           <select
             id="data-classification"
@@ -148,6 +162,7 @@ export function ImplementationSection({
               claim={implementation.governance.allowedDataSources[0]}
               label="Allowed data sources"
               rows={2}
+              optional
               onChange={(text) =>
                 onClaimChange(implementation.governance.allowedDataSources[0].id, text)
               }
@@ -156,6 +171,7 @@ export function ImplementationSection({
               claim={implementation.governance.approvedModelNotes[0]}
               label="Approved model notes"
               rows={2}
+              optional
               onChange={(text) =>
                 onClaimChange(implementation.governance.approvedModelNotes[0].id, text)
               }

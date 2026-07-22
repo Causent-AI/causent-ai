@@ -103,7 +103,7 @@ export function DecisionReportOnboarding() {
         {[
           ["01", "Decision", "The change, context, and problem"],
           ["02", "Evidence", "Signals, mechanism, and metric"],
-          ["03", "Implementation", "Actions, owners, cost, and governance"],
+          ["03", "Implementation", "Actions, owners, and governance"],
         ].map(([number, title, description]) => (
           <div key={number} className="rounded-xl border border-[var(--border)] bg-white/60 p-4">
             <p className="text-[10px] font-semibold text-[var(--brand-teal)]">{number}</p>

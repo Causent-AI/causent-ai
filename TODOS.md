@@ -38,40 +38,51 @@ Approved design: `docs/designs/ai-assisted-decision-report.md`.
   and three actions. Unsupplied customers, stakeholders, and data sources materialized as
   explicit `missing` states.
 
-### Slice 3 — focused gap completion and typed edits
+### Completed Slice 3 — focused gap completion and typed edits
 
 Goal: help the user finish the partial report without adding chat infrastructure or another model call.
 
-- [ ] Add a pure `scanDecisionReportGaps(report)` function with stable priority: Decision, Problem, at least one proof claim, Core Metric mechanism, Action Plan summary, then at least one action.
-- [ ] Define the smallest `ReportEditCommandV1` reducer used by both direct field edits and focused answers. Commands may replace/confirm claim text, edit action title/summary/owner, add an action up to the three-action ceiling, and set data classification.
-- [ ] Render a compact “Complete this report” panel with at most three open questions and focus the corresponding report field when selected.
-- [ ] Mark user answers `user_confirmed`, preserve immutable claim/action IDs, and recompute gaps locally without another AI request.
-- [ ] Replace the inert final-review behavior with an explicit ready/not-ready state. Optional customers, stakeholders, owner, governance, and mock-up fields must not block readiness.
-- [ ] Add unit tests for gap ordering, optional missing fields, command validation, the three-action ceiling, ID preservation, and direct-edit/question parity.
-- [ ] Browser-test the Gummy Alpha live report, sparse safe fallback, keyboard focus, and ready-state transition.
+- [x] Add a pure `scanDecisionReportGaps(report)` function with stable priority: Decision, Problem, at least one proof claim, Core Metric mechanism, Action Plan summary, then at least one action.
+- [x] Define the smallest `ReportEditCommandV1` reducer used by both direct field edits and focused answers. Commands may replace/confirm claim text, edit action title/summary/owner, add an action up to the three-action ceiling, and set data classification.
+- [x] Render a compact “Complete this report” panel with at most three open questions and focus the corresponding report field when selected.
+- [x] Mark user answers `user_confirmed`, preserve immutable claim/action IDs, and recompute gaps locally without another AI request.
+- [x] Replace the inert final-review behavior with an explicit ready/not-ready state. Optional customers, stakeholders, owner, governance, and mock-up fields do not block readiness.
+- [x] Add unit tests for gap ordering, optional missing fields, command validation, the three-action ceiling, ID preservation, direct-edit/question parity, and completing the safe fallback to ready.
+- [x] Browser-review the live Gummy Alpha report and the ready-state transition. The review caught and fixed a contradiction where optional owners, customers, and stakeholders appeared required beside a “Decision Report ready” message.
+- [ ] Complete the remaining browser acceptance pass for the sparse safe fallback and keyboard focus before the partner session.
 
 Acceptance: the safe fallback can be completed into a report-ready draft; the Gummy Alpha report is already ready or names only real required gaps; direct editing and answering a focused question produce the same validated report state.
 
 Non-goals: report persistence, refresh/Back recovery, general chatbot/history, metric or CSV handoff, uploads, final graph materialization, and connector work.
 
-### Work after Slice 3
+### Slice 4 — durable report revisions and approval boundary
 
-- Inspect the current onboarding writes and define the one final idempotent materialization operation.
+Goal: make the reviewed Decision Report durable and retry-safe without prematurely writing the canonical decision graph.
 
-### Report persistence and security
+- [ ] Add `decision_reports` and `decision_report_revisions` with scope-bound RLS and explicit grants. Revisions are append-only full `DecisionReportV1` snapshots with author, timestamp, base revision, and a deterministic content hash.
+- [ ] Add injected-client repository functions to create a report, append a revision, and load its current revision. Repeating an identical save must reuse the existing revision; a stale base revision must return a conflict with the current revision ID.
+- [ ] Bind server actions to the authenticated scope and runtime schema. Save only on an explicit user action in this slice; do not add per-keystroke autosave.
+- [ ] Add `Saved`/`Unsaved` UI state and an explicit **Save report** or **Save and continue** action. Reloading the saved report must reproduce the exact reviewed snapshot.
+- [ ] Define and validate a pure `ReportActivationInputV1` contract containing the report/revision IDs, confirmed metric ID, human prediction fields, and selected action source-item IDs. Do not execute it yet.
+- [ ] Integration-test cross-workspace denial, append-only revisions, identical-save idempotency, stale-revision conflicts, schema/readiness rejection, and exact reload.
 
-- Add report, report-revision, source, and asset persistence with scope-bound RLS and explicit grants.
-- Store append-only full snapshots for the partner wedge.
+Acceptance: a ready Gummy Alpha report persists once; an identical retry creates no revision; one real edit creates one revision; another workspace cannot read or write it; reload restores the same report; and the slice creates zero `decisions`, `predictions`, `actions`, `decision_actions`, or `levers`.
+
+Non-goals: sources/assets/uploads, Data Workshop or CSV handoff, human-prediction UI, canonical materialization, connectors, and per-keystroke autosave.
+
+### Work after Slice 4
+
 - Add private Storage handling for one size-capped PNG/JPEG: magic-byte validation, decode/re-encode, scoped read, deletion, and failure states.
+- Reuse existing metric selection/CSV and human prediction commitment behavior to complete `ReportActivationInputV1`.
+- Materialize the canonical decision, prediction, metric relationship, and selected actions once after final activation approval.
+- Keep lever creation as a subsequent explicit action-selection step.
 - Feature-flag the new onboarding per user/workspace; preserve legacy onboarding as rollback.
 
 ### Persistence and materialization
 
-- Autosave draft snapshots and preserve state through refresh and Back.
-- Reuse existing metric selection/CSV and human prediction commitment behavior.
-- Materialize the canonical decision, prediction, metric relationship, and selected actions once after final approval.
-- Make retries idempotent and verify double-submit creates zero duplicates.
-- Store the approved report in Reports and surface the created work in Actions & Decisions.
+- Preserve state through refresh and Back; consider autosave only after explicit-save behavior is reliable.
+- Make final activation retries idempotent and verify double-submit creates zero duplicates.
+- Store the reviewed report in Reports and surface activated work in Actions & Decisions.
 
 ### Partner verification
 

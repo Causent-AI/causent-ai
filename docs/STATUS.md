@@ -17,9 +17,9 @@ metric relationship, and selected actions. Approved design:
 
 ## TL;DR
 
-**Both existing loops are on `main`; Decision Report Slices 1 and 2 are implemented and
-live-validated on `codex/ai-decision-report`. Report persistence and materialization remain
-unbuilt.**
+**Both existing loops are on `main`; Decision Report Slices 1–3 are implemented on
+`codex/ai-decision-report`, and bounded generation is live-validated. Durable report
+revisions and canonical materialization remain unbuilt.**
 The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
 all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
@@ -85,9 +85,9 @@ delivery, or production automation.
 ☐ CONNECT  SUPABASE_SERVICE_ROLE_KEY deliberately withheld from Vercel → webhook auto-detect
            + reconcile cron return 500 (paste-URL attribution works; deliberate, reversible)
 ☐ OPEN     #16 connector live (creds) · #18 drift-alert surface (gated) · ~~#19 Jira parity~~ (PR #25)
-◐ ACTIVE   AI-assisted Decision Report partner wedge: Slice 1 interaction prototype and
-           Slice 2 bounded generation complete. The 24.4s six-action baseline triggered a
-           sparse three-proof/three-action contract; live re-benchmark passed in 13.9s.
+◐ ACTIVE   AI-assisted Decision Report partner wedge: Slices 1–3 complete. The 24.4s
+           six-action baseline triggered a sparse three-proof/three-action contract; live
+           re-benchmark passed in 13.9s. Slice 4 durable revisions are next.
 ```
 
 ## What's built (all on `main`, verified against live evidence)
@@ -343,21 +343,23 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 
 ## Next (priority order)
 
-### 1. Begin the next Decision Report slice
+### 1. Build Decision Report Slice 4
 
-- The pre-optimization Gummy Alpha request through `anthropic/claude-sonnet-5` returned a
-  six-action report in one attempt: 24,412 ms and 2,967 output tokens. That is too slow for onboarding.
-- The MVP contract now allows sparse `null`/`[]` model values, materializes missing states on
-  the server, removes Alternatives/Precedent/Estimated Cost, caps proof claims and actions at
-  three, and caps output at 2,200 tokens. Its live Gummy Alpha benchmark returned in one
-  13,852 ms attempt with 1,598 output tokens, three proof claims, and three actions. Unsupplied
-  implementation fields materialized as explicit `missing` states.
-- Slice 3 is focused gap completion: add a pure deterministic gap scanner, a typed edit-command
-  reducer shared by direct edits and focused answers, and a compact panel showing at most three
-  open questions. The report becomes explicitly ready when Decision, Problem, one proof claim,
-  the metric mechanism, the Action Plan summary, and at least one action are present.
-- Slice 3 does not add persistence, refresh/Back recovery, a general chatbot, metric/CSV
-  handoff, uploads, final graph materialization, or connectors. Those remain later slices.
+- Slice 3 now deterministically completes required gaps without another model request. Its live
+  Gummy Alpha browser review caught and fixed misleading readiness copy: Decision, Problem, one
+  proof claim, the metric mechanism, the Action Plan summary, and one action produce **Ready for
+  review**; owners, customers, stakeholders, governance, and mock-ups remain visibly optional.
+- The remaining Slice 3 browser acceptance pass covers the sparse safe fallback and keyboard
+  focus. Unit coverage already verifies gap ordering, optional-field behavior, command rejection,
+  the three-action ceiling, ID preservation, edit/question parity, and fallback completion.
+- Slice 4 adds only `decision_reports` and append-only `decision_report_revisions`, protected by
+  scope-bound RLS. Explicit saves use a deterministic content hash for retry idempotency, reject
+  stale base revisions, and reload the exact reviewed `DecisionReportV1` snapshot.
+- Slice 4 also defines a validated but inert activation packet: report/revision IDs, confirmed
+  metric ID, human prediction fields, and selected action source-item IDs. It creates no canonical
+  decisions, predictions, actions, decision-action edges, or levers.
+- Acceptance requires identical saves to produce no duplicate revision, one real edit to produce
+  exactly one revision, cross-workspace denial, exact reload, and zero canonical graph writes.
 
 ### 2. Finish the partner wedge
 
@@ -367,7 +369,7 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 - One final materialization step into decisions, predictions, metrics, and actions.
 - Feature-flagged rollout with legacy onboarding as rollback.
 
-Slices 1 and 2 delivered the interactive report and bounded generation seam. Remaining target: end-to-end partner flow in
+Slices 1–3 delivered the interactive report, bounded generation seam, and deterministic completion layer. Remaining target: end-to-end partner flow in
 roughly 2–3 weeks; stabilized wedge in 3–5 weeks at 15–25 focused hours/week.
 
 ### 3. Validate before production expansion

@@ -4,32 +4,17 @@ import { useState } from "react";
 import { ProvenanceLegend } from "@/components/decision-report/ClaimEditor";
 import { DecisionSection } from "@/components/decision-report/DecisionSection";
 import { ImplementationSection } from "@/components/decision-report/ImplementationSection";
+import { ReportCompletionPanel } from "@/components/decision-report/ReportCompletionPanel";
 import { SupportingEvidenceSection } from "@/components/decision-report/SupportingEvidenceSection";
-import type {
-  Claim,
-  DecisionReportV1,
-  MetricProjection,
-} from "@/lib/decision-reports/schema";
+import {
+  applyReportEditCommand,
+  createGapAnswerCommand,
+  scanDecisionReportGaps,
+  type DecisionReportGap,
+  type ReportEditCommandV1,
+} from "@/lib/decision-reports/editing";
+import type { DecisionReportV1, MetricProjection } from "@/lib/decision-reports/schema";
 import { cloneDecisionReport } from "@/lib/decision-reports/schema";
-
-function editableClaims(report: DecisionReportV1): Claim[] {
-  return [
-    ...report.decision.decision,
-    ...report.decision.background,
-    ...report.decision.problem,
-    ...report.supportingEvidence.factors,
-    ...report.supportingEvidence.metricMechanism,
-    ...report.implementation.actionPlanSummary,
-    ...report.implementation.customers,
-    ...report.implementation.stakeholders,
-    ...report.implementation.governance.allowedDataSources,
-    ...report.implementation.governance.approvedModelNotes,
-    ...report.implementation.actions.flatMap((action) => [
-      ...action.summary,
-      ...(action.owner ? [action.owner] : []),
-    ]),
-  ];
-}
 
 export function DecisionReportEditor({
   initialReport,
@@ -52,43 +37,63 @@ export function DecisionReportEditor({
   onStartOver: () => void;
 }) {
   const [report, setReport] = useState(() => cloneDecisionReport(initialReport));
+  const [editError, setEditError] = useState<string | null>(null);
+  const gaps = scanDecisionReportGaps(report);
+  const ready = gaps.length === 0;
+
+  function dispatchEdit(command: ReportEditCommandV1): boolean {
+    const result = applyReportEditCommand(report, command);
+    if (!result.ok) {
+      setEditError(result.error);
+      return false;
+    }
+    setEditError(null);
+    setReport(result.report);
+    return true;
+  }
 
   function updateClaim(claimId: string, text: string) {
-    setReport((current) => {
-      const next = cloneDecisionReport(current);
-      const target = editableClaims(next).find((claim) => claim.id === claimId);
-      if (!target) return current;
-
-      target.text = text;
-      target.status = text.trim() === "" ? "missing" : "user_confirmed";
-      target.sourceChunkIds = [];
-      return next;
-    });
+    dispatchEdit({ type: "replace_claim_text", claimId, text });
   }
 
   function updateActionTitle(sourceItemId: string, title: string) {
-    setReport((current) => {
-      const next = cloneDecisionReport(current);
-      const action = next.implementation.actions.find((item) => item.sourceItemId === sourceItemId);
-      if (action) action.title = title;
-      return next;
-    });
+    dispatchEdit({ type: "edit_action_title", sourceItemId, title });
+  }
+
+  function updateActionSummary(sourceItemId: string, text: string) {
+    dispatchEdit({ type: "edit_action_summary", sourceItemId, text });
   }
 
   function updateActionOwner(sourceItemId: string, text: string) {
-    setReport((current) => {
-      const next = cloneDecisionReport(current);
-      const action = next.implementation.actions.find((item) => item.sourceItemId === sourceItemId);
-      if (!action) return current;
-      action.owner = text.trim()
-        ? {
-            id: `${sourceItemId}-owner`,
-            text,
-            status: "user_confirmed",
-            sourceChunkIds: [],
-          }
-        : null;
-      return next;
+    dispatchEdit({ type: "edit_action_owner", sourceItemId, text });
+  }
+
+  function focusGap(gap: DecisionReportGap) {
+    const target = document.getElementById(gap.targetId);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.focus({ preventScroll: true });
+  }
+
+  function answerGap(gap: DecisionReportGap, answer: string): boolean {
+    const command = createGapAnswerCommand(
+      gap,
+      answer,
+      gap.kind === "action" ? `user-action-${crypto.randomUUID()}` : undefined,
+    );
+    if (!command.ok) {
+      setEditError(command.error);
+      return false;
+    }
+    return dispatchEdit(command.command);
+  }
+
+  function setDataClassification(
+    value: DecisionReportV1["implementation"]["governance"]["dataClassification"],
+  ) {
+    dispatchEdit({
+      type: "set_data_classification",
+      value,
     });
   }
 
@@ -108,6 +113,15 @@ export function DecisionReportEditor({
               <span>{projectName}</span>
               <span className="rounded-full bg-teal-50 px-2 py-0.5 font-semibold text-[var(--pos)]">
                 Draft
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 font-semibold ${
+                  ready
+                    ? "bg-emerald-50 text-emerald-800"
+                    : "bg-amber-50 text-amber-800"
+                }`}
+              >
+                {ready ? "Ready for review" : `${gaps.length} required fields open`}
               </span>
               {generationMeta ? (
                 <span>
@@ -154,32 +168,54 @@ export function DecisionReportEditor({
         implementation={report.implementation}
         onClaimChange={updateClaim}
         onActionTitleChange={updateActionTitle}
+        onActionSummaryChange={updateActionSummary}
         onActionOwnerChange={updateActionOwner}
-        onDataClassificationChange={(value) =>
-          setReport((current) => ({
-            ...current,
-            implementation: {
-              ...current.implementation,
-              governance: {
-                ...current.implementation.governance,
-                dataClassification: value,
-              },
-            },
-          }))
-        }
+        onDataClassificationChange={setDataClassification}
       />
 
-      <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-white/95 px-4 py-3 shadow-lg shadow-slate-300/30 backdrop-blur">
-        <p className="text-[11px] text-[var(--text-muted)]">
-          Prototype draft · changes live only in this browser session
-        </p>
-        <button
-          type="button"
-          className="rounded-lg bg-[var(--text)] px-4 py-2 text-[12px] font-semibold text-white"
-          onClick={() => document.getElementById("report-top")?.scrollIntoView({ behavior: "smooth" })}
+      <ReportCompletionPanel
+        gaps={gaps}
+        onAnswer={answerGap}
+        onFocus={focusGap}
+      />
+
+      {editError ? (
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800"
+          role="alert"
         >
-          Review from the top
-        </button>
+          {editError}
+        </p>
+      ) : null}
+
+      <div
+        className={`sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-lg shadow-slate-300/30 backdrop-blur ${
+          ready
+            ? "border-emerald-200 bg-emerald-50/95"
+            : "border-[var(--border)] bg-white/95"
+        }`}
+        aria-live="polite"
+      >
+        <div>
+          <p className={`text-[12px] font-semibold ${ready ? "text-emerald-900" : "text-[var(--text)]"}`}>
+            {ready ? "Ready for review" : "Decision Report not ready"}
+          </p>
+          <p className={`text-[11px] ${ready ? "text-emerald-900/75" : "text-[var(--text-muted)]"}`}>
+            {ready
+              ? "All six required report fields are complete. Optional details are marked separately."
+              : `${gaps.length} required ${gaps.length === 1 ? "field remains" : "fields remain"}. Changes live only in this browser session.`}
+          </p>
+        </div>
+        {!ready ? (
+          <button
+            type="button"
+            className="rounded-lg bg-[var(--text)] px-4 py-2 text-[12px] font-semibold text-white"
+            aria-controls={gaps[0].targetId}
+            onClick={() => focusGap(gaps[0])}
+          >
+            Go to next required field
+          </button>
+        ) : null}
       </div>
     </div>
   );

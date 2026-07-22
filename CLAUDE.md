@@ -42,7 +42,8 @@ There is no `/src` tree, LangGraph layer, Recharts/Tremor dependency, or TanStac
 
 - Slice 1 is implemented at `/onboarding`: `components/decision-report/` renders the compact editable report, while `lib/decision-reports/` owns the versioned schema, validation, tests, and Gummy Alpha fixture.
 - Slice 2 is implemented and live-validated behind the same report contract: the core AI SDK calls Vercel AI Gateway server-side, model output contains no trusted IDs, exact evidence excerpts are verified against the bounded prompt, and unsafe or failed output becomes an editable fallback. The sparse three-proof/three-action Gummy Alpha benchmark completed in one 13.9-second attempt with 1,598 output tokens.
-- Slice 3 is next: a pure deterministic gap scanner, a small typed edit-command reducer shared by direct edits and focused questions, and a compact completion panel. It does not add persistence, a general chatbot, metric handoff, or canonical materialization.
+- Slice 3 is implemented: a pure deterministic gap scanner, a typed edit-command reducer shared by direct edits and focused questions, and a compact completion panel. Required report content produces “Ready for review”; optional owners, customers, stakeholders, governance, and mock-ups never block that state.
+- Slice 4 is next: persist scope-bound, append-only full report revisions with explicit save/reload, retry idempotency, stale-revision conflicts, and an inert typed activation packet. It must not create decisions, predictions, actions, or levers.
 - One typed report aggregate remains the draft during onboarding.
 - One final idempotent operation materializes the decision, prediction, metric relationship, and selected actions.
 - Partner inputs are limited to the initial prompt, pasted supporting text, an existing metric or one metric CSV, and one re-encoded PNG/JPEG mock-up.

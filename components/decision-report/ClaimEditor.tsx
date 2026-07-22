@@ -31,12 +31,14 @@ export function ClaimEditor({
   label,
   placeholder,
   rows = 2,
+  optional = false,
   onChange,
 }: {
   claim: Claim;
   label: string;
   placeholder?: string;
   rows?: number;
+  optional?: boolean;
   onChange: (text: string) => void;
 }) {
   const inputId = `claim-${claim.id}`;
@@ -45,8 +47,10 @@ export function ClaimEditor({
   return (
     <div
       className={`rounded-lg border px-3 py-2 transition-colors ${
-        missing
+        missing && !optional
           ? "border-dashed border-amber-300 bg-amber-50/40"
+          : missing
+            ? "border-dashed border-slate-300 bg-slate-50/60"
           : "border-[var(--border)] bg-[var(--surface)]"
       }`}
     >
@@ -54,7 +58,13 @@ export function ClaimEditor({
         <label className="text-[12px] font-semibold text-[var(--text)]" htmlFor={inputId}>
           {label}
         </label>
-        <ClaimStatusBadge status={claim.status} />
+        {missing && optional ? (
+          <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600">
+            Optional
+          </span>
+        ) : (
+          <ClaimStatusBadge status={claim.status} />
+        )}
       </div>
       <textarea
         id={inputId}
@@ -72,25 +82,41 @@ export function ClaimListEditor({
   claims,
   label,
   placeholder,
+  optional = false,
   onChange,
 }: {
   claims: Claim[];
   label: string;
   placeholder?: string;
+  optional?: boolean;
   onChange: (claimId: string, text: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
-        {label}
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
+          {label}
+        </p>
+        {optional ? (
+          <span className="text-[10px] font-medium normal-case tracking-normal text-slate-500">
+            Optional
+          </span>
+        ) : null}
+      </div>
       {claims.map((claim) => (
         <ClaimEditor
           key={claim.id}
           claim={claim}
-          label={claim.status === "missing" ? "Missing information" : "Claim"}
+          label={
+            claim.status === "missing"
+              ? optional
+                ? "Add if useful"
+                : "Missing information"
+              : "Claim"
+          }
           placeholder={placeholder}
           rows={2}
+          optional={optional}
           onChange={(text) => onChange(claim.id, text)}
         />
       ))}

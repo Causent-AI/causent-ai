@@ -48,6 +48,10 @@ Open `http://localhost:3000/onboarding`, select **Generate Decision Report**, an
 
 The model supplies untrusted content and exact evidence excerpts, never trusted IDs. Unknown scalar claims return as `null` and unknown lists as `[]`; the server assigns IDs, verifies evidence against the brief, and materializes editable missing states for owners, customers, stakeholders, governance, and metric values. Provider failures preserve the brief in a safe editable fallback rather than dead-ending onboarding.
 
+Slice 3 completes required gaps without another model call. The report shows at most three focused questions at a time, applies answers through the same typed reducer as direct edits, and marks the draft ready for review when Decision, Problem, one proof claim, the metric mechanism, the Action Plan summary, and one action are present. Owners, customers, stakeholders, governance, and mock-ups are explicitly optional and do not block review readiness.
+
+Slice 4 is the next implementation boundary: persist the report as scope-bound, append-only revisions and save an immutable reviewed revision for the later metric/prediction handoff. It will not create canonical decisions, predictions, actions, or levers.
+
 Before changing Next.js behavior, read the relevant bundled guide under `node_modules/next/dist/docs/`; this repository uses Next.js 16 conventions that may differ from older App Router documentation.
 
 ## Verification

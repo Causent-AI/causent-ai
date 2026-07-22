@@ -16,7 +16,9 @@ Slice 1 and Slice 2 shipped on `codex/ai-decision-report` on 2026-07-21. `/onboa
 
 The original Slice 2 contract was live-validated: a Gummy Alpha request through `anthropic/claude-sonnet-5` returned a six-action report in one attempt at 24,412 ms and 2,967 output tokens. The latency was too slow for onboarding. The MVP contract now caps Supporting Evidence at three proof claims, caps Implementation at three actions, removes Alternatives, Relevant Precedent, and Estimated Cost, and represents unknown model values as `null`/`[]` before server-side missing-state materialization. The reduced contract live-validated in one 13,852 ms attempt with 1,598 output tokens, three proof claims, and three actions; unsupplied implementation fields materialized as explicit `missing` states. Persistence, inline gap assistance, metric handoff, and idempotent materialization remain later slices.
 
-Slice 3 is the focused completion layer: a pure deterministic gap scanner, a small typed edit-command reducer shared by direct edits and focused answers, and a compact panel exposing at most three open questions. Readiness requires Decision, Problem, at least one proof claim, the core-metric mechanism, the Action Plan summary, and at least one action. Optional implementation metadata does not block. Slice 3 makes no additional model call and deliberately excludes persistence, refresh/Back recovery, general chat history, metric/CSV handoff, uploads, final materialization, and connectors.
+Slice 3 is implemented as the focused completion layer: a pure deterministic gap scanner, a small typed edit-command reducer shared by direct edits and focused answers, and a compact panel exposing at most three open questions. Review readiness requires Decision, Problem, at least one proof claim, the core-metric mechanism, the Action Plan summary, and at least one action. Owners, customers, stakeholders, governance, and mock-ups are explicitly optional and do not block. User answers become `user_confirmed`, clear inherited source attribution, and preserve existing claim/action IDs. The safe fallback can be completed to ready for review without another model request. Live Gummy Alpha browser review caught and fixed the optional-field/readiness contradiction; sparse-fallback and keyboard-focus browser acceptance remain. Persistence, refresh/Back recovery, general chat history, metric/CSV handoff, uploads, final materialization, and connectors remain excluded from Slice 3.
+
+Slice 4 is the durable report boundary. It adds scope-bound `decision_reports` plus append-only full `decision_report_revisions`, explicit save/reload, deterministic identical-save idempotency, and stale-base conflict handling. It also locks a validated `ReportActivationInputV1` packet for the later metric, prediction, and action handoff. The packet remains inert in Slice 4: no canonical decision, prediction, action, decision-action edge, or lever is created.
 
 ## Problem Statement
 
@@ -108,12 +110,13 @@ These questions guide generation and follow-up; they are not additional top-leve
 The partner wedge uses one draft and one canonical write boundary:
 
 ```text
-draft -> ready_for_approval -> materializing -> active
-                           \-> materialization_failed -> retry
+draft -> report_ready -> activation_ready -> materializing -> active
+                                               \-> materialization_failed -> retry
 ```
 
-- `draft`: generation, inline gap questions, direct edits, metric selection, prediction commitment, and action review are stored only in the report aggregate.
-- `ready_for_approval`: required report fields, a confirmed metric, the human-entered prediction, and one to three selected actions pass deterministic validation.
+- `draft`: generation, inline gap questions, and direct report edits are stored only in the report aggregate.
+- `report_ready`: Decision, Problem, at least one proof claim, the metric mechanism, the Action Plan summary, and one to three draft actions pass deterministic validation. Optional Implementation fields may remain missing.
+- `activation_ready`: a confirmed metric, the human-entered prediction, and one to three selected actions are attached to a specific reviewed revision and pass deterministic validation.
 - `materializing`: one idempotent server operation creates the decision, prediction, actions, and relationships.
 - `materialization_failed`: the complete report remains intact; retry resumes safely using `(report_id, source_item_id)` keys.
 - `active`: canonical IDs are stored on the report and the first-run experience will not repeat.
@@ -245,7 +248,7 @@ type DecisionReportV1 = {
 
 `dataClassification` is descriptive metadata only and never changes authorization or Storage visibility. Actual access remains scope/RLS controlled and private by default.
 
-Runtime schema rules, not TypeScript comments, enforce cardinality and transition requirements. The untrusted model DTO uses `null` for an unknown scalar claim and `[]` for an unknown claim list; server materialization creates `Claim { status: "missing" }` only for a field the UI must visibly request. At `ready_for_approval`, Decision, rationale, metric mechanism, confirmed metric, human prediction commitment, and `actions` must each be present; proof claims and actions are each runtime-constrained to 1-3. At `active`, the canonical decision, prediction, and at least one approved action ID are required.
+Runtime schema rules, not TypeScript comments, enforce cardinality and transition requirements. The untrusted model DTO uses `null` for an unknown scalar claim and `[]` for an unknown claim list; server materialization creates `Claim { status: "missing" }` only for a field the UI must visibly request. At `report_ready`, Decision, Problem, at least one proof claim, metric mechanism, Action Plan summary, and one to three draft actions must be present. At `activation_ready`, the reviewed revision, confirmed metric, human prediction commitment, and one to three selected action source-item IDs are required. At `active`, the canonical decision, prediction, and at least one approved action ID are required.
 
 Before parallel implementation begins, this contract and one complete golden JSON fixture must pass shared contract tests.
 
