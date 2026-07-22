@@ -55,39 +55,58 @@ Acceptance: the safe fallback can be completed into a report-ready draft; the Gu
 
 Non-goals: report persistence, refresh/Back recovery, general chatbot/history, metric or CSV handoff, uploads, final graph materialization, and connector work.
 
-### Slice 4 — durable report revisions and approval boundary
+### Completed Slice 4 — durable report revisions and approval boundary
 
 Goal: make the reviewed Decision Report durable and retry-safe without prematurely writing the canonical decision graph.
 
-- [ ] Add `decision_reports` and `decision_report_revisions` with scope-bound RLS and explicit grants. Revisions are append-only full `DecisionReportV1` snapshots with author, timestamp, base revision, and a deterministic content hash.
-- [ ] Add injected-client repository functions to create a report, append a revision, and load its current revision. Repeating an identical save must reuse the existing revision; a stale base revision must return a conflict with the current revision ID.
-- [ ] Bind server actions to the authenticated scope and runtime schema. Save only on an explicit user action in this slice; do not add per-keystroke autosave.
-- [ ] Add `Saved`/`Unsaved` UI state and an explicit **Save report** or **Save and continue** action. Reloading the saved report must reproduce the exact reviewed snapshot.
-- [ ] Define and validate a pure `ReportActivationInputV1` contract containing the report/revision IDs, confirmed metric ID, human prediction fields, and selected action source-item IDs. Do not execute it yet.
-- [ ] Integration-test cross-workspace denial, append-only revisions, identical-save idempotency, stale-revision conflicts, schema/readiness rejection, and exact reload.
+- [x] Add `decision_reports` and `decision_report_revisions` with scope-bound RLS and explicit grants. Revisions are append-only full `DecisionReportV1` snapshots with author, timestamp, base revision, and a database-owned deterministic content hash.
+- [x] Add injected-client repository functions to create a report, append a revision, and load its current revision. Identical saves reuse the existing revision; a stale base revision returns an immediate HTTP 409 conflict with the current revision ID.
+- [x] Bind generation and persistence server actions to the authenticated session and scope, then validate all client payloads at runtime. Save only on explicit user action; no per-keystroke autosave was added.
+- [x] Add `Saved`/`Unsaved` UI state and explicit **Save draft**, **Save report**, and **Save changes** actions. The stable `?report=<id>` route reloads the exact report snapshot and metric projection.
+- [x] Define and validate a pure, inert `ReportActivationInputV1` containing the report/revision IDs, confirmed metric ID, human prediction fields, and one to three selected action source-item IDs.
+- [x] Integration-test cross-workspace denial, read-only report tables, append-only revisions, identical-save idempotency, stale-revision conflicts, schema/readiness rejection, exact reload, and zero canonical graph writes.
 
 Acceptance: a ready Gummy Alpha report persists once; an identical retry creates no revision; one real edit creates one revision; another workspace cannot read or write it; reload restores the same report; and the slice creates zero `decisions`, `predictions`, `actions`, `decision_actions`, or `levers`.
 
+Verification: the live local Supabase repository test passes both cases in roughly 250 ms; the RLS isolation suite passes 19/19; TypeScript, targeted lint, all 368 library tests, the Supabase schema linter, and the webpack production build pass. Manual UI acceptance remains part of the partner pass.
+
 Non-goals: sources/assets/uploads, Data Workshop or CSV handoff, human-prediction UI, canonical materialization, connectors, and per-keystroke autosave.
 
-### Work after Slice 4
+### Completed Slice 5 — reviewed-report activation bridge
+
+Goal: let one saved Decision Report produce several canonical assets without allowing duplicate or partial graph writes.
+
+- [x] Add a three-part activation panel for real metric confirmation, a blank human prediction commitment, and selection of one to three generated actions.
+- [x] Keep the illustrative metric chart separate from the commitment: it never pre-fills direction, magnitude, resolution date, or metric observations.
+- [x] Add `decision_report_activations` as a scope-bound, read-only audit table and add the `active` report state plus canonical identity pointers.
+- [x] Add one checked `activate_decision_report_v1` transaction that validates the exact reviewed revision, workspace metric, human prediction, and selected source-item IDs before creating one decision, one prediction, planned manual actions, and decision-action links.
+- [x] Make exact retries return the same activation/decision/prediction/action IDs; return an immediate HTTP 409 when a retry changes the activation inputs.
+- [x] Lock active reports against later revision saves. Activation failures leave the complete `report_ready` revision intact with zero partial canonical rows.
+- [x] Hand off to `/actions?selected=<decision_id>` and render report-created actions with collision-free UUID identities plus a `Planned` reference instead of a fake GitHub PR number.
+- [x] Keep lever creation, tracker tickets, causal edges, evidence, and impact claims outside activation.
+- [x] Verify live atomic creation, exact retry reuse, changed-retry conflict, invalid-action rollback, cross-workspace metric rejection, zero levers, active-report reload, and edit locking. Expand the authenticated RLS gate to 22 passing cases.
+
+Acceptance: a saved reviewed Gummy Alpha report requires explicit human metric/prediction/action choices; activation creates the intended canonical rows exactly once; retry and failure paths create no duplicates or partial plan; the user lands on the selected decision in Actions & Decisions.
+
+Non-goals: metric creation, CSV ingestion, source/assets/uploads, connectors, tracker ticket creation, lever selection, causal impact, Completion Outlook, and per-keystroke autosave.
+
+### Work after Slice 5
 
 - Add private Storage handling for one size-capped PNG/JPEG: magic-byte validation, decode/re-encode, scoped read, deletion, and failure states.
-- Reuse existing metric selection/CSV and human prediction commitment behavior to complete `ReportActivationInputV1`.
-- Materialize the canonical decision, prediction, metric relationship, and selected actions once after final activation approval.
+- Add a real metric-creation/CSV ingestion path in Data Workshop; Slice 5 currently confirms only an existing workspace metric and provides a return link.
+- Store or index Decision Reports in the Reports tab instead of relying only on the stable onboarding report URL.
 - Keep lever creation as a subsequent explicit action-selection step.
 - Feature-flag the new onboarding per user/workspace; preserve legacy onboarding as rollback.
 
 ### Persistence and materialization
 
 - Preserve state through refresh and Back; consider autosave only after explicit-save behavior is reliable.
-- Make final activation retries idempotent and verify double-submit creates zero duplicates.
-- Store the reviewed report in Reports and surface activated work in Actions & Decisions.
+- Store the reviewed report in Reports; activated work already surfaces in Actions & Decisions.
 
 ### Partner verification
 
 - Unit-test schema, provenance invariants, gap ordering, and typed edits.
-- Integration-test RLS, snapshots, asset access, and idempotent materialization.
+- Integration-test asset access when the supplied-image path lands; report RLS, snapshots, and idempotent materialization are covered.
 - Browser-test partial generation, direct edits, inline questions, metric confirmation, approval, retry, refresh, Back, and feature-flag rollback.
 - Add at least nine adversarial unsupported-claim scenarios.
 - Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, metric mechanism plausible, next action usable.

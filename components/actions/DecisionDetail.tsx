@@ -14,6 +14,7 @@ import {
   resolveNow,
   recordScorecardView,
 } from "@/app/(dashboard)/actions/server-actions";
+import { actionReferenceLabel } from "@/components/actions/ActionReference";
 
 // The decision detail view (replaces the action-centric DecisionEditor):
 // intent (rationale) → the actions carrying it (lever marked) → the
@@ -26,14 +27,10 @@ import {
 function MidWindowTouch({ resolutionDate }: { resolutionDate: string }) {
   const due = Date.parse(resolutionDate);
   if (Number.isNaN(due)) return null;
-  const days = Math.max(0, Math.ceil((due - Date.now()) / 86_400_000));
   return (
     <p className="mt-1 text-[12px] text-[var(--text-subtle)]">
       <span aria-hidden="true">⧗ </span>
-      Still on track — nothing has drifted.{" "}
-      {days === 0
-        ? "Resolves today."
-        : `${days} day${days === 1 ? "" : "s"} to resolution (${resolutionDate}).`}
+      Still on track — nothing has drifted. Resolves {resolutionDate}.
     </p>
   );
 }
@@ -257,7 +254,7 @@ export function DecisionDetail({
                   onClick={() => onSelectAction(id)}
                   className="text-[var(--text)] underline-offset-2 hover:underline"
                 >
-                  {a ? `#${a.pr} ${a.title}` : id}
+                  {a ? `${actionReferenceLabel(a)} ${a.title}` : id}
                 </button>
                 {isLever && (
                   <span className="rounded-full border border-[var(--text)]/20 bg-[var(--bg)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
@@ -265,7 +262,9 @@ export function DecisionDetail({
                   </span>
                 )}
                 {a && a.shippedAt === null && (
-                  <span className="text-[11px] text-[var(--text-subtle)]">not shipped</span>
+                  <span className="text-[11px] text-[var(--text-subtle)]">
+                    {a.source === "manual" ? "planned" : "not shipped"}
+                  </span>
                 )}
               </li>
             );

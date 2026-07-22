@@ -12,10 +12,12 @@ import type {
 export function SupportingEvidenceSection({
   evidence,
   projection,
+  readOnly = false,
   onClaimChange,
 }: {
   evidence: DecisionReportV1["supportingEvidence"];
   projection: MetricProjection;
+  readOnly?: boolean;
   onClaimChange: (claimId: string, text: string) => void;
 }) {
   return (
@@ -28,6 +30,7 @@ export function SupportingEvidenceSection({
         <ClaimListEditor
           claims={evidence.factors}
           label="Factors and supplied evidence"
+          readOnly={readOnly}
           onChange={onClaimChange}
         />
         <MetricPredictionChart projection={projection} />
@@ -36,6 +39,7 @@ export function SupportingEvidenceSection({
       <ClaimEditor
         claim={evidence.metricMechanism[0]}
         label="Why this should affect the core metric"
+        readOnly={readOnly}
         onChange={(text) => onClaimChange(evidence.metricMechanism[0].id, text)}
       />
     </ReportSection>

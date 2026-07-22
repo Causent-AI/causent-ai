@@ -2,6 +2,25 @@
 
 Branch: `feat/schema-rls` · Migrations: `20260703223627_v1_schema.sql`, `20260703223628_v1_rls.sql`
 
+Historical note: this report records the original v1 schema review. The active
+`codex/ai-decision-report` branch adds `decision_reports`, append-only
+`decision_report_revisions`, and append-only `decision_report_activations` through
+the Slice 4/5 migrations beginning at `20260722052759_decision_report_persistence.sql`.
+Authenticated reads are scope-bound through `has_scope_access`; direct application
+writes are revoked and checked security-definer RPCs require member access. The
+current isolation gate inspects at least 22 public tables and passes 22/22 tests.
+
+Slice 5 adds the `active` report state and an atomic
+`activate_decision_report_v1` RPC. It locks the report, validates the exact current
+and reviewed revision, confirms the metric belongs to the report workspace, validates
+one human prediction plus one to three source-item IDs against the stored snapshot,
+then creates one decision, one prediction, planned manual actions, their decision links,
+and one activation audit row in the same transaction. A deterministic input hash returns
+the original canonical IDs for identical retries and rejects changed retries with HTTP 409.
+The RPC creates no lever, causal edge, evidence object, observation, or impact claim.
+Application roles can read activation audit rows through RLS but cannot insert, update,
+or delete them directly.
+
 ## Verdict
 
 **Merge-ready.** All 11 tables ship with RLS enabled; the live tenant-isolation

@@ -9,9 +9,11 @@ import { DEMO_SCOPE_ID, METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
 import { getMetricRecords } from "@/lib/data/metrics";
 import { edgeKey, loadEdgeReadouts } from "@/lib/data/graph";
 import { toImpactCell } from "@/lib/data/readout";
+import { toActionIdentity } from "@/lib/data/action-identifiers";
 
 type ActionRow = {
   action_id: string;
+  source: string | null;
   external_ref: string | null;
   ship_ts: string | null;
   effective_date: string | null;
@@ -26,12 +28,6 @@ type RationaleDoc = {
   content?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
   meta?: { expected_metric?: string };
 };
-
-/** "PR #8421" -> 8421; null/garbage -> 0. */
-function parsePr(externalRef: string | null): number {
-  const m = externalRef?.match(/(\d+)/);
-  return m ? Number(m[1]) : 0;
-}
 
 /** Flatten a rationale doc's paragraphs into plain-text lines. */
 function paragraphs(doc: RationaleDoc | null): string[] {
@@ -60,7 +56,7 @@ export async function getActions(): Promise<Action[]> {
   const [actionsRes, records, edges] = await Promise.all([
     sb
       .from("actions")
-      .select("action_id, external_ref, ship_ts, effective_date, status, rationale_richtext")
+      .select("action_id, source, external_ref, ship_ts, effective_date, status, rationale_richtext")
       .eq("scope_id", DEMO_SCOPE_ID)
       .order("effective_date", { ascending: false }),
     getMetricRecords(),
@@ -72,7 +68,7 @@ export async function getActions(): Promise<Action[]> {
   const firstMetricSlug = records[0]?.metric.id ?? "arr";
 
   return actionRows.map((row) => {
-    const pr = parsePr(row.external_ref);
+    const identity = toActionIdentity(row);
     const doc = row.rationale_richtext;
     const body = paragraphs(doc);
 
@@ -83,13 +79,16 @@ export async function getActions(): Promise<Action[]> {
 
     // Primary metric = the action's hypothesized target (rationale meta), by slug.
     const expectedName = doc?.meta?.expected_metric;
-    const primaryMetricId =
-      (expectedName && METRIC_CONFIG_BY_NAME[expectedName]?.id) || firstMetricSlug;
+    const primaryMetricId = expectedName
+      ? (METRIC_CONFIG_BY_NAME[expectedName]?.id ?? expectedName)
+      : firstMetricSlug;
 
     const action: Action = {
-      id: `a-${pr}`,
-      pr,
-      title: doc?.title ?? row.external_ref ?? `PR #${pr}`,
+      id: identity.uiId,
+      pr: identity.pr,
+      source: identity.source,
+      referenceLabel: identity.referenceLabel,
+      title: doc?.title ?? row.external_ref ?? identity.referenceLabel,
       shippedAt: row.effective_date ?? (row.ship_ts ? row.ship_ts.slice(0, 10) : null),
       primaryMetricId,
       impact,

@@ -1,5 +1,6 @@
 import type { Action, Metric } from "@/lib/types";
 import { Delta } from "@/components/ui/Delta";
+import { actionReferenceLabel } from "@/components/actions/ActionReference";
 
 // Slim detail for an action selected on its own (an unassigned action, or a
 // drill-down from a decision). Replaces the retired DecisionEditor — the
@@ -22,11 +23,11 @@ export function ActionDetail({
             {action.title}
           </h2>
           <span className="text-[14px] tabular-nums text-[var(--text-subtle)]">
-            #{action.pr}
+            {actionReferenceLabel(action)}
           </span>
         </div>
         <p className="mt-0.5 text-[12px] text-[var(--text-subtle)]">
-          {action.shippedAt ? `Shipped ${action.shippedAt}` : "Not shipped"}
+          {action.shippedAt ? `Shipped ${action.shippedAt}` : action.source === "manual" ? "Planned from Decision Report" : "Not shipped"}
         </p>
       </div>
 

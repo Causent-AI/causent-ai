@@ -7,7 +7,7 @@ The product has two existing loops:
 - **Retrospective:** ingest a shipped action, connect it to a metric, and produce an honest Interrupted Time Series readout.
 - **Prospective:** record a decision and human prediction before shipping, watch the implementation lever, and resolve the prediction against measured evidence.
 
-The active product plan adds an **AI-assisted Decision Report** as the onboarding wedge. One initial prompt produces multiple coordinated assets: a partial report, up to three sourced proof claims, a metric hypothesis/chart, an action-plan summary, up to three draft actions, and a rendered supplied mock-up. Focused inline questions fill required gaps; this is structured generation, not a general chatbot.
+The active product plan adds an **AI-assisted Decision Report** as the onboarding wedge. One initial prompt produces multiple coordinated assets: a partial report, up to three sourced proof claims, a metric hypothesis/chart, an action-plan summary, up to three draft actions, and an explicit supplied-mock-up state. Focused inline questions fill required gaps; this is structured generation, not a general chatbot.
 
 See [docs/STATUS.md](docs/STATUS.md) for the current build state and [docs/designs/ai-assisted-decision-report.md](docs/designs/ai-assisted-decision-report.md) for the approved active plan.
 
@@ -15,7 +15,7 @@ See [docs/STATUS.md](docs/STATUS.md) for the current build state and [docs/desig
 
 - Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
 - Supabase PostgreSQL, Auth, RLS, and Storage
-- Anthropic API for bounded structured generation and summary polishing
+- Vercel AI Gateway and the AI SDK for bounded Anthropic structured generation; Anthropic for summary polishing
 - Python/NumPy causal engine deployed as Vercel functions
 - Vercel application hosting
 
@@ -23,10 +23,10 @@ The application lives at the repository root rather than under `src/`.
 
 ## Product surfaces
 
-- `/onboarding` — AI-assisted Decision Report onboarding with bounded live generation, verified provenance, and a safe editable fallback
+- `/onboarding` — AI-assisted Decision Report onboarding with bounded live generation, durable revisions, metric/prediction activation, and a safe editable fallback
 - `/reports` — saved reports and future Decision Report home
 - `/actions` — decisions, predictions, actions, levers, drift, and scorecards
-- `/data-workshop` — metric connection and CSV input
+- `/data-workshop` — core-metric inventory and the current CSV input affordance
 - `/impact` — causal impact readouts
 
 ## Local development
@@ -50,7 +50,19 @@ The model supplies untrusted content and exact evidence excerpts, never trusted 
 
 Slice 3 completes required gaps without another model call. The report shows at most three focused questions at a time, applies answers through the same typed reducer as direct edits, and marks the draft ready for review when Decision, Problem, one proof claim, the metric mechanism, the Action Plan summary, and one action are present. Owners, customers, stakeholders, governance, and mock-ups are explicitly optional and do not block review readiness.
 
-Slice 4 is the next implementation boundary: persist the report as scope-bound, append-only revisions and save an immutable reviewed revision for the later metric/prediction handoff. It will not create canonical decisions, predictions, actions, or levers.
+Slice 4 makes the report durable. An explicit **Save draft**, **Save report**, or **Save changes** action writes a scope-bound full snapshot to append-only revisions, updates the URL with the stable report ID, and restores the exact report and metric projection on reload. Identical retries reuse the current revision and stale tabs receive a conflict instead of overwriting newer work. The validated `ReportActivationInputV1` handoff is defined but deliberately inert: saving a report creates no canonical decisions, predictions, actions, decision-action edges, or levers.
+
+Slice 5 activates one exact reviewed revision. After saving a complete report, the user confirms an existing workspace metric, enters the human prediction direction/magnitude/resolution date, and selects one to three report actions. One checked database transaction creates one decision, one prediction, the selected planned manual actions, their decision links, and an append-only activation audit row. Identical retries return the same IDs; changed retries fail with HTTP 409. Activation creates no lever, causal edge, evidence object, tracker ticket, or impact claim. The active report becomes read-only and opens directly in **Actions & Decisions**. Report-created actions use UUID identities and a `Planned` label rather than pretending to be GitHub PRs.
+
+To exercise the Slice 5 handoff locally, start Supabase and apply migrations before opening the app:
+
+```bash
+supabase start
+supabase migration up --local
+CAUSENT_LOCAL_DEMO=1 npm run dev
+```
+
+Generate or reload a report, complete the required fields, save the reviewed revision, choose a real workspace metric, enter the team prediction, select one to three actions, and choose **Activate decision**. The illustrative report chart is never copied into the human prediction or stored as metric observations.
 
 Before changing Next.js behavior, read the relevant bundled guide under `node_modules/next/dist/docs/`; this repository uses Next.js 16 conventions that may differ from older App Router documentation.
 
@@ -76,6 +88,7 @@ Database-backed engine/RLS/bridge tests require the local Supabase stack:
 
 ```bash
 supabase start
+supabase migration up --local
 ```
 
 ## Documentation

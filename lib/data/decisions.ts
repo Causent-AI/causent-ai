@@ -12,6 +12,7 @@ import type {
 import { getServerSupabase } from "@/lib/supabase-server";
 import { DEMO_SCOPE_ID, METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
 import { getDriftByPrediction } from "@/lib/data/drift";
+import { toActionIdentity } from "@/lib/data/action-identifiers";
 
 type RationaleDoc = {
   content?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
@@ -110,7 +111,7 @@ export async function getDecisions(): Promise<Decision[]> {
       .eq("scope_id", DEMO_SCOPE_ID)
       .order("created_at", { ascending: false }),
     // uuid -> UI "a-<pr>" id map (same derivation as lib/data/actions.ts).
-    sb.from("actions").select("action_id, external_ref").eq("scope_id", DEMO_SCOPE_ID),
+    sb.from("actions").select("action_id, source, external_ref").eq("scope_id", DEMO_SCOPE_ID),
     // Baseline drift, computed on read through the engine (empty on any failure).
     getDriftByPrediction(),
   ]);
@@ -118,11 +119,12 @@ export async function getDecisions(): Promise<Decision[]> {
   if (actionsRes.error) throw actionsRes.error;
 
   const uiIdByUuid = new Map(
-    (actionsRes.data as Array<{ action_id: string; external_ref: string | null }>).map(
-      (a) => {
-        const m = a.external_ref?.match(/(\d+)/);
-        return [a.action_id, m ? `a-${m[1]}` : a.action_id] as const;
-      },
+    (actionsRes.data as Array<{
+      action_id: string;
+      source: string | null;
+      external_ref: string | null;
+    }>).map(
+      (action) => [action.action_id, toActionIdentity(action).uiId] as const,
     ),
   );
 

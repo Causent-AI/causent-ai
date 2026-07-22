@@ -5,6 +5,7 @@ import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "./fixtures/gummy-alpha.ts";
 import {
   cloneDecisionReport,
   validateDecisionReport,
+  validateMetricProjection,
 } from "./schema.ts";
 
 test("Gummy Alpha is a valid versioned Decision Report fixture", () => {
@@ -53,5 +54,21 @@ test("supporting evidence cannot exceed three proof claims", () => {
   assert.equal(result.success, false);
   if (!result.success) {
     assert.ok(result.errors.some((error) => error.includes("supportingEvidence.factors cannot exceed 3")));
+  }
+});
+
+test("metric projections validate bounded percentages and evidence state", () => {
+  const valid = validateMetricProjection(GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection);
+  assert.equal(valid.success, true);
+
+  const invalid = validateMetricProjection({
+    ...GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    predictedPct: 140,
+    evidenceState: "observed",
+  });
+  assert.equal(invalid.success, false);
+  if (!invalid.success) {
+    assert.ok(invalid.errors.some((error) => error.includes("predictedPct")));
+    assert.ok(invalid.errors.some((error) => error.includes("evidenceState")));
   }
 });

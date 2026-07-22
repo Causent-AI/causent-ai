@@ -6,6 +6,7 @@ type GovernanceValue = DecisionReportV1["implementation"]["governance"]["dataCla
 
 export function ImplementationSection({
   implementation,
+  readOnly = false,
   onClaimChange,
   onActionTitleChange,
   onActionSummaryChange,
@@ -13,6 +14,7 @@ export function ImplementationSection({
   onDataClassificationChange,
 }: {
   implementation: DecisionReportV1["implementation"];
+  readOnly?: boolean;
   onClaimChange: (claimId: string, text: string) => void;
   onActionTitleChange: (sourceItemId: string, title: string) => void;
   onActionSummaryChange: (sourceItemId: string, text: string) => void;
@@ -28,6 +30,7 @@ export function ImplementationSection({
       <ClaimEditor
         claim={implementation.actionPlanSummary[0]}
         label="Action Plan summary"
+        readOnly={readOnly}
         onChange={(text) => onClaimChange(implementation.actionPlanSummary[0].id, text)}
       />
 
@@ -57,6 +60,7 @@ export function ImplementationSection({
                   id={`action-title-${action.sourceItemId}`}
                   className="w-full bg-transparent text-[13px] font-semibold text-[var(--text)] outline-none"
                   value={action.title}
+                  disabled={readOnly}
                   onChange={(event) => onActionTitleChange(action.sourceItemId, event.target.value)}
                 />
                 <label className="sr-only" htmlFor={`action-summary-${action.sourceItemId}`}>
@@ -67,6 +71,7 @@ export function ImplementationSection({
                   className="mt-0.5 w-full resize-y bg-transparent text-[12px] leading-5 text-[var(--text-muted)] outline-none"
                   rows={1}
                   value={action.summary[0]?.text ?? ""}
+                  disabled={readOnly}
                   onChange={(event) => onActionSummaryChange(action.sourceItemId, event.target.value)}
                 />
               </div>
@@ -89,6 +94,7 @@ export function ImplementationSection({
                   id={`action-owner-${action.sourceItemId}`}
                   className="mt-1 w-full bg-transparent text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--text-subtle)]"
                   value={action.owner?.text ?? ""}
+                  disabled={readOnly}
                   placeholder="Assign an owner"
                   onChange={(event) => onActionOwnerChange(action.sourceItemId, event.target.value)}
                 />
@@ -116,6 +122,7 @@ export function ImplementationSection({
           label="Customers"
           placeholder="Name the affected customer group."
           optional
+          readOnly={readOnly}
           onChange={onClaimChange}
         />
         <ClaimListEditor
@@ -123,6 +130,7 @@ export function ImplementationSection({
           label="Stakeholders"
           placeholder="Name the accountable stakeholders."
           optional
+          readOnly={readOnly}
           onChange={onClaimChange}
         />
       </div>
@@ -150,6 +158,7 @@ export function ImplementationSection({
             id="data-classification"
             className="mt-1 w-full rounded border border-[var(--border)] bg-white px-3 py-2 text-[12px] text-[var(--text)]"
             value={implementation.governance.dataClassification ?? ""}
+            disabled={readOnly}
             onChange={(event) => onDataClassificationChange((event.target.value || null) as GovernanceValue)}
           >
             <option value="">Not declared</option>
@@ -163,6 +172,7 @@ export function ImplementationSection({
               label="Allowed data sources"
               rows={2}
               optional
+              readOnly={readOnly}
               onChange={(text) =>
                 onClaimChange(implementation.governance.allowedDataSources[0].id, text)
               }
@@ -172,6 +182,7 @@ export function ImplementationSection({
               label="Approved model notes"
               rows={2}
               optional
+              readOnly={readOnly}
               onChange={(text) =>
                 onClaimChange(implementation.governance.approvedModelNotes[0].id, text)
               }

@@ -32,6 +32,7 @@ export function ClaimEditor({
   placeholder,
   rows = 2,
   optional = false,
+  readOnly = false,
   onChange,
 }: {
   claim: Claim;
@@ -39,6 +40,7 @@ export function ClaimEditor({
   placeholder?: string;
   rows?: number;
   optional?: boolean;
+  readOnly?: boolean;
   onChange: (text: string) => void;
 }) {
   const inputId = `claim-${claim.id}`;
@@ -72,6 +74,7 @@ export function ClaimEditor({
         value={claim.text}
         rows={rows}
         placeholder={placeholder ?? (missing ? "Add what you know…" : undefined)}
+        disabled={readOnly}
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
@@ -83,12 +86,14 @@ export function ClaimListEditor({
   label,
   placeholder,
   optional = false,
+  readOnly = false,
   onChange,
 }: {
   claims: Claim[];
   label: string;
   placeholder?: string;
   optional?: boolean;
+  readOnly?: boolean;
   onChange: (claimId: string, text: string) => void;
 }) {
   return (
@@ -117,6 +122,7 @@ export function ClaimListEditor({
           placeholder={placeholder}
           rows={2}
           optional={optional}
+          readOnly={readOnly}
           onChange={(text) => onChange(claim.id, text)}
         />
       ))}

@@ -70,6 +70,10 @@ export type ValidationResult =
   | { success: true; data: DecisionReportV1 }
   | { success: false; errors: string[] };
 
+export type MetricProjectionValidationResult =
+  | { success: true; data: MetricProjection }
+  | { success: false; errors: string[] };
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -211,6 +215,48 @@ export function validateDecisionReport(value: unknown): ValidationResult {
 
   return errors.length === 0
     ? { success: true, data: value as DecisionReportV1 }
+    : { success: false, errors };
+}
+
+export function validateMetricProjection(
+  value: unknown,
+): MetricProjectionValidationResult {
+  const errors: string[] = [];
+  if (!isRecord(value)) {
+    return { success: false, errors: ["metric projection must be an object"] };
+  }
+
+  for (const field of [
+    "metricName",
+    "definition",
+    "baselineLabel",
+    "predictionLabel",
+  ] as const) {
+    if (typeof value[field] !== "string" || value[field].trim() === "") {
+      errors.push(`${field} must be a non-empty string`);
+    }
+  }
+
+  for (const field of ["baselinePct", "predictedPct"] as const) {
+    const numeric = value[field];
+    if (
+      numeric !== null &&
+      (typeof numeric !== "number" || !Number.isFinite(numeric) || numeric < 0 || numeric > 100)
+    ) {
+      errors.push(`${field} must be null or a finite percentage from 0 to 100`);
+    }
+  }
+
+  if (
+    !["illustrative_assumption", "prompt_supplied", "missing"].includes(
+      value.evidenceState as MetricProjection["evidenceState"],
+    )
+  ) {
+    errors.push("evidenceState is invalid");
+  }
+
+  return errors.length === 0
+    ? { success: true, data: value as MetricProjection }
     : { success: false, errors };
 }
 

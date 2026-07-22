@@ -58,6 +58,9 @@ export type Action = {
   id: string;
   /** GitHub PR number, e.g. 8421. */
   pr: number;
+  /** Origin and human-readable reference. Optional for legacy seed fixtures. */
+  source?: "github" | "jira" | "manual";
+  referenceLabel?: string;
   title: string;
   /** ISO yyyy-mm-dd ship date. null = not yet shipped (an open lever — see VOIDED). */
   shippedAt: string | null;

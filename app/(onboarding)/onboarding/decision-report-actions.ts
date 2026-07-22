@@ -8,6 +8,8 @@ import {
   generateDecisionReportFromPrompt,
   type DecisionReportGenerationResult,
 } from "@/lib/decision-reports/generate";
+import { getSession } from "@/lib/auth/session";
+import { isLocalDemo } from "@/lib/supabase-server";
 
 export type GenerateDecisionReportActionResult =
   | { ok: true; generation: DecisionReportGenerationResult }
@@ -16,6 +18,11 @@ export type GenerateDecisionReportActionResult =
 export async function generateDecisionReportAction(
   rawPrompt: string,
 ): Promise<GenerateDecisionReportActionResult> {
+  const session = await getSession();
+  if (!isLocalDemo() && !session.userId) {
+    return { ok: false, error: "Sign in before generating a Decision Report." };
+  }
+
   const prompt = rawPrompt.trim();
   if (prompt.length < DECISION_REPORT_PROMPT_MIN_CHARS) {
     return {

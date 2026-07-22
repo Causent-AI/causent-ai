@@ -1,22 +1,66 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { DecisionReportEditor } from "@/components/decision-report/DecisionReportEditor";
 import {
   generateDecisionReportAction,
   type GenerateDecisionReportActionResult,
 } from "@/app/(onboarding)/onboarding/decision-report-actions";
 import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "@/lib/decision-reports/fixtures/gummy-alpha";
+import type { DecisionReportPersistenceStatus } from "@/lib/decision-reports/persistence";
+import type { DecisionReportActivationPointer } from "@/lib/decision-reports/persistence";
+import type { ReportActivationMetric } from "@/lib/decision-reports/materialization";
+import type { DecisionReportV1, MetricProjection } from "@/lib/decision-reports/schema";
 
 type GeneratedReport = Extract<
   GenerateDecisionReportActionResult,
   { ok: true }
 >["generation"];
 
-export function DecisionReportOnboarding() {
+export type InitialSavedDecisionReport = {
+  report: DecisionReportV1;
+  metricProjection: MetricProjection;
+  workspaceName: string;
+  projectName: string;
+  persistence: {
+    reportId: string;
+    revisionId: string;
+    status: DecisionReportPersistenceStatus;
+    savedAt: string;
+    activation: DecisionReportActivationPointer | null;
+  };
+};
+
+type ReportDraft = {
+  report: DecisionReportV1;
+  metricProjection: MetricProjection;
+  workspaceName: string;
+  projectName: string;
+  generationMeta?: {
+    mode: "live" | "fixture" | "fallback";
+    warning: string | null;
+    latencyMs: number;
+    totalTokens: number | null;
+  };
+  persistence?: InitialSavedDecisionReport["persistence"];
+};
+
+export function DecisionReportOnboarding({
+  initialSavedReport = null,
+  initialLoadError = null,
+  activationMetrics = [],
+}: {
+  initialSavedReport?: InitialSavedDecisionReport | null;
+  initialLoadError?: string | null;
+  activationMetrics?: ReportActivationMetric[];
+}) {
+  const router = useRouter();
   const [prompt, setPrompt] = useState(GUMMY_ALPHA_GOLDEN_EXAMPLE.initialPrompt);
-  const [generated, setGenerated] = useState<GeneratedReport | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ReportDraft | null>(() =>
+    initialSavedReport ? { ...initialSavedReport } : null,
+  );
+  const [error, setError] = useState<string | null>(initialLoadError);
   const [isPending, startTransition] = useTransition();
 
   function generateReport() {
@@ -27,25 +71,38 @@ export function DecisionReportOnboarding() {
         setError(result.error);
         return;
       }
-      setGenerated(result.generation);
+      const generated: GeneratedReport = result.generation;
+      setDraft({
+        report: generated.report,
+        metricProjection: generated.metricProjection,
+        workspaceName: generated.workspaceName,
+        projectName: generated.projectName,
+        generationMeta: {
+          mode: generated.mode,
+          warning: generated.warning,
+          latencyMs: generated.telemetry.latencyMs,
+          totalTokens: generated.telemetry.totalTokens,
+        },
+      });
     });
   }
 
-  if (generated) {
+  if (draft) {
     return (
       <div id="report-top">
         <DecisionReportEditor
-          initialReport={generated.report}
-          projection={generated.metricProjection}
-          workspaceName={generated.workspaceName}
-          projectName={generated.projectName}
-          generationMeta={{
-            mode: generated.mode,
-            warning: generated.warning,
-            latencyMs: generated.telemetry.latencyMs,
-            totalTokens: generated.telemetry.totalTokens,
+          initialReport={draft.report}
+          projection={draft.metricProjection}
+          workspaceName={draft.workspaceName}
+          projectName={draft.projectName}
+          generationMeta={draft.generationMeta}
+          initialPersistence={draft.persistence}
+          activationMetrics={activationMetrics}
+          onStartOver={() => {
+            setDraft(null);
+            setError(null);
+            router.replace("/onboarding", { scroll: false });
           }}
-          onStartOver={() => setGenerated(null)}
         />
       </div>
     );

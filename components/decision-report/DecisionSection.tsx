@@ -4,9 +4,11 @@ import type { DecisionReportV1 } from "@/lib/decision-reports/schema";
 
 export function DecisionSection({
   decision,
+  readOnly = false,
   onClaimChange,
 }: {
   decision: DecisionReportV1["decision"];
+  readOnly?: boolean;
   onClaimChange: (claimId: string, text: string) => void;
 }) {
   return (
@@ -19,6 +21,7 @@ export function DecisionSection({
         claim={decision.decision[0]}
         label="Decision being made"
         rows={2}
+        readOnly={readOnly}
         onChange={(text) => onClaimChange(decision.decision[0].id, text)}
       />
       <div className="grid gap-4 lg:grid-cols-2">
@@ -26,12 +29,14 @@ export function DecisionSection({
           claim={decision.background[0]}
           label="Background"
           rows={3}
+          readOnly={readOnly}
           onChange={(text) => onClaimChange(decision.background[0].id, text)}
         />
         <ClaimEditor
           claim={decision.problem[0]}
           label="Problem"
           rows={3}
+          readOnly={readOnly}
           onChange={(text) => onClaimChange(decision.problem[0].id, text)}
         />
       </div>

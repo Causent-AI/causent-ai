@@ -10,16 +10,18 @@ on-ramp (human pre-registered prediction → drift watch → engine-measured res
 that makes Causent's leverage visible immediately. One initial prompt produces multiple
 coordinated assets from one typed report aggregate: a partial three-section report,
 sourced-evidence summary with up to three proof claims, metric hypothesis/chart, action-plan
-summary, up to three draft actions, and a supplied mock-up. Focused inline questions fill required gaps; this is not a
+summary, up to three draft actions, and an explicit supplied-mock-up state. Focused inline questions fill required gaps; this is not a
 general chatbot. One final idempotent operation materializes the decision, human prediction,
 metric relationship, and selected actions. Approved design:
 `docs/designs/ai-assisted-decision-report.md`.
 
 ## TL;DR
 
-**Both existing loops are on `main`; Decision Report Slices 1–3 are implemented on
-`codex/ai-decision-report`, and bounded generation is live-validated. Durable report
-revisions and canonical materialization remain unbuilt.**
+**Both existing loops are on `main`; Decision Report Slices 1–5 are implemented on
+`codex/ai-decision-report`. Bounded generation, durable report persistence, human-controlled
+metric/prediction/action activation, and the atomic Actions & Decisions handoff are
+live-validated. Metric creation/CSV ingestion, supplied-image handling, Reports-tab indexing,
+feature-flag rollout, and partner acceptance remain.**
 The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
 all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
@@ -85,9 +87,11 @@ delivery, or production automation.
 ☐ CONNECT  SUPABASE_SERVICE_ROLE_KEY deliberately withheld from Vercel → webhook auto-detect
            + reconcile cron return 500 (paste-URL attribution works; deliberate, reversible)
 ☐ OPEN     #16 connector live (creds) · #18 drift-alert surface (gated) · ~~#19 Jira parity~~ (PR #25)
-◐ ACTIVE   AI-assisted Decision Report partner wedge: Slices 1–3 complete. The 24.4s
+◐ ACTIVE   AI-assisted Decision Report partner wedge: Slices 1–5 complete. The 24.4s
            six-action baseline triggered a sparse three-proof/three-action contract; live
-           re-benchmark passed in 13.9s. Slice 4 durable revisions are next.
+           re-benchmark passed in 13.9s. Durable explicit save/reload is now verified;
+           explicit metric/prediction/action activation now materializes atomically and
+           hands the user to Actions & Decisions. Partner-input/acceptance work is next.
 ```
 
 ## What's built (all on `main`, verified against live evidence)
@@ -343,7 +347,7 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 
 ## Next (priority order)
 
-### 1. Build Decision Report Slice 4
+### 1. Finish partner inputs and acceptance around the activation handoff
 
 - Slice 3 now deterministically completes required gaps without another model request. Its live
   Gummy Alpha browser review caught and fixed misleading readiness copy: Decision, Problem, one
@@ -352,24 +356,37 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 - The remaining Slice 3 browser acceptance pass covers the sparse safe fallback and keyboard
   focus. Unit coverage already verifies gap ordering, optional-field behavior, command rejection,
   the three-action ceiling, ID preservation, edit/question parity, and fallback completion.
-- Slice 4 adds only `decision_reports` and append-only `decision_report_revisions`, protected by
-  scope-bound RLS. Explicit saves use a deterministic content hash for retry idempotency, reject
-  stale base revisions, and reload the exact reviewed `DecisionReportV1` snapshot.
-- Slice 4 also defines a validated but inert activation packet: report/revision IDs, confirmed
-  metric ID, human prediction fields, and selected action source-item IDs. It creates no canonical
-  decisions, predictions, actions, decision-action edges, or levers.
-- Acceptance requires identical saves to produce no duplicate revision, one real edit to produce
-  exactly one revision, cross-workspace denial, exact reload, and zero canonical graph writes.
+- Slice 4 now adds only `decision_reports` and append-only `decision_report_revisions`, protected
+  by scope-bound RLS and checked RPCs. Explicit saves use a database-owned content hash for retry
+  idempotency, return an immediate HTTP 409 for stale bases, and reload the exact reviewed
+  `DecisionReportV1` plus metric projection from `?report=<id>`.
+- Slice 5 turns that packet into three explicit user controls: select an existing workspace
+  metric, enter a human prediction, and choose one to three report actions. The AI chart never
+  pre-fills the commitment or becomes metric observations.
+- One checked transaction validates the exact reviewed revision and atomically creates a decision,
+  prediction, planned manual actions, decision-action links, and append-only activation audit.
+  Exact retries reuse the same IDs; changed retries return HTTP 409; invalid inputs create zero
+  partial rows. No lever, tracker ticket, causal edge, evidence object, or impact claim is created.
+- Active reports are immutable and deep-link to the new decision in Actions & Decisions.
+  Report-created actions use UUID identities plus a `Planned` label instead of fake PR numbers.
+- Automated Slice 5 acceptance includes 376 library tests (337 passed, 39 environment-gated
+  skips, zero failures), 4/4 separate live persistence/activation integration cases, and 22/22
+  authenticated RLS isolation cases; the full engine suite passes 1,166/1,166. TypeScript,
+  focused lint, schema lint, and the documented webpack production build pass. The default
+  Turbopack build remains blocked by the existing `engine/.venv/bin/python` symlink escaping
+  its filesystem root.
+- Next, add real metric creation/CSV ingestion and the supplied-image path, index saved reports in
+  Reports, add the rollout flag, and run the unassisted partner/browser acceptance pass.
 
 ### 2. Finish the partner wedge
 
 - Partial three-section report plus coordinated evidence, metric, action, and mock-up views.
 - Inline focused gap questions rather than general chatbot infrastructure.
-- Existing metric/CSV and human prediction commitment reuse.
-- One final materialization step into decisions, predictions, metrics, and actions.
+- Existing metric confirmation and human prediction commitment are implemented; metric creation/CSV remains.
+- The final materialization step is implemented; lever/tracker selection stays separate.
 - Feature-flagged rollout with legacy onboarding as rollback.
 
-Slices 1–3 delivered the interactive report, bounded generation seam, and deterministic completion layer. Remaining target: end-to-end partner flow in
+Slices 1–5 delivered the interactive report, bounded generation seam, deterministic completion layer, durable revisions, and atomic activation handoff. Remaining target: partner inputs, rollout controls, and end-to-end acceptance in
 roughly 2–3 weeks; stabilized wedge in 3–5 weeks at 15–25 focused hours/week.
 
 ### 3. Validate before production expansion

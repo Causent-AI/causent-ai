@@ -75,6 +75,14 @@ TRANSITION_B = uuid.UUID("bbbb0000-0000-0000-0000-0000000000f3")
 LEVER_A = uuid.UUID("aaaa0000-0000-0000-0000-0000000000e4")
 LEVER_B = uuid.UUID("bbbb0000-0000-0000-0000-0000000000f4")
 
+# Decision Report Slice 4: durable report + append-only revision.
+REPORT_A = uuid.UUID("aaaa0000-0000-0000-0000-0000000000e5")
+REPORT_B = uuid.UUID("bbbb0000-0000-0000-0000-0000000000f5")
+REPORT_REVISION_A = uuid.UUID("aaaa0000-0000-0000-0000-0000000000e6")
+REPORT_REVISION_B = uuid.UUID("bbbb0000-0000-0000-0000-0000000000f6")
+ACTIVATION_A = uuid.UUID("aaaa0000-0000-0000-0000-0000000000e7")
+ACTIVATION_B = uuid.UUID("bbbb0000-0000-0000-0000-0000000000f7")
+
 ALL_USERS = (USER_A, USER_B, USER_A_VIEWER)
 
 # Domain tables under a workspace + how to identify a row's tenant.
@@ -97,6 +105,10 @@ DOMAIN_TABLES = [
     ("public.transition_events", "action_id", ACTION_A, ACTION_B),
     # Cold-start layer — levers carry their own scope_id.
     ("public.levers", "scope_id", WS_A, WS_B),
+    # Decision Report Slice 4 — both tables carry scope_id for direct RLS.
+    ("public.decision_reports", "scope_id", WS_A, WS_B),
+    ("public.decision_report_revisions", "scope_id", WS_A, WS_B),
+    ("public.decision_report_activations", "scope_id", WS_A, WS_B),
 ]
 
 # Hierarchy / spine tables also carry tenant identity and must isolate too.
@@ -255,6 +267,65 @@ def _seed(conn: psycopg.Connection) -> None:
              LEVER_B, WS_B, DECISION_B, ACTION_B, METRIC_B),
         )
 
+        # Decision Report Slice 4. Reports are inserted before their revisions,
+        # then the current pointers are connected once both append-only rows exist.
+        cur.execute(
+            "insert into public.decision_reports (report_id, scope_id, title, status) values "
+            "(%s,%s,'report a','draft'),(%s,%s,'report b','draft')",
+            (REPORT_A, WS_A, REPORT_B, WS_B),
+        )
+        cur.execute(
+            "insert into public.decision_report_revisions "
+            "(revision_id, report_id, scope_id, revision_number, schema_version, snapshot, "
+            "metric_projection, content_hash) values "
+            "(%s,%s,%s,1,1,'{}'::jsonb,'{}'::jsonb,%s),"
+            "(%s,%s,%s,1,1,'{}'::jsonb,'{}'::jsonb,%s)",
+            (
+                REPORT_REVISION_A, REPORT_A, WS_A, "a" * 32,
+                REPORT_REVISION_B, REPORT_B, WS_B, "b" * 32,
+            ),
+        )
+        cur.execute(
+            "update public.decision_reports set current_revision_id = case "
+            "when report_id = %s then %s when report_id = %s then %s end "
+            "where report_id in (%s,%s)",
+            (
+                REPORT_A, REPORT_REVISION_A, REPORT_B, REPORT_REVISION_B,
+                REPORT_A, REPORT_B,
+            ),
+        )
+        cur.execute(
+            "insert into public.decision_report_activations "
+            "(activation_id, report_id, revision_id, scope_id, input_hash, metric_id, "
+            "prediction_direction, prediction_magnitude_pct_mean, prediction_resolution_date, "
+            "selected_action_source_ids, decision_id, prediction_id, action_ids, activated_by) values "
+            "(%s,%s,%s,%s,%s,%s,'POSITIVE',3.0,date '2026-03-01',array['seed-a'],%s,%s,array[%s]::uuid[],%s),"
+            "(%s,%s,%s,%s,%s,%s,'POSITIVE',3.0,date '2026-03-01',array['seed-b'],%s,%s,array[%s]::uuid[],%s)",
+            (
+                ACTIVATION_A, REPORT_A, REPORT_REVISION_A, WS_A, "c" * 32, METRIC_A,
+                DECISION_A, PREDICTION_A, ACTION_A, USER_A,
+                ACTIVATION_B, REPORT_B, REPORT_REVISION_B, WS_B, "d" * 32, METRIC_B,
+                DECISION_B, PREDICTION_B, ACTION_B, USER_B,
+            ),
+        )
+        cur.execute(
+            "update public.decision_reports set "
+            "status='active', active_activation_id=case when report_id=%s then %s else %s end, "
+            "active_decision_id=case when report_id=%s then %s else %s end, "
+            "active_prediction_id=case when report_id=%s then %s else %s end, "
+            "active_metric_id=case when report_id=%s then %s else %s end, "
+            "activated_by=case when report_id=%s then %s else %s end, activated_at=now() "
+            "where report_id in (%s,%s)",
+            (
+                REPORT_A, ACTIVATION_A, ACTIVATION_B,
+                REPORT_A, DECISION_A, DECISION_B,
+                REPORT_A, PREDICTION_A, PREDICTION_B,
+                REPORT_A, METRIC_A, METRIC_B,
+                REPORT_A, USER_A, USER_B,
+                REPORT_A, REPORT_B,
+            ),
+        )
+
 
 @pytest.fixture(scope="module")
 def seeded():
@@ -327,8 +398,8 @@ def test_rls_enabled_on_every_public_table(seeded):
         rows = cur.fetchall()
     rls_off = [name for name, on in rows if not on]
     assert rls_off == [], f"RLS DISABLED on public tables: {rls_off}"
-    # sanity: we actually inspected the 17 migration tables (11 + 5 prospective + levers)
-    assert len(rows) >= 17, f"expected >=17 public tables, saw {len(rows)}"
+    # sanity: 11 v1 + 5 prospective + levers + funnel/objective + 3 report tables.
+    assert len(rows) >= 22, f"expected >=22 public tables, saw {len(rows)}"
 
 
 # ============================================================================
@@ -468,6 +539,198 @@ def test_prospective_logs_are_append_only(seeded):
             conn.rollback()
 
 
+# ============================================================================
+# GATE 7 — Decision Report Slice 4 persistence boundary
+# ============================================================================
+READY_REPORT = {
+    "schemaVersion": 1,
+    "title": "AI assistant rollout",
+    "decision": {
+        "decision": [{"id": "d", "text": "Deploy it", "status": "user_confirmed", "sourceChunkIds": []}],
+        "background": [],
+        "problem": [{"id": "p", "text": "Users are blocked", "status": "user_confirmed", "sourceChunkIds": []}],
+    },
+    "supportingEvidence": {
+        "factors": [{"id": "f", "text": "Sessions abandon", "status": "user_confirmed", "sourceChunkIds": []}],
+        "metricMechanism": [{"id": "m", "text": "Completion should rise", "status": "user_confirmed", "sourceChunkIds": []}],
+    },
+    "implementation": {
+        "actionPlanSummary": [{"id": "s", "text": "Instrument and ship", "status": "user_confirmed", "sourceChunkIds": []}],
+        "actions": [{"sourceItemId": "a1", "title": "Instrument completion", "summary": [], "owner": None}],
+        "customers": [],
+        "stakeholders": [],
+        "assetIds": [],
+        "governance": {
+            "dataClassification": None,
+            "allowedDataSources": [],
+            "approvedModelNotes": [],
+        },
+    },
+}
+
+READY_PROJECTION = {
+    "metricName": "Completion rate",
+    "definition": "Completed mixer sessions",
+    "baselinePct": None,
+    "predictedPct": None,
+    "baselineLabel": "Missing",
+    "predictionLabel": "Missing",
+    "evidenceState": "missing",
+}
+
+
+def test_member_uses_checked_report_rpc_and_identical_retry_reuses(seeded):
+    with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select report_id, revision_id, reused from public.create_decision_report_v1("
+            "%s,%s,'report_ready',%s::jsonb,%s::jsonb,%s)",
+            (WS_A, READY_REPORT["title"], json.dumps(READY_REPORT),
+             json.dumps(READY_PROJECTION), USER_A),
+        )
+        report_id, revision_id, reused = cur.fetchone()
+        assert reused is False
+
+        cur.execute(
+            "select revision_id, reused from public.append_decision_report_revision_v1("
+            "%s,%s,%s,'report_ready',%s::jsonb,%s::jsonb,%s)",
+            (report_id, revision_id, READY_REPORT["title"], json.dumps(READY_REPORT),
+             json.dumps(READY_PROJECTION), USER_A),
+        )
+        retry_revision_id, retry_reused = cur.fetchone()
+        assert retry_reused is True
+        assert retry_revision_id == revision_id
+
+        cur.execute(
+            "select count(*) from public.decision_report_revisions where report_id=%s",
+            (report_id,),
+        )
+        assert cur.fetchone()[0] == 1
+        conn.rollback()
+
+
+def test_report_rpc_denies_viewer_and_cross_tenant_member(seeded):
+    for user_id, target_scope in [
+        (USER_A_VIEWER, WS_A),
+        (USER_A, WS_B),
+    ]:
+        with as_user(user_id, autocommit=False) as conn, conn.cursor() as cur:
+            with pytest.raises(pgerr.InsufficientPrivilege):
+                cur.execute(
+                    "select * from public.create_decision_report_v1("
+                    "%s,%s,'report_ready',%s::jsonb,%s::jsonb,%s)",
+                    (target_scope, READY_REPORT["title"], json.dumps(READY_REPORT),
+                     json.dumps(READY_PROJECTION), user_id),
+                )
+            conn.rollback()
+
+
+def test_report_tables_are_read_only_and_revisions_append_only(seeded):
+    statements = [
+        ("insert into public.decision_reports (scope_id,title) values (%s,'blocked')", (WS_A,)),
+        ("update public.decision_reports set title='blocked' where report_id=%s", (REPORT_A,)),
+        ("delete from public.decision_reports where report_id=%s", (REPORT_A,)),
+        ("update public.decision_report_revisions set snapshot='{}' where revision_id=%s", (REPORT_REVISION_A,)),
+        ("delete from public.decision_report_revisions where revision_id=%s", (REPORT_REVISION_A,)),
+    ]
+    for statement, params in statements:
+        with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+            with pytest.raises(pgerr.InsufficientPrivilege):
+                cur.execute(statement, params)
+            conn.rollback()
+
+
+def test_member_activates_reviewed_report_once_and_retry_reuses(seeded):
+    with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select report_id, revision_id from public.create_decision_report_v1("
+            "%s,%s,'report_ready',%s::jsonb,%s::jsonb,%s)",
+            (WS_A, READY_REPORT["title"], json.dumps(READY_REPORT),
+             json.dumps(READY_PROJECTION), USER_A),
+        )
+        report_id, revision_id = cur.fetchone()
+
+        cur.execute(
+            "select activation_id, decision_id, prediction_id, action_ids, reused "
+            "from public.activate_decision_report_v1("
+            "%s,%s,%s,'POSITIVE',15.0,date '2026-12-15',array['a1'],%s)",
+            (report_id, revision_id, METRIC_A, USER_A),
+        )
+        activation_id, decision_id, prediction_id, action_ids, reused = cur.fetchone()
+        assert reused is False
+        assert len(action_ids) == 1
+
+        cur.execute(
+            "select activation_id, decision_id, prediction_id, action_ids, reused "
+            "from public.activate_decision_report_v1("
+            "%s,%s,%s,'POSITIVE',15.0,date '2026-12-15',array['a1'],%s)",
+            (report_id, revision_id, METRIC_A, USER_A),
+        )
+        retry = cur.fetchone()
+        assert retry == (activation_id, decision_id, prediction_id, action_ids, True)
+
+        cur.execute(
+            "select status, active_activation_id, active_decision_id, active_prediction_id "
+            "from public.decision_reports where report_id=%s",
+            (report_id,),
+        )
+        assert cur.fetchone() == ("active", activation_id, decision_id, prediction_id)
+        cur.execute("select count(*) from public.levers where decision_id=%s", (decision_id,))
+        assert cur.fetchone()[0] == 0
+        conn.rollback()
+
+
+def test_activation_rpc_denies_viewer_cross_tenant_and_changed_retry(seeded):
+    # The function re-authenticates and checks member access even though it is
+    # SECURITY DEFINER. A viewer cannot activate their own tenant's report, and
+    # an org-A member cannot activate org B's report.
+    for user_id, report_id, revision_id, metric_id in [
+        (USER_A_VIEWER, REPORT_A, REPORT_REVISION_A, METRIC_A),
+        (USER_A, REPORT_B, REPORT_REVISION_B, METRIC_B),
+    ]:
+        with as_user(user_id, autocommit=False) as conn, conn.cursor() as cur:
+            with pytest.raises(pgerr.InsufficientPrivilege):
+                cur.execute(
+                    "select * from public.activate_decision_report_v1("
+                    "%s,%s,%s,'POSITIVE',3.0,date '2026-12-15',array['seed-a'],%s)",
+                    (report_id, revision_id, metric_id, user_id),
+                )
+            conn.rollback()
+
+    with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select report_id, revision_id from public.create_decision_report_v1("
+            "%s,%s,'report_ready',%s::jsonb,%s::jsonb,%s)",
+            (WS_A, READY_REPORT["title"], json.dumps(READY_REPORT),
+             json.dumps(READY_PROJECTION), USER_A),
+        )
+        report_id, revision_id = cur.fetchone()
+        cur.execute(
+            "select * from public.activate_decision_report_v1("
+            "%s,%s,%s,'POSITIVE',15.0,date '2026-12-15',array['a1'],%s)",
+            (report_id, revision_id, METRIC_A, USER_A),
+        )
+        with pytest.raises(psycopg.Error) as conflict:
+            cur.execute(
+                "select * from public.activate_decision_report_v1("
+                "%s,%s,%s,'POSITIVE',20.0,date '2026-12-15',array['a1'],%s)",
+                (report_id, revision_id, METRIC_A, USER_A),
+            )
+        assert conflict.value.sqlstate == "PT409"
+        conn.rollback()
+
+
+def test_activation_table_is_read_only_to_authenticated(seeded):
+    statements = [
+        ("update public.decision_report_activations set input_hash=%s where activation_id=%s", ("e" * 32, ACTIVATION_A)),
+        ("delete from public.decision_report_activations where activation_id=%s", (ACTIVATION_A,)),
+    ]
+    for statement, params in statements:
+        with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+            with pytest.raises(pgerr.InsufficientPrivilege):
+                cur.execute(statement, params)
+            conn.rollback()
+
+
 def test_actions_source_accepts_jira_rejects_unknown(seeded):
     # The widened CHECK admits 'jira' and still rejects a bogus value.
     with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
@@ -486,7 +749,7 @@ def test_actions_source_accepts_jira_rejects_unknown(seeded):
 
 
 # ============================================================================
-# GATE 7 — Cold-start levers (epic #13 child C1/#14)
+# GATE 8 — Cold-start levers (epic #13 child C1/#14)
 # ============================================================================
 def test_levers_member_reads_and_writes_own_scope(seeded):
     # A member can read the scope's levers and insert/update new ones; a viewer
