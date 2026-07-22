@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   createSafeFallbackReport,
   materializeModelDecisionReport,
+  recoverStringifiedModelDecisionReportDraft,
   validateModelDecisionReportDraft,
   type ModelClaimDraft,
   type ModelDecisionReportDraft,
@@ -14,7 +15,7 @@ import {
 } from "./generation-policy.ts";
 
 const PROMPT =
-  "Launch an AI helper for checkout. Shoppers abandon checkout. Baseline completion is 40% and the founder prediction is 55%. The product lead is Maya. Cost is $15 per month.";
+  "Launch an AI helper for checkout. Shoppers abandon checkout. Baseline completion is 40% and the founder prediction is 55%. The product lead is Maya.";
 
 function claim(
   text: string,
@@ -44,8 +45,6 @@ function draft(): ModelDecisionReportDraft {
     supportingEvidence: {
       factors: [claim("Shoppers abandon checkout.", "supported", "Shoppers abandon checkout.")],
       metricMechanism: claim("Guidance may reduce uncertainty.", "inference"),
-      alternatives: [claim("Improve static checkout guidance.")],
-      precedent: [claim("", "missing")],
     },
     implementation: {
       actionPlanSummary: claim("Instrument, build, and test the helper."),
@@ -56,7 +55,6 @@ function draft(): ModelDecisionReportDraft {
           owner: claim("Maya", "supported", "The product lead is Maya."),
         },
       ],
-      cost: [claim("$15 per month", "supported", "Cost is $15 per month.")],
       customers: [claim("Enterprise customers", "inference")],
       stakeholders: [claim("Maya", "supported", "The product lead is Maya.")],
       governance: {
@@ -81,6 +79,30 @@ test("model draft validation rejects malformed structured output", () => {
   assert.equal(result.success, false);
 });
 
+test("provider-stringified structured output is recovered only after full validation", () => {
+  const expected = draft();
+  const wrapped = JSON.stringify({ decision: JSON.stringify(expected) });
+  const objectWrapped = JSON.stringify({ decision: expected });
+  const stringifiedSections = JSON.stringify({
+    ...expected,
+    decision: JSON.stringify(expected.decision),
+    supportingEvidence: JSON.stringify(expected.supportingEvidence),
+    implementation: JSON.stringify(expected.implementation),
+    metric: JSON.stringify(expected.metric),
+  });
+
+  assert.deepEqual(recoverStringifiedModelDecisionReportDraft(wrapped), expected);
+  assert.deepEqual(recoverStringifiedModelDecisionReportDraft(objectWrapped), expected);
+  assert.deepEqual(recoverStringifiedModelDecisionReportDraft(stringifiedSections), expected);
+  assert.equal(
+    recoverStringifiedModelDecisionReportDraft(
+      JSON.stringify({ decision: JSON.stringify({ title: "Incomplete" }) }),
+    ),
+    null,
+  );
+  assert.equal(recoverStringifiedModelDecisionReportDraft("not json"), null);
+});
+
 test("server materialization assigns IDs and verifies exact prompt evidence", () => {
   let nextId = 0;
   const result = materializeModelDecisionReport(draft(), PROMPT, {
@@ -95,11 +117,10 @@ test("server materialization assigns IDs and verifies exact prompt evidence", ()
   assert.equal(result.metricProjection.predictedPct, 55);
 });
 
-test("invented metrics, customers, owners, costs, and numeric claims are removed", () => {
+test("invented metrics, customers, owners, and numeric claims are removed", () => {
   const generated = draft();
   generated.implementation.customers = [claim("Fortune 500 buyers", "inference")];
   generated.implementation.actions[0].owner = claim("Sam", "inference");
-  generated.implementation.cost = [claim("$99,000", "supported", "Cost is $15 per month.")];
   generated.metric.baselinePct = 72;
   generated.metric.baselineEvidenceQuote = "Baseline completion is 40%";
   generated.supportingEvidence.metricMechanism = claim("Completion will improve 30%", "inference");
@@ -107,9 +128,35 @@ test("invented metrics, customers, owners, costs, and numeric claims are removed
   const result = materializeModelDecisionReport(generated, PROMPT, { idFactory: () => "trusted" });
   assert.equal(result.report.implementation.customers[0].status, "missing");
   assert.equal(result.report.implementation.actions[0].owner, null);
-  assert.equal(result.report.implementation.cost[0].status, "missing");
   assert.equal(result.metricProjection.baselinePct, null);
   assert.equal(result.report.supportingEvidence.metricMechanism[0].status, "missing");
+});
+
+test("sparse model values materialize as explicit editable missing states", () => {
+  const generated = draft();
+  generated.decision.background = null;
+  generated.supportingEvidence.factors = [];
+  generated.supportingEvidence.metricMechanism = null;
+  generated.implementation.actionPlanSummary = null;
+  generated.implementation.actions[0].summary = null;
+  generated.implementation.actions[0].owner = null;
+  generated.implementation.customers = [];
+  generated.implementation.stakeholders = [];
+  generated.implementation.governance = null;
+
+  const validation = validateModelDecisionReportDraft(generated);
+  assert.equal(validation.success, true);
+
+  const result = materializeModelDecisionReport(generated, PROMPT, { idFactory: () => "sparse" });
+  assert.equal(result.report.decision.background[0].status, "missing");
+  assert.equal(result.report.supportingEvidence.factors[0].status, "missing");
+  assert.equal(result.report.supportingEvidence.metricMechanism[0].status, "missing");
+  assert.equal(result.report.implementation.actionPlanSummary[0].status, "missing");
+  assert.equal(result.report.implementation.actions[0].summary[0].status, "missing");
+  assert.equal(result.report.implementation.actions[0].owner, null);
+  assert.equal(result.report.implementation.customers[0].status, "missing");
+  assert.equal(result.report.implementation.governance.dataClassification, null);
+  assert.equal(result.report.implementation.governance.allowedDataSources[0].status, "missing");
 });
 
 test("safe fallback preserves the brief and leaves unsupported fields missing", () => {
@@ -156,4 +203,21 @@ test("generation policy times out and retries once", async () => {
     DecisionReportGenerationTimeoutError,
   );
   assert.equal(attempts, 2);
+});
+
+test("generation policy can stop after one non-retryable timeout", async () => {
+  let attempts = 0;
+  await assert.rejects(
+    runWithSingleRetry(
+      async () => {
+        attempts += 1;
+        await new Promise(() => undefined);
+        return "never";
+      },
+      5,
+      (error) => !(error instanceof DecisionReportGenerationTimeoutError),
+    ),
+    DecisionReportGenerationTimeoutError,
+  );
+  assert.equal(attempts, 1);
 });

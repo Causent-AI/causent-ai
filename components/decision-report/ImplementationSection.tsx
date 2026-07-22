@@ -21,7 +21,7 @@ export function ImplementationSection({
     <ReportSection
       number="3"
       title="Implementation"
-      description="A bounded action plan plus the people, cost, assets, and governance needed to carry it out."
+      description="A three-step action plan plus the people, assets, and governance needed to carry it out."
     >
       <ClaimEditor
         claim={implementation.actionPlanSummary[0]}
@@ -35,7 +35,7 @@ export function ImplementationSection({
             Draft actions
           </p>
           <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
-            {implementation.actions.length} of 7
+            {implementation.actions.length} of 3
           </span>
         </div>
         <ol className="flex flex-col gap-2">
@@ -98,13 +98,7 @@ export function ImplementationSection({
         </ol>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <ClaimListEditor
-          claims={implementation.cost}
-          label="Estimated cost"
-          placeholder="Add a supplied or confirmed estimate."
-          onChange={onClaimChange}
-        />
+      <div className="grid gap-4 lg:grid-cols-2">
         <ClaimListEditor
           claims={implementation.customers}
           label="Customers"

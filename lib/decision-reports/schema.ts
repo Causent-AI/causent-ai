@@ -33,13 +33,10 @@ export type DecisionReportV1 = {
   supportingEvidence: {
     factors: Claim[];
     metricMechanism: Claim[];
-    alternatives: Claim[];
-    precedent: Claim[];
   };
   implementation: {
     actionPlanSummary: Claim[];
     actions: DraftAction[];
-    cost: Claim[];
     customers: Claim[];
     stakeholders: Claim[];
     assetIds: string[];
@@ -109,10 +106,18 @@ function validateClaim(value: unknown, path: string, errors: string[]): value is
   return errors.length === 0;
 }
 
-function validateClaimArray(value: unknown, path: string, errors: string[]): value is Claim[] {
+function validateClaimArray(
+  value: unknown,
+  path: string,
+  errors: string[],
+  maxItems?: number,
+): value is Claim[] {
   if (!Array.isArray(value)) {
     errors.push(`${path} must be an array`);
     return false;
+  }
+  if (maxItems !== undefined && value.length > maxItems) {
+    errors.push(`${path} cannot exceed ${maxItems} items`);
   }
   value.forEach((claim, index) => validateClaim(claim, `${path}[${index}]`, errors));
   return true;
@@ -157,10 +162,8 @@ export function validateDecisionReport(value: unknown): ValidationResult {
   if (!isRecord(evidence)) {
     errors.push("supportingEvidence must be an object");
   } else {
-    validateClaimArray(evidence.factors, "supportingEvidence.factors", errors);
+    validateClaimArray(evidence.factors, "supportingEvidence.factors", errors, 3);
     validateClaimArray(evidence.metricMechanism, "supportingEvidence.metricMechanism", errors);
-    validateClaimArray(evidence.alternatives, "supportingEvidence.alternatives", errors);
-    validateClaimArray(evidence.precedent, "supportingEvidence.precedent", errors);
   }
 
   const implementation = value.implementation;
@@ -168,14 +171,13 @@ export function validateDecisionReport(value: unknown): ValidationResult {
     errors.push("implementation must be an object");
   } else {
     validateClaimArray(implementation.actionPlanSummary, "implementation.actionPlanSummary", errors);
-    validateClaimArray(implementation.cost, "implementation.cost", errors);
     validateClaimArray(implementation.customers, "implementation.customers", errors);
     validateClaimArray(implementation.stakeholders, "implementation.stakeholders", errors);
 
     if (!Array.isArray(implementation.actions)) {
       errors.push("implementation.actions must be an array");
     } else {
-      if (implementation.actions.length > 7) errors.push("implementation.actions cannot exceed 7 items");
+      if (implementation.actions.length > 3) errors.push("implementation.actions cannot exceed 3 items");
       implementation.actions.forEach((action, index) =>
         validateAction(action, `implementation.actions[${index}]`, errors),
       );

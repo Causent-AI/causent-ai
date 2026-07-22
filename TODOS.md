@@ -8,25 +8,54 @@ Approved design: `docs/designs/ai-assisted-decision-report.md`.
 
 ### Completed Slice 1 — interaction prototype
 
-- [x] Lock the versioned `DecisionReportV1` schema, five claim/provenance states, runtime validation, and the seven-action ceiling.
+- [x] Lock the versioned `DecisionReportV1` schema, five claim/provenance states, runtime validation, and the three-action ceiling.
 - [x] Add the Gummy Alpha golden prompt, complete three-section report, metric hypothesis, 40% illustrative baseline, and 55% founder prediction.
 - [x] Replace `/onboarding` with the deterministic prompt-to-report flow while retaining the legacy funnel code for rollback.
 - [x] Build compact focused editors for Decision, Supporting Evidence, Implementation, actions, owners, governance, and visible missing fields.
 - [x] Add contract tests for the golden fixture, sourced-claim requirements, missing-claim honesty, and action cardinality.
 
-### Slice 2 — live report generation
+### Completed Slice 2 — live report generation
 
 - [x] Define a model-output DTO that contains content and evidence excerpts but no trusted claim or action IDs.
 - [x] Generate and validate the three prescribed sections from arbitrary bounded prompt text through a server-only Vercel AI Gateway seam.
 - [x] Assign immutable claim/action IDs server-side and accept a sourced claim only when its evidence excerpt matches the supplied prompt.
-- [x] Reject unsupported numeric claims and leave owners, customers, stakeholders, costs, governance, and metric values missing unless sourced.
+- [x] Reject unsupported numeric claims and leave owners, customers, stakeholders, governance, and metric values missing unless sourced.
 - [x] Preserve the deterministic Gummy Alpha fixture as an explicit development mode and provider-failure fallback; preserve arbitrary briefs in a safe partial fallback.
 - [x] Add timeout, refusal, malformed-output, unsupported-claim, and retry-once tests.
-- [ ] Run the live Gummy Alpha evaluation in a network-enabled environment and record latency/token usage. The UI already captures both; local outbound DNS was unavailable on 2026-07-21.
+- [x] Live-validate the Gummy Alpha prompt through `anthropic/claude-sonnet-5`: one attempt,
+  24,412 ms, 4,309 input tokens, 2,967 output tokens, 7,276 total tokens, and six actions.
+  Provider-wrapped structured output is normalized only when the recovered report passes the
+  complete runtime contract. This was the pre-optimization six-action baseline.
 
-### Remaining contract and materialization work
+### MVP latency reduction
 
-- Lock gap ordering and typed edit commands.
+- [x] Cap the report at three supporting proof claims and three actions.
+- [x] Remove Alternatives, Relevant Precedent, and Estimated Cost from the MVP report and model contract.
+- [x] Return `null`/`[]` for unknown model values, then materialize explicit editable `missing` states server-side.
+- [x] Reduce the output ceiling from 4,500 to 2,200 tokens while preserving the safe fallback.
+- [x] Re-run the live Gummy Alpha benchmark against the reduced contract: one attempt,
+  13,852 ms, 3,873 input tokens, 1,598 output tokens, 5,471 total tokens, three proof claims,
+  and three actions. Unsupplied customers, stakeholders, and data sources materialized as
+  explicit `missing` states.
+
+### Slice 3 — focused gap completion and typed edits
+
+Goal: help the user finish the partial report without adding chat infrastructure or another model call.
+
+- [ ] Add a pure `scanDecisionReportGaps(report)` function with stable priority: Decision, Problem, at least one proof claim, Core Metric mechanism, Action Plan summary, then at least one action.
+- [ ] Define the smallest `ReportEditCommandV1` reducer used by both direct field edits and focused answers. Commands may replace/confirm claim text, edit action title/summary/owner, add an action up to the three-action ceiling, and set data classification.
+- [ ] Render a compact “Complete this report” panel with at most three open questions and focus the corresponding report field when selected.
+- [ ] Mark user answers `user_confirmed`, preserve immutable claim/action IDs, and recompute gaps locally without another AI request.
+- [ ] Replace the inert final-review behavior with an explicit ready/not-ready state. Optional customers, stakeholders, owner, governance, and mock-up fields must not block readiness.
+- [ ] Add unit tests for gap ordering, optional missing fields, command validation, the three-action ceiling, ID preservation, and direct-edit/question parity.
+- [ ] Browser-test the Gummy Alpha live report, sparse safe fallback, keyboard focus, and ready-state transition.
+
+Acceptance: the safe fallback can be completed into a report-ready draft; the Gummy Alpha report is already ready or names only real required gaps; direct editing and answering a focused question produce the same validated report state.
+
+Non-goals: report persistence, refresh/Back recovery, general chatbot/history, metric or CSV handoff, uploads, final graph materialization, and connector work.
+
+### Work after Slice 3
+
 - Inspect the current onboarding writes and define the one final idempotent materialization operation.
 
 ### Report persistence and security
@@ -35,10 +64,6 @@ Approved design: `docs/designs/ai-assisted-decision-report.md`.
 - Store append-only full snapshots for the partner wedge.
 - Add private Storage handling for one size-capped PNG/JPEG: magic-byte validation, decode/re-encode, scoped read, deletion, and failure states.
 - Feature-flag the new onboarding per user/workspace; preserve legacy onboarding as rollback.
-
-### Inline assistance after Slice 2
-
-- Implement deterministic gap ranking and inline focused questions. Do not build general chatbot or chat-history infrastructure.
 
 ### Persistence and materialization
 

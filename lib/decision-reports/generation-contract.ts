@@ -30,35 +30,32 @@ export type ModelClaimDraft = {
 
 export type ModelActionDraft = {
   title: string;
-  summary: ModelClaimDraft;
-  owner: ModelClaimDraft;
+  summary: ModelClaimDraft | null;
+  owner: ModelClaimDraft | null;
 };
 
 export type ModelDecisionReportDraft = {
   projectName: string;
   title: string;
   decision: {
-    decision: ModelClaimDraft;
-    background: ModelClaimDraft;
-    problem: ModelClaimDraft;
+    decision: ModelClaimDraft | null;
+    background: ModelClaimDraft | null;
+    problem: ModelClaimDraft | null;
   };
   supportingEvidence: {
     factors: ModelClaimDraft[];
-    metricMechanism: ModelClaimDraft;
-    alternatives: ModelClaimDraft[];
-    precedent: ModelClaimDraft[];
+    metricMechanism: ModelClaimDraft | null;
   };
   implementation: {
-    actionPlanSummary: ModelClaimDraft;
+    actionPlanSummary: ModelClaimDraft | null;
     actions: ModelActionDraft[];
-    cost: ModelClaimDraft[];
     customers: ModelClaimDraft[];
     stakeholders: ModelClaimDraft[];
     governance: {
       dataClassification: "private" | "organization" | "public" | "unspecified";
       allowedDataSources: ModelClaimDraft[];
       approvedModelNotes: ModelClaimDraft[];
-    };
+    } | null;
   };
   metric: {
     name: string;
@@ -83,16 +80,21 @@ const claimDraftSchema: JSONSchema7 = {
   type: "object",
   additionalProperties: false,
   properties: {
-    text: { type: "string", maxLength: 1_500 },
+    text: { type: "string", maxLength: 500 },
     kind: { type: "string", enum: [...MODEL_CLAIM_KINDS] },
-    evidenceQuote: { type: "string", maxLength: 1_500 },
+    evidenceQuote: { type: "string", maxLength: 500 },
   },
   required: ["text", "kind", "evidenceQuote"],
 };
 
+const nullableClaimDraftSchema: JSONSchema7 = {
+  ...claimDraftSchema,
+  type: ["object", "null"],
+};
+
 const claimArraySchema = (maxItems: number): JSONSchema7 => ({
   type: "array",
-  minItems: 1,
+  minItems: 0,
   maxItems,
   items: claimDraftSchema,
 });
@@ -107,9 +109,9 @@ export const MODEL_DECISION_REPORT_JSON_SCHEMA: JSONSchema7 = {
       type: "object",
       additionalProperties: false,
       properties: {
-        decision: claimDraftSchema,
-        background: claimDraftSchema,
-        problem: claimDraftSchema,
+        decision: nullableClaimDraftSchema,
+        background: nullableClaimDraftSchema,
+        problem: nullableClaimDraftSchema,
       },
       required: ["decision", "background", "problem"],
     },
@@ -117,38 +119,35 @@ export const MODEL_DECISION_REPORT_JSON_SCHEMA: JSONSchema7 = {
       type: "object",
       additionalProperties: false,
       properties: {
-        factors: claimArraySchema(5),
-        metricMechanism: claimDraftSchema,
-        alternatives: claimArraySchema(4),
-        precedent: claimArraySchema(3),
+        factors: claimArraySchema(3),
+        metricMechanism: nullableClaimDraftSchema,
       },
-      required: ["factors", "metricMechanism", "alternatives", "precedent"],
+      required: ["factors", "metricMechanism"],
     },
     implementation: {
       type: "object",
       additionalProperties: false,
       properties: {
-        actionPlanSummary: claimDraftSchema,
+        actionPlanSummary: nullableClaimDraftSchema,
         actions: {
           type: "array",
-          minItems: 1,
-          maxItems: 7,
+          minItems: 0,
+          maxItems: 3,
           items: {
             type: "object",
             additionalProperties: false,
             properties: {
-              title: { type: "string", minLength: 1, maxLength: 180 },
-              summary: claimDraftSchema,
-              owner: claimDraftSchema,
+              title: { type: "string", minLength: 1, maxLength: 120 },
+              summary: nullableClaimDraftSchema,
+              owner: nullableClaimDraftSchema,
             },
             required: ["title", "summary", "owner"],
           },
         },
-        cost: claimArraySchema(3),
         customers: claimArraySchema(3),
         stakeholders: claimArraySchema(3),
         governance: {
-          type: "object",
+          type: ["object", "null"],
           additionalProperties: false,
           properties: {
             dataClassification: {
@@ -168,7 +167,6 @@ export const MODEL_DECISION_REPORT_JSON_SCHEMA: JSONSchema7 = {
       required: [
         "actionPlanSummary",
         "actions",
-        "cost",
         "customers",
         "stakeholders",
         "governance",
@@ -218,8 +216,12 @@ function isModelClaim(value: unknown): value is ModelClaimDraft {
   );
 }
 
+function isNullableModelClaim(value: unknown): value is ModelClaimDraft | null {
+  return value === null || isModelClaim(value);
+}
+
 function isClaimArray(value: unknown, max: number): value is ModelClaimDraft[] {
-  return Array.isArray(value) && value.length >= 1 && value.length <= max && value.every(isModelClaim);
+  return Array.isArray(value) && value.length <= max && value.every(isModelClaim);
 }
 
 export function validateModelDecisionReportDraft(
@@ -236,35 +238,34 @@ export function validateModelDecisionReportDraft(
 
   if (
     !isRecord(decision) ||
-    !isModelClaim(decision.decision) ||
-    !isModelClaim(decision.background) ||
-    !isModelClaim(decision.problem) ||
+    !isNullableModelClaim(decision.decision) ||
+    !isNullableModelClaim(decision.background) ||
+    !isNullableModelClaim(decision.problem) ||
     !isRecord(evidence) ||
-    !isClaimArray(evidence.factors, 5) ||
-    !isModelClaim(evidence.metricMechanism) ||
-    !isClaimArray(evidence.alternatives, 4) ||
-    !isClaimArray(evidence.precedent, 3) ||
+    !isClaimArray(evidence.factors, 3) ||
+    !isNullableModelClaim(evidence.metricMechanism) ||
     !isRecord(implementation) ||
-    !isModelClaim(implementation.actionPlanSummary) ||
+    !isNullableModelClaim(implementation.actionPlanSummary) ||
     !Array.isArray(implementation.actions) ||
-    implementation.actions.length < 1 ||
-    implementation.actions.length > 7 ||
+    implementation.actions.length > 3 ||
     !implementation.actions.every(
       (action) =>
         isRecord(action) &&
         typeof action.title === "string" &&
-        isModelClaim(action.summary) &&
-        isModelClaim(action.owner),
+        isNullableModelClaim(action.summary) &&
+        isNullableModelClaim(action.owner),
     ) ||
-    !isClaimArray(implementation.cost, 3) ||
     !isClaimArray(implementation.customers, 3) ||
     !isClaimArray(implementation.stakeholders, 3) ||
-    !isRecord(implementation.governance) ||
-    !["private", "organization", "public", "unspecified"].includes(
-      implementation.governance.dataClassification as string,
+    !(
+      implementation.governance === null ||
+      (isRecord(implementation.governance) &&
+        ["private", "organization", "public", "unspecified"].includes(
+          implementation.governance.dataClassification as string,
+        ) &&
+        isClaimArray(implementation.governance.allowedDataSources, 3) &&
+        isClaimArray(implementation.governance.approvedModelNotes, 3))
     ) ||
-    !isClaimArray(implementation.governance.allowedDataSources, 3) ||
-    !isClaimArray(implementation.governance.approvedModelNotes, 3) ||
     !isRecord(metric) ||
     typeof metric.name !== "string" ||
     typeof metric.definition !== "string" ||
@@ -277,6 +278,93 @@ export function validateModelDecisionReportDraft(
   }
 
   return { success: true, value: value as ModelDecisionReportDraft };
+}
+
+function schemaExpectsStructuredValue(schema: JSONSchema7): boolean {
+  const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+  return types.includes("object") || types.includes("array");
+}
+
+function schemaIncludesType(schema: JSONSchema7, type: "object" | "array"): boolean {
+  const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+  return types.includes(type);
+}
+
+function normalizeStringifiedStructuredValues(value: unknown, schema: JSONSchema7): unknown {
+  let candidate = value;
+  if (typeof candidate === "string" && schemaExpectsStructuredValue(schema)) {
+    try {
+      candidate = JSON.parse(candidate);
+    } catch {
+      return value;
+    }
+  }
+
+  if (schemaIncludesType(schema, "object") && isRecord(candidate) && schema.properties) {
+    return Object.fromEntries(
+      Object.entries(candidate).map(([key, child]) => {
+        const childSchema = schema.properties?.[key];
+        return [
+          key,
+          childSchema && typeof childSchema === "object"
+            ? normalizeStringifiedStructuredValues(child, childSchema)
+            : child,
+        ];
+      }),
+    );
+  }
+
+  if (
+    schemaIncludesType(schema, "array") &&
+    Array.isArray(candidate) &&
+    schema.items &&
+    !Array.isArray(schema.items) &&
+    typeof schema.items === "object"
+  ) {
+    return candidate.map((item) => normalizeStringifiedStructuredValues(item, schema.items as JSONSchema7));
+  }
+
+  return candidate;
+}
+
+export function recoverStringifiedModelDecisionReportDraft(
+  text: string | undefined,
+): ModelDecisionReportDraft | null {
+  if (!text) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+    const candidates: unknown[] = [parsed];
+    if (isRecord(parsed)) {
+      const values = Object.values(parsed);
+      if (values.length === 1 && isRecord(values[0])) {
+        candidates.push(values[0]);
+      }
+
+      for (const value of values) {
+        if (typeof value === "string") {
+          try {
+            candidates.push(JSON.parse(value));
+          } catch {
+            // Ordinary string fields are not recovery candidates.
+          }
+        }
+      }
+    }
+
+    for (const candidate of candidates) {
+      const normalized = normalizeStringifiedStructuredValues(
+        candidate,
+        MODEL_DECISION_REPORT_JSON_SCHEMA,
+      );
+      const validation = validateModelDecisionReportDraft(normalized);
+      if (validation.success) return validation.value;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function isOptionalPercentage(value: unknown): value is number | null {
@@ -336,6 +424,15 @@ function mapClaim(
   };
 }
 
+function mapClaimOrMissing(
+  draft: ModelClaimDraft | null,
+  prompt: string,
+  id: string,
+  options: { sourceOnly?: boolean } = {},
+): Claim {
+  return draft === null ? missingClaim(id) : mapClaim(draft, prompt, id, options);
+}
+
 function mapClaimArray(
   drafts: ModelClaimDraft[],
   prompt: string,
@@ -359,11 +456,13 @@ function mapAction(
   const title = containsUnsupportedNumber(draft.title, prompt)
     ? "Define the next implementation step"
     : draft.title.trim();
-  const owner = mapClaim(draft.owner, prompt, `${actionId}-owner`, { sourceOnly: true });
+  const owner = mapClaimOrMissing(draft.owner, prompt, `${actionId}-owner`, {
+    sourceOnly: true,
+  });
   return {
     sourceItemId: actionId,
     title: title || "Define the next implementation step",
-    summary: [mapClaim(draft.summary, prompt, `${actionId}-summary`)],
+    summary: [mapClaimOrMissing(draft.summary, prompt, `${actionId}-summary`)],
     owner: owner.status === "missing" ? null : owner,
   };
 }
@@ -388,33 +487,31 @@ export function materializeModelDecisionReport(
     schemaVersion: 1,
     title: draft.title.trim() || "Decision Report draft",
     decision: {
-      decision: [mapClaim(draft.decision.decision, prompt, `decision-${idFactory()}`)],
-      background: [mapClaim(draft.decision.background, prompt, `background-${idFactory()}`)],
-      problem: [mapClaim(draft.decision.problem, prompt, `problem-${idFactory()}`)],
+      decision: [mapClaimOrMissing(draft.decision.decision, prompt, `decision-${idFactory()}`)],
+      background: [mapClaimOrMissing(draft.decision.background, prompt, `background-${idFactory()}`)],
+      problem: [mapClaimOrMissing(draft.decision.problem, prompt, `problem-${idFactory()}`)],
     },
     supportingEvidence: {
       factors: mapClaimArray(draft.supportingEvidence.factors, prompt, "factor", idFactory),
       metricMechanism: [
-        mapClaim(draft.supportingEvidence.metricMechanism, prompt, `mechanism-${idFactory()}`),
+        mapClaimOrMissing(
+          draft.supportingEvidence.metricMechanism,
+          prompt,
+          `mechanism-${idFactory()}`,
+        ),
       ],
-      alternatives: mapClaimArray(
-        draft.supportingEvidence.alternatives,
-        prompt,
-        "alternative",
-        idFactory,
-      ),
-      precedent: mapClaimArray(draft.supportingEvidence.precedent, prompt, "precedent", idFactory),
     },
     implementation: {
       actionPlanSummary: [
-        mapClaim(draft.implementation.actionPlanSummary, prompt, `action-summary-${idFactory()}`),
+        mapClaimOrMissing(
+          draft.implementation.actionPlanSummary,
+          prompt,
+          `action-summary-${idFactory()}`,
+        ),
       ],
       actions: draft.implementation.actions
-        .slice(0, 7)
+        .slice(0, 3)
         .map((action) => mapAction(action, prompt, idFactory)),
-      cost: mapClaimArray(draft.implementation.cost, prompt, "cost", idFactory, {
-        sourceOnly: true,
-      }),
       customers: mapClaimArray(draft.implementation.customers, prompt, "customer", idFactory, {
         sourceOnly: true,
       }),
@@ -428,18 +525,19 @@ export function materializeModelDecisionReport(
       assetIds: [],
       governance: {
         dataClassification:
+          !draft.implementation.governance ||
           draft.implementation.governance.dataClassification === "unspecified"
             ? null
             : draft.implementation.governance.dataClassification,
         allowedDataSources: mapClaimArray(
-          draft.implementation.governance.allowedDataSources,
+          draft.implementation.governance?.allowedDataSources ?? [],
           prompt,
           "data-source",
           idFactory,
           { sourceOnly: true },
         ),
         approvedModelNotes: mapClaimArray(
-          draft.implementation.governance.approvedModelNotes,
+          draft.implementation.governance?.approvedModelNotes ?? [],
           prompt,
           "model-note",
           idFactory,
@@ -506,13 +604,10 @@ export function createSafeFallbackReport(
     supportingEvidence: {
       factors: [missing("factor")],
       metricMechanism: [missing("mechanism")],
-      alternatives: [missing("alternative")],
-      precedent: [missing("precedent")],
     },
     implementation: {
       actionPlanSummary: [missing("action-summary")],
       actions: [],
-      cost: [missing("cost")],
       customers: [missing("customer")],
       stakeholders: [missing("stakeholder")],
       assetIds: [],

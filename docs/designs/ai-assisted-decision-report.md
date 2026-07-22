@@ -12,15 +12,17 @@ Mode: Startup
 
 ## Implementation Status
 
-Slice 1 and the Slice 2 bounded-generation implementation shipped on `codex/ai-decision-report` on 2026-07-21. `/onboarding` sends arbitrary bounded prompts through a server-only Vercel AI Gateway seam and renders the compact, editable three-section report. The model DTO contains no trusted IDs; application code assigns IDs, verifies exact evidence excerpts, removes unsupported numeric and sensitive implementation claims, and preserves the deterministic fixture plus a safe arbitrary-prompt fallback. Timeout, refusal, malformed-output, unsupported-claim, and retry-once tests are green.
+Slice 1 and Slice 2 shipped on `codex/ai-decision-report` on 2026-07-21. `/onboarding` sends arbitrary bounded prompts through a server-only Vercel AI Gateway seam and renders the compact, editable three-section report. The model DTO contains no trusted IDs; application code assigns IDs, verifies exact evidence excerpts, removes unsupported numeric and sensitive implementation claims, and preserves the deterministic fixture plus a safe arbitrary-prompt fallback. Timeout, refusal, malformed-output, provider-wrapper recovery, unsupported-claim, and retry-policy tests are green.
 
-A network-enabled Gummy Alpha latency/token evaluation remains before declaring Slice 2 complete. Persistence, inline gap assistance, metric handoff, and idempotent materialization remain later slices.
+The original Slice 2 contract was live-validated: a Gummy Alpha request through `anthropic/claude-sonnet-5` returned a six-action report in one attempt at 24,412 ms and 2,967 output tokens. The latency was too slow for onboarding. The MVP contract now caps Supporting Evidence at three proof claims, caps Implementation at three actions, removes Alternatives, Relevant Precedent, and Estimated Cost, and represents unknown model values as `null`/`[]` before server-side missing-state materialization. The reduced contract live-validated in one 13,852 ms attempt with 1,598 output tokens, three proof claims, and three actions; unsupplied implementation fields materialized as explicit `missing` states. Persistence, inline gap assistance, metric handoff, and idempotent materialization remain later slices.
+
+Slice 3 is the focused completion layer: a pure deterministic gap scanner, a small typed edit-command reducer shared by direct edits and focused answers, and a compact panel exposing at most three open questions. Readiness requires Decision, Problem, at least one proof claim, the core-metric mechanism, the Action Plan summary, and at least one action. Optional implementation metadata does not block. Slice 3 makes no additional model call and deliberately excludes persistence, refresh/Back recovery, general chat history, metric/CSV handoff, uploads, final materialization, and connectors.
 
 ## Problem Statement
 
 Causent's current onboarding asks users to move through discrete form-like steps before they see the value of the system. The proposed experience should make the multiplicative effect of AI visible from the first prompt: a user describes what they are building, the evidence behind it, and the resources available; Causent immediately renders a partial, editable Decision Report and asks only the follow-up questions needed to make it useful.
 
-The user remains the author and approver. AI extracts, structures, drafts, and connects work, but does not invent facts, customer evidence, metric observations, owners, costs, expected lift, or completion probability.
+The user remains the author and approver. AI extracts, structures, drafts, and connects work, but does not invent facts, customer evidence, metric observations, owners, expected lift, or completion probability.
 
 ## Demand Evidence
 
@@ -41,7 +43,7 @@ The narrowest production-shaped wedge is one onboarding path:
 3. Answer focused inline questions for missing required information while editing any field directly.
 4. Approve the report progressively, even when optional fields remain visibly incomplete.
 5. Confirm or add a core metric.
-6. Review and approve an Action Plan of no more than seven draft actions.
+6. Review and approve an Action Plan of no more than three draft actions.
 
 ## Product Principle
 
@@ -52,7 +54,7 @@ One initial prompt visibly produces multiple coordinated assets:
 1. The partial three-section Decision Report
 2. A sourced-evidence summary with provenance states
 3. A core-metric hypothesis plus an existing-metric chart when data is available
-4. An Action Plan summary and one to seven editable draft actions
+4. An Action Plan summary and up to three editable draft actions
 5. A rendered user-supplied mock-up
 
 These are typed views of one report aggregate, not separate free-form generations. Editing the underlying field updates every dependent view.
@@ -67,16 +69,13 @@ These are typed views of one report aggregate, not separate free-form generation
 
 ### 2. Supporting Evidence
 
-- Factors and supplied evidence
+- Up to three factors and supplied proof claims
 - Why the decision should affect the selected core metric
-- Alternatives considered
-- Relevant precedent from prior Causent decisions when available
 
 ### 3. Implementation
 
 - Action Plan summary at the top
-- Up to seven editable draft actions
-- Estimated cost, only when supplied or explicitly confirmed
+- Up to three editable draft actions
 - Customers and stakeholders
 - Owners
 - Supplied mock-up
@@ -114,7 +113,7 @@ draft -> ready_for_approval -> materializing -> active
 ```
 
 - `draft`: generation, inline gap questions, direct edits, metric selection, prediction commitment, and action review are stored only in the report aggregate.
-- `ready_for_approval`: required report fields, a confirmed metric, the human-entered prediction, and one to seven selected actions pass deterministic validation.
+- `ready_for_approval`: required report fields, a confirmed metric, the human-entered prediction, and one to three selected actions pass deterministic validation.
 - `materializing`: one idempotent server operation creates the decision, prediction, actions, and relationships.
 - `materialization_failed`: the complete report remains intact; retry resumes safely using `(report_id, source_item_id)` keys.
 - `active`: canonical IDs are stored on the report and the first-run experience will not repeat.
@@ -128,7 +127,7 @@ The AI may:
 - Extract claims and entities from supplied material.
 - Summarize evidence.
 - Draft qualitative report fields.
-- Suggest alternatives and actions.
+- Suggest actions.
 - Connect supplied evidence to a proposed metric mechanism.
 
 The AI may not silently invent:
@@ -136,7 +135,7 @@ The AI may not silently invent:
 - Customers, quotes, or research findings
 - Metric observations or historical performance
 - Owners or stakeholders
-- Costs or dates
+- Dates
 - Expected lift or prediction magnitude
 - Completion probability
 
@@ -228,13 +227,10 @@ type DecisionReportV1 = {
   supportingEvidence: {
     factors: Claim[];
     metricMechanism: Claim[];
-    alternatives: Claim[];
-    precedent: Claim[];
   };
   implementation: {
     actionPlanSummary: Claim[];
-    actions: DraftAction[]; // 1..7 at report approval
-    cost: Claim[];
+    actions: DraftAction[]; // 1..3 at report approval
     customers: Claim[];
     stakeholders: Claim[];
     assetIds: string[];
@@ -249,7 +245,7 @@ type DecisionReportV1 = {
 
 `dataClassification` is descriptive metadata only and never changes authorization or Storage visibility. Actual access remains scope/RLS controlled and private by default.
 
-Runtime schema rules, not TypeScript comments, enforce cardinality and transition requirements. Missing optional content is always an empty array or `null`; `Claim { status: "missing" }` is used only for a required field that the UI must visibly request. At `ready_for_approval`, Decision, rationale, metric mechanism, confirmed metric, human prediction commitment, and `actions` must each be present; `actions` is runtime-constrained to 1-7. At `active`, the canonical decision, prediction, and at least one approved action ID are required.
+Runtime schema rules, not TypeScript comments, enforce cardinality and transition requirements. The untrusted model DTO uses `null` for an unknown scalar claim and `[]` for an unknown claim list; server materialization creates `Claim { status: "missing" }` only for a field the UI must visibly request. At `ready_for_approval`, Decision, rationale, metric mechanism, confirmed metric, human prediction commitment, and `actions` must each be present; proof claims and actions are each runtime-constrained to 1-3. At `active`, the canonical decision, prediction, and at least one approved action ID are required.
 
 Before parallel implementation begins, this contract and one complete golden JSON fixture must pass shared contract tests.
 
@@ -288,7 +284,7 @@ Materialization is one idempotent orchestration over existing write paths. Every
 
 ```text
 decision_report --approved revision--> decision
-decision --decision_actions--> action (1..7, after action approval)
+decision --decision_actions--> action (1..3, after action approval)
 decision --human commitment--> prediction --declared metric--> metric
 action --selected as watched mechanism--> lever
 ```
@@ -369,7 +365,7 @@ Build the visual flow against constrained fixtures in 3-5 days or a working but 
 - Report draft and snapshot persistence
 - Deterministic readiness validation
 - Existing metric confirmation; Data Workshop handoff may use the existing CSV path but is not required to pass the report thesis test
-- Materialize one to seven draft actions
+- Materialize one to three draft actions
 - Store report in Reports tab
 - Minimal supplied-image path: private bucket, magic-byte validation, decode/re-encode, scoped read, and failure recovery
 
@@ -458,7 +454,7 @@ For the first design-partner test, target:
 - The user can identify which fields were sourced, inferred, missing, or confirmed.
 - At least 4 of 5 structured usefulness checks pass: decision accurate, problem accurate, evidence traceable, metric mechanism plausible, next action usable.
 - The user can approve the core report while optional Implementation fields remain incomplete, with a target under 15 minutes for the test scenario.
-- Reaching `active` produces the intended decision, confirmed metric relationship, human prediction commitment, and one to seven editable actions with zero duplicates across forced retries.
+- Reaching `active` produces the intended decision, confirmed metric relationship, human prediction commitment, and one to three editable actions with zero duplicates across forced retries.
 - The guided first-run flow completes without manual recovery and never repeats.
 - Zero unsupported claims are presented as sourced facts across the golden fixture and at least nine adversarial scenarios.
 - The partner can explain what Causent created from their input and what still requires their judgment.
@@ -469,7 +465,6 @@ For the first design-partner test, target:
 - Exact source-size and file-size limits for MVP uploads
 - Whether post-MVP URL extraction may follow a small bounded set of links
 - The eventual auditable inputs and calibration method for numeric completion probability
-- Whether alternatives and precedent are always rendered or hidden when no evidence exists
 
 ## Dependencies
 
@@ -480,7 +475,7 @@ For the first design-partner test, target:
 
 ## The Assignment
 
-Before implementation, write one realistic “launch a video feature” input packet containing the exact initial prompt, pasted supporting text, one supplied PNG/JPEG mock-up, and one metric CSV. Then manually author the ideal three-section report and seven-or-fewer action plan. This becomes the golden fixture and acceptance test for every agent.
+Before implementation, write one realistic “launch a video feature” input packet containing the exact initial prompt, pasted supporting text, one supplied PNG/JPEG mock-up, and one metric CSV. Then manually author the ideal three-section report and three-action plan. This becomes the golden fixture and acceptance test for every agent.
 
 ## What I Noticed About How You Think
 

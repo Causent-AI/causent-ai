@@ -9,17 +9,17 @@ on-ramp (human pre-registered prediction → drift watch → engine-measured res
 **Active product plan:** replace form-like onboarding with an AI-assisted Decision Report
 that makes Causent's leverage visible immediately. One initial prompt produces multiple
 coordinated assets from one typed report aggregate: a partial three-section report,
-sourced-evidence summary, metric hypothesis/chart, action-plan summary, one to seven draft
-actions, and a supplied mock-up. Focused inline questions fill required gaps; this is not a
+sourced-evidence summary with up to three proof claims, metric hypothesis/chart, action-plan
+summary, up to three draft actions, and a supplied mock-up. Focused inline questions fill required gaps; this is not a
 general chatbot. One final idempotent operation materializes the decision, human prediction,
 metric relationship, and selected actions. Approved design:
 `docs/designs/ai-assisted-decision-report.md`.
 
 ## TL;DR
 
-**Both existing loops are on `main`; Decision Report Slices 1 and 2 are implemented on
-`codex/ai-decision-report`. Slice 2 needs one network-enabled live evaluation before it is
-declared complete; report persistence and materialization remain unbuilt.**
+**Both existing loops are on `main`; Decision Report Slices 1 and 2 are implemented and
+live-validated on `codex/ai-decision-report`. Report persistence and materialization remain
+unbuilt.**
 The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
 all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
@@ -85,9 +85,9 @@ delivery, or production automation.
 ☐ CONNECT  SUPABASE_SERVICE_ROLE_KEY deliberately withheld from Vercel → webhook auto-detect
            + reconcile cron return 500 (paste-URL attribution works; deliberate, reversible)
 ☐ OPEN     #16 connector live (creds) · #18 drift-alert surface (gated) · ~~#19 Jira parity~~ (PR #25)
-◐ ACTIVE   AI-assisted Decision Report partner wedge: Slice 1 interaction prototype complete;
-           Slice 2 bounded generation, trust mapping, safe fallback, and tests implemented.
-           Live Gateway evaluation remains; persistence/materialization are unbuilt.
+◐ ACTIVE   AI-assisted Decision Report partner wedge: Slice 1 interaction prototype and
+           Slice 2 bounded generation complete. The 24.4s six-action baseline triggered a
+           sparse three-proof/three-action contract; live re-benchmark passed in 13.9s.
 ```
 
 ## What's built (all on `main`, verified against live evidence)
@@ -343,14 +343,21 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 
 ## Next (priority order)
 
-### 1. Complete the Slice 2 live evaluation
+### 1. Begin the next Decision Report slice
 
-- The untrusted model DTO, bounded generation, runtime validation, server-assigned IDs,
-  evidence-quote verification, sensitive-field rejection, retry/timeout policy, and safe
-  editable fallback are implemented and tested.
-- Run the Gummy Alpha prompt once in a network-enabled environment and record the latency and
-  token telemetry already returned by the generation seam. Local outbound DNS was unavailable
-  during the 2026-07-21 implementation pass.
+- The pre-optimization Gummy Alpha request through `anthropic/claude-sonnet-5` returned a
+  six-action report in one attempt: 24,412 ms and 2,967 output tokens. That is too slow for onboarding.
+- The MVP contract now allows sparse `null`/`[]` model values, materializes missing states on
+  the server, removes Alternatives/Precedent/Estimated Cost, caps proof claims and actions at
+  three, and caps output at 2,200 tokens. Its live Gummy Alpha benchmark returned in one
+  13,852 ms attempt with 1,598 output tokens, three proof claims, and three actions. Unsupplied
+  implementation fields materialized as explicit `missing` states.
+- Slice 3 is focused gap completion: add a pure deterministic gap scanner, a typed edit-command
+  reducer shared by direct edits and focused answers, and a compact panel showing at most three
+  open questions. The report becomes explicitly ready when Decision, Problem, one proof claim,
+  the metric mechanism, the Action Plan summary, and at least one action are present.
+- Slice 3 does not add persistence, refresh/Back recovery, a general chatbot, metric/CSV
+  handoff, uploads, final graph materialization, or connectors. Those remain later slices.
 
 ### 2. Finish the partner wedge
 

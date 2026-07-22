@@ -8,6 +8,7 @@ export class DecisionReportGenerationTimeoutError extends Error {
 export async function runWithSingleRetry<T>(
   operation: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number,
+  shouldRetry: (error: unknown) => boolean = () => true,
 ): Promise<{ value: T; attempts: number }> {
   let lastError: unknown;
 
@@ -26,6 +27,7 @@ export async function runWithSingleRetry<T>(
       return { value, attempts: attempt };
     } catch (error) {
       lastError = error;
+      if (!shouldRetry(error)) throw error;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }

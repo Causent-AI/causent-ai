@@ -25,7 +25,7 @@ test("sourced claims require a source chunk", () => {
 
 test("missing claims cannot silently contain text", () => {
   const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
-  report.implementation.cost[0].text = "$25,000";
+  report.implementation.stakeholders[0].text = "Product lead";
 
   const result = validateDecisionReport(report);
   assert.equal(result.success, false);
@@ -34,13 +34,24 @@ test("missing claims cannot silently contain text", () => {
   }
 });
 
-test("action plans cannot exceed seven actions", () => {
+test("action plans cannot exceed three actions", () => {
   const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
   report.implementation.actions.push(structuredClone(report.implementation.actions[0]));
 
   const result = validateDecisionReport(report);
   assert.equal(result.success, false);
   if (!result.success) {
-    assert.ok(result.errors.some((error) => error.includes("cannot exceed 7")));
+    assert.ok(result.errors.some((error) => error.includes("cannot exceed 3")));
+  }
+});
+
+test("supporting evidence cannot exceed three proof claims", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  report.supportingEvidence.factors.push(structuredClone(report.supportingEvidence.factors[0]));
+
+  const result = validateDecisionReport(report);
+  assert.equal(result.success, false);
+  if (!result.success) {
+    assert.ok(result.errors.some((error) => error.includes("supportingEvidence.factors cannot exceed 3")));
   }
 });

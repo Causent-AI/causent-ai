@@ -67,12 +67,6 @@ export const GUMMY_ALPHA_GOLDEN_EXAMPLE: DecisionReportGoldenExample = {
           [BRIEF_SOURCE],
         ),
         claim(
-          "evidence-discoverability",
-          "Customers ask where to find the mixer.",
-          "sourced",
-          [BRIEF_SOURCE],
-        ),
-        claim(
           "evidence-simple-mixes",
           "Customers commonly select basic one-flavor configurations.",
           "sourced",
@@ -92,13 +86,6 @@ export const GUMMY_ALPHA_GOLDEN_EXAMPLE: DecisionReportGoldenExample = {
           "inferred",
         ),
       ],
-      alternatives: [
-        claim("alternative-redesign", "Redesign the flavor-selection interface.", "suggested"),
-        claim("alternative-static", "Add static combination recommendations.", "suggested"),
-        claim("alternative-faq", "Add explanatory tooltips or an FAQ.", "suggested"),
-        claim("alternative-reduce", "Reduce the available choices.", "suggested"),
-      ],
-      precedent: [claim("precedent-missing", "", "missing")],
     },
     implementation: {
       actionPlanSummary: [
@@ -110,14 +97,9 @@ export const GUMMY_ALPHA_GOLDEN_EXAMPLE: DecisionReportGoldenExample = {
       ],
       actions: [
         action(1, "Instrument the flavor-combination funnel", "Capture starts, completions, exits, and the exact step where each session ends."),
-        action(2, "Define approved product knowledge", "Document valid flavors, combinations, shapes, prices, minimums, and taste descriptions."),
-        action(3, "Design the contextual assistant", "Place guidance inside the combination step and keep the mixer visible and controllable."),
-        action(4, "Implement product answers and recommendations", "Return grounded answers and valid one- or two-flavor recommendations."),
-        action(5, "Connect recommendations to mixer selections", "Let shoppers apply an assistant recommendation without re-entering their choices."),
-        action(6, "Run a controlled experiment", "Compare assisted and unassisted mixer sessions using the completion metric and guardrails."),
-        action(7, "Review the result and decide", "Assess completion, purchase conversion, response accuracy, and added completion time."),
+        action(2, "Build the contextual assistant", "Ground answers in approved product knowledge and connect valid recommendations to mixer selections."),
+        action(3, "Run a controlled experiment", "Compare assisted and unassisted mixer sessions, then decide using completion and accuracy guardrails."),
       ],
-      cost: [claim("implementation-cost", "", "missing")],
       customers: [claim("implementation-customers", "", "missing")],
       stakeholders: [claim("implementation-stakeholders", "", "missing")],
       assetIds: [],

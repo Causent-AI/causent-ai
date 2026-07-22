@@ -33,7 +33,7 @@ There is no `/src` tree, LangGraph layer, Recharts/Tremor dependency, or TanStac
 - Keep page files thin; put domain behavior in typed `lib/` modules and UI behavior in focused components.
 - Preserve the existing injected-client pattern for database domain logic so it remains integration-testable.
 - All user data must stay scope-bound and RLS-protected. Never expose a service-role credential to the client.
-- Preserve the honesty boundary: AI may structure or suggest, but cannot invent evidence, metric observations, owners, costs, prediction magnitudes, or causal claims.
+- Preserve the honesty boundary: AI may structure or suggest, but cannot invent evidence, metric observations, owners, prediction magnitudes, or causal claims.
 - Human users enter prediction direction, magnitude, and resolution date.
 - Prefer deterministic validation and fallbacks around every model call.
 - New report/action materialization must be idempotent and covered by integration tests.
@@ -41,7 +41,8 @@ There is no `/src` tree, LangGraph layer, Recharts/Tremor dependency, or TanStac
 ## Active Decision Report boundary
 
 - Slice 1 is implemented at `/onboarding`: `components/decision-report/` renders the compact editable report, while `lib/decision-reports/` owns the versioned schema, validation, tests, and Gummy Alpha fixture.
-- Slice 2 is implemented behind the same report contract: the core AI SDK calls Vercel AI Gateway server-side, model output contains no trusted IDs, exact evidence excerpts are verified against the bounded prompt, and unsafe or failed output becomes an editable fallback. A network-enabled live Gummy Alpha telemetry run remains.
+- Slice 2 is implemented and live-validated behind the same report contract: the core AI SDK calls Vercel AI Gateway server-side, model output contains no trusted IDs, exact evidence excerpts are verified against the bounded prompt, and unsafe or failed output becomes an editable fallback. The sparse three-proof/three-action Gummy Alpha benchmark completed in one 13.9-second attempt with 1,598 output tokens.
+- Slice 3 is next: a pure deterministic gap scanner, a small typed edit-command reducer shared by direct edits and focused questions, and a compact completion panel. It does not add persistence, a general chatbot, metric handoff, or canonical materialization.
 - One typed report aggregate remains the draft during onboarding.
 - One final idempotent operation materializes the decision, prediction, metric relationship, and selected actions.
 - Partner inputs are limited to the initial prompt, pasted supporting text, an existing metric or one metric CSV, and one re-encoded PNG/JPEG mock-up.
