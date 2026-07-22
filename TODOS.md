@@ -6,13 +6,27 @@ Last reconciled: 2026-07-21. Completed historical work is documented in `docs/ST
 
 Approved design: `docs/designs/ai-assisted-decision-report.md`.
 
-### Contract and golden fixture
+### Completed Slice 1 — interaction prototype
 
-- Create the “launch a video feature” acceptance packet: exact initial prompt, pasted supporting text, one PNG/JPEG mock-up, and one metric CSV.
-- Manually author the ideal three-section Decision Report and no-more-than-seven-action plan.
-- Lock `DecisionReportV1`, claim/provenance states, runtime invariants, gap ordering, and typed edit commands.
+- [x] Lock the versioned `DecisionReportV1` schema, five claim/provenance states, runtime validation, and the seven-action ceiling.
+- [x] Add the Gummy Alpha golden prompt, complete three-section report, metric hypothesis, 40% illustrative baseline, and 55% founder prediction.
+- [x] Replace `/onboarding` with the deterministic prompt-to-report flow while retaining the legacy funnel code for rollback.
+- [x] Build compact focused editors for Decision, Supporting Evidence, Implementation, actions, owners, governance, and visible missing fields.
+- [x] Add contract tests for the golden fixture, sourced-claim requirements, missing-claim honesty, and action cardinality.
+
+### Slice 2 — live report generation
+
+- Define a model-output DTO that contains content and source references but no trusted claim or action IDs.
+- Generate and validate the three prescribed sections from arbitrary bounded prompt text.
+- Assign immutable claim/action IDs server-side and map source references only to supplied input chunks.
+- Preserve the deterministic Gummy Alpha fixture as a development mode and provider-failure fallback.
+- Add timeout, refusal, malformed-output, unsupported-claim, and retry-once tests.
+- Measure generation latency and token usage against the Gummy Alpha prompt.
+
+### Remaining contract and materialization work
+
+- Lock gap ordering and typed edit commands.
 - Inspect the current onboarding writes and define the one final idempotent materialization operation.
-- Prove the selected Anthropic model can produce valid completed section events within acceptable latency and token usage.
 
 ### Report persistence and security
 
@@ -21,17 +35,12 @@ Approved design: `docs/designs/ai-assisted-decision-report.md`.
 - Add private Storage handling for one size-capped PNG/JPEG: magic-byte validation, decode/re-encode, scoped read, deletion, and failure states.
 - Feature-flag the new onboarding per user/workspace; preserve legacy onboarding as rollback.
 
-### Report generation and inline assistance
+### Inline assistance after Slice 2
 
-- Generate the three prescribed sections: Decision, Supporting Evidence, and Implementation.
-- Generate coordinated views from one aggregate: evidence summary, metric hypothesis/chart, action-plan summary, one to seven draft actions, and supplied mock-up.
-- Mark claims `sourced`, `inferred`, `suggested`, `missing`, or `user_confirmed`; models/clients cannot self-promote content to `sourced`.
 - Implement deterministic gap ranking and inline focused questions. Do not build general chatbot or chat-history infrastructure.
-- Preserve an editable partial report through malformed output, refusal, timeout, and provider failure.
 
-### Editing and materialization
+### Persistence and materialization
 
-- Build focused report components rather than a generic block editor.
 - Autosave draft snapshots and preserve state through refresh and Back.
 - Reuse existing metric selection/CSV and human prediction commitment behavior.
 - Materialize the canonical decision, prediction, metric relationship, and selected actions once after final approval.

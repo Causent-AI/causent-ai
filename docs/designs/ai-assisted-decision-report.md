@@ -7,7 +7,14 @@ Branch: `main`
 Repo: `adam-causent/causent`
 
 Status: APPROVED
+
 Mode: Startup
+
+## Implementation Status
+
+Slice 1 shipped on `codex/ai-decision-report` on 2026-07-21. `/onboarding` now renders the deterministic Gummy Alpha golden prompt into the compact, editable three-section report. The versioned schema, five provenance states, runtime validation, illustrative metric chart, seven-action ceiling, and visible missing fields are implemented and contract-tested.
+
+Slice 2 is active: bounded live generation will produce untrusted report content behind the same schema, while application code assigns IDs, validates provenance, and preserves the deterministic fixture as the development and provider-failure fallback. Persistence, inline gap assistance, metric handoff, and idempotent materialization remain later slices.
 
 ## Problem Statement
 

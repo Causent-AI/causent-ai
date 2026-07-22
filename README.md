@@ -23,7 +23,7 @@ The application lives at the repository root rather than under `src/`.
 
 ## Product surfaces
 
-- `/onboarding` — current decision/prediction onboarding; target of the Decision Report plan
+- `/onboarding` — AI-assisted Decision Report onboarding; Slice 1 currently uses the deterministic Gummy Alpha golden fixture
 - `/reports` — saved reports and future Decision Report home
 - `/actions` — decisions, predictions, actions, levers, drift, and scorecards
 - `/data-workshop` — metric connection and CSV input
@@ -38,6 +38,14 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+To review the Decision Report prototype without authentication:
+
+```bash
+CAUSENT_LOCAL_DEMO=1 npm run dev
+```
+
+Open `http://localhost:3000/onboarding`, select **Generate Decision Report**, and edit any report field. Slice 1 intentionally uses deterministic fixture generation; live model generation arrives in Slice 2.
+
 Before changing Next.js behavior, read the relevant bundled guide under `node_modules/next/dist/docs/`; this repository uses Next.js 16 conventions that may differ from older App Router documentation.
 
 ## Verification
@@ -49,6 +57,9 @@ npm test
 # Lint and production build
 npm run lint
 npm run build
+
+# Supported fallback when Turbopack rejects engine/.venv symlinks
+npx next build --webpack
 
 # Python engine tests
 cd engine
