@@ -1,19 +1,90 @@
 import type { Metadata } from "next";
-import { OnboardingFunnel } from "@/components/onboarding/OnboardingFunnel";
+import {
+  DecisionReportOnboarding,
+  type InitialSavedDecisionReport,
+} from "@/components/decision-report/DecisionReportOnboarding";
+import { getSession } from "@/lib/auth/session";
+import { getScope } from "@/lib/data/scope";
+import { loadDecisionReport, UUID_PATTERN } from "@/lib/decision-reports/persistence";
+import {
+  loadReportActivationMetrics,
+  type ReportActivationMetric,
+} from "@/lib/decision-reports/materialization";
+import { getServerSupabase, isLocalDemo } from "@/lib/supabase-server";
 
-// The cold-start funnel, Steps 2-4 (C2/#15): paste -> structured decision card
-// + interrogation -> declared metric -> committed prediction. No connector
-// wall — the earned connector ask (Steps 5-6) is C3. The page is a thin shell;
-// all state lives in the client wizard and all writes go through the
-// server actions (scoped by lib/auth/session.ts).
+// Slice 5 of the AI-assisted onboarding: a reviewed saved revision can be
+// explicitly activated into one decision, one human prediction, and selected
+// planned actions through a checked idempotent RPC.
 
 export const metadata: Metadata = {
-  title: "Causent — What are you about to build?",
+  title: "Causent — Build a Decision Report",
 };
 
 // The funnel writes on every visit path; never prerender it at build time.
 export const dynamic = "force-dynamic";
 
-export default function OnboardingPage() {
-  return <OnboardingFunnel />;
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ report?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const requestedReportId = Array.isArray(params.report) ? params.report[0] : params.report;
+  let initialSavedReport: InitialSavedDecisionReport | null = null;
+  let initialLoadError: string | null = null;
+  let activationMetrics: ReportActivationMetric[] = [];
+  const session = await getSession();
+  if (isLocalDemo() || session.userId) {
+    activationMetrics = await loadReportActivationMetrics(
+      await getServerSupabase(),
+      session.workspaceId,
+    ).catch(() => []);
+  }
+
+  if (requestedReportId) {
+    if (!UUID_PATTERN.test(requestedReportId)) {
+      initialLoadError = "That saved-report address is invalid.";
+    } else {
+      if (!isLocalDemo() && !session.userId) {
+        initialLoadError = "Sign in to open this saved report.";
+      } else {
+        const [loaded, scope] = await Promise.all([
+          loadDecisionReport(
+            await getServerSupabase(),
+            session.workspaceId,
+            requestedReportId,
+          ),
+          getScope(),
+        ]).catch(() => [null, null] as const);
+
+        if (loaded?.ok && scope) {
+          initialSavedReport = {
+            report: loaded.saved.report,
+            metricProjection: loaded.saved.metricProjection,
+            workspaceName: scope.project,
+            projectName: scope.workspace,
+            persistence: {
+              reportId: loaded.saved.reportId,
+              revisionId: loaded.saved.revisionId,
+              status: loaded.saved.status,
+              savedAt: loaded.saved.savedAt,
+              activation: loaded.saved.activation,
+            },
+          };
+        } else {
+          initialLoadError = loaded && !loaded.ok
+            ? loaded.error
+            : "Causent could not load that saved report.";
+        }
+      }
+    }
+  }
+
+  return (
+    <DecisionReportOnboarding
+      initialSavedReport={initialSavedReport}
+      initialLoadError={initialLoadError}
+      activationMetrics={activationMetrics}
+    />
+  );
 }

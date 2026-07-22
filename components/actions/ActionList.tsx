@@ -2,6 +2,7 @@ import type { Action, Metric } from "@/lib/types";
 import { formatLongDate } from "@/lib/format";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { CheckIcon, GitHubIcon, PlusIcon } from "@/components/ui/icons";
+import { ActionSourceIcon, actionReferenceLabel } from "@/components/actions/ActionReference";
 
 export function ActionList({
   actions,
@@ -42,22 +43,22 @@ export function ActionList({
                   : "border-transparent hover:bg-black/[0.02]"
               }`}
             >
-              <GitHubIcon size={20} className="shrink-0 text-[var(--text-subtle)]" />
+              <ActionSourceIcon action={a} size={20} className="shrink-0 text-[var(--text-subtle)]" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] font-medium text-[var(--text)]">
                   {a.title}
                 </div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-                  <span className="tabular-nums">#{a.pr}</span>
-                  <CheckIcon size={12} className="text-[var(--pos)]" />
+                  <span className="tabular-nums">{actionReferenceLabel(a)}</span>
+                  {a.shippedAt ? <CheckIcon size={12} className="text-[var(--pos)]" /> : null}
                   <span>
-                    {a.shippedAt ? `Shipped ${formatLongDate(a.shippedAt)}` : "Not shipped"}
+                    {a.shippedAt ? `Shipped ${formatLongDate(a.shippedAt)}` : a.source === "manual" ? "Planned from report" : "Not shipped"}
                   </span>
                 </div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 <span className="text-[11px] text-[var(--text-muted)]">
-                  {metric?.name}
+                  {metric?.name ?? a.primaryMetricId}
                 </span>
                 {metric && (
                   <Sparkline

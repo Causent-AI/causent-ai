@@ -1,5 +1,6 @@
 import type { Metric } from "@/lib/types";
 import { formatLongDate } from "@/lib/format";
+import { summarizeMetricConnections } from "@/lib/data/metric-connections";
 import { GripIcon, PencilIcon, TrashIcon } from "@/components/ui/icons";
 
 function updatedLabel(iso: string): string {
@@ -12,11 +13,19 @@ function updatedLabel(iso: string): string {
   return `${formatLongDate(iso.slice(0, 10))} ${time}`;
 }
 
-export function ConnectedMetrics({ metrics }: { metrics: Metric[] }) {
+export function ConnectedMetrics({
+  metrics,
+  connectionSummary,
+}: {
+  metrics: Metric[];
+  connectionSummary?: { connected: number; total: number };
+}) {
+  const summary = connectionSummary ?? summarizeMetricConnections(metrics.length);
+
   return (
     <div>
       <h3 className="mb-3 text-[13px] font-semibold text-[var(--text)]">
-        Connected Core Metrics ({metrics.length}/5)
+        Connected Core Metrics ({summary.connected}/{summary.total})
       </h3>
       <table className="w-full border-collapse text-[13px]">
         <thead>

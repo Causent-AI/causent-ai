@@ -26,7 +26,7 @@ type ObsRow = { metric_id: string; obs_date: string; value: number | string | nu
  * slug; the graph (nodes/edges) keys by metric_id, so callers that join readouts
  * (actions, impact) need both.
  */
-export type MetricRecord = { metricId: string; metric: Metric };
+export type MetricRecord = { metricId: string; metric: Metric; configured: boolean };
 
 /**
  * All metrics in the demo scope (UI Metric + DB metric_id), ordered to match the UI's
@@ -74,12 +74,20 @@ export const getMetricRecords = cache(async function getMetricRecords(): Promise
 
   const records: MetricRecord[] = [];
   for (const row of metricRows) {
-    const cfg = METRIC_CONFIG_BY_NAME[row.name];
-    if (!cfg) continue; // unknown metric — never fabricate display config
+    const configured = METRIC_CONFIG_BY_NAME[row.name] ?? null;
+    // Report-created metrics are intentionally not limited to the legacy demo
+    // catalog. They receive neutral presentation defaults; their database UUID
+    // remains the identity used for all authorization and writes.
+    const cfg = configured ?? {
+      id: `metric-${row.metric_id}`,
+      color: "#00A29C",
+      higherIsBetter: true,
+    };
     const series = seriesByMetric.get(row.metric_id) ?? [];
     const lastDate = lastDateByMetric.get(row.metric_id);
     records.push({
       metricId: row.metric_id,
+      configured: configured !== null,
       metric: {
         id: cfg.id,
         name: row.name,
@@ -97,9 +105,11 @@ export const getMetricRecords = cache(async function getMetricRecords(): Promise
     });
   }
 
-  records.sort(
-    (a, b) => METRIC_ORDER.indexOf(a.metric.id) - METRIC_ORDER.indexOf(b.metric.id),
-  );
+  records.sort((a, b) => {
+    if (a.configured !== b.configured) return a.configured ? -1 : 1;
+    if (!a.configured) return a.metric.name.localeCompare(b.metric.name);
+    return METRIC_ORDER.indexOf(a.metric.id) - METRIC_ORDER.indexOf(b.metric.id);
+  });
   return records;
 });
 

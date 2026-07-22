@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Causent
 
-## Getting Started
+Causent is a decision-intelligence product that connects evidence, decisions, human predictions, shipped actions, and measured impact on one causal graph.
 
-First, run the development server:
+The product has two existing loops:
+
+- **Retrospective:** ingest a shipped action, connect it to a metric, and produce an honest Interrupted Time Series readout.
+- **Prospective:** record a decision and human prediction before shipping, watch the implementation lever, and resolve the prediction against measured evidence.
+
+The active product plan adds an **AI-assisted Decision Report** as the onboarding wedge. One initial prompt produces multiple coordinated assets: a partial report, up to three sourced proof claims, a metric hypothesis/chart, an action-plan summary, up to three draft actions, and an explicit supplied-mock-up state. Focused inline questions fill required gaps; this is structured generation, not a general chatbot.
+
+See [docs/STATUS.md](docs/STATUS.md) for the current build state and [docs/designs/ai-assisted-decision-report.md](docs/designs/ai-assisted-decision-report.md) for the approved active plan.
+
+## Stack
+
+- Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
+- Supabase PostgreSQL, Auth, RLS, and Storage
+- Vercel AI Gateway and the AI SDK for bounded Anthropic structured generation; Anthropic for summary polishing
+- Python/NumPy causal engine deployed as Vercel functions
+- Vercel application hosting
+
+The application lives at the repository root rather than under `src/`.
+
+## Product surfaces
+
+- `/onboarding` — AI-assisted Decision Report onboarding with bounded live generation, durable revisions, metric/prediction activation, and a safe editable fallback
+- `/reports` — saved reports and future Decision Report home
+- `/actions` — decisions, predictions, actions, levers, drift, and scorecards
+- `/data-workshop` — core-metric inventory and the current CSV input affordance
+- `/impact` — causal impact readouts
+
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+To review the Decision Report prototype without authentication:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+CAUSENT_LOCAL_DEMO=1 npm run dev
+```
 
-## Learn More
+Open `http://localhost:3000/onboarding`, select **Generate Decision Report**, and edit any report field. Slice 2 uses the Vercel AI Gateway through the core AI SDK. Authenticate locally with `VERCEL_OIDC_TOKEN` or `AI_GATEWAY_API_KEY`; override the default `anthropic/claude-sonnet-5` model with `CAUSENT_DECISION_REPORT_MODEL`. Set `CAUSENT_DECISION_REPORT_FIXTURE=1` to make the exact Gummy Alpha prompt deterministic.
 
-To learn more about Next.js, take a look at the following resources:
+The model supplies untrusted content and exact evidence excerpts, never trusted IDs. Unknown scalar claims return as `null` and unknown lists as `[]`; the server assigns IDs, verifies evidence against the brief, and materializes editable missing states for owners, customers, stakeholders, governance, and metric values. Provider failures preserve the brief in a safe editable fallback rather than dead-ending onboarding.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Slice 3 completes required gaps without another model call. The report shows at most three focused questions at a time, applies answers through the same typed reducer as direct edits, and marks the draft ready for review when Decision, Problem, one proof claim, the metric mechanism, the Action Plan summary, and one action are present. Owners, customers, stakeholders, governance, and mock-ups are explicitly optional and do not block review readiness.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Slice 4 makes the report durable. An explicit **Save draft**, **Save report**, or **Save changes** action writes a scope-bound full snapshot to append-only revisions, updates the URL with the stable report ID, and restores the exact report and metric projection on reload. Identical retries reuse the current revision and stale tabs receive a conflict instead of overwriting newer work. The validated `ReportActivationInputV1` handoff is defined but deliberately inert: saving a report creates no canonical decisions, predictions, actions, decision-action edges, or levers.
 
-## Deploy on Vercel
+Slice 5 activates one exact reviewed revision. After saving a complete report, the user confirms an existing workspace metric, enters the human prediction direction/magnitude/resolution date, and selects one to three report actions. One checked database transaction creates one decision, one prediction, the selected planned manual actions, their decision links, and an append-only activation audit row. Identical retries return the same IDs; changed retries fail with HTTP 409. Activation creates no lever, causal edge, evidence object, tracker ticket, or impact claim. The active report becomes read-only and opens directly in **Actions & Decisions**. Report-created actions use UUID identities and a `Planned` label rather than pretending to be GitHub PRs.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+To exercise the Slice 5 handoff locally, start Supabase and apply migrations before opening the app:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+supabase start
+supabase migration up --local
+CAUSENT_LOCAL_DEMO=1 npm run dev
+```
+
+Generate or reload a report, complete the required fields, save the reviewed revision, choose a real workspace metric, enter the team prediction, select one to three actions, and choose **Activate decision**. The illustrative report chart is never copied into the human prediction or stored as metric observations.
+
+Before changing Next.js behavior, read the relevant bundled guide under `node_modules/next/dist/docs/`; this repository uses Next.js 16 conventions that may differ from older App Router documentation.
+
+## Verification
+
+```bash
+# TypeScript/lib tests
+npm test
+
+# Lint and production build
+npm run lint
+npm run build
+
+# Supported fallback when Turbopack rejects engine/.venv symlinks
+npx next build --webpack
+
+# Python engine tests
+cd engine
+.venv/bin/python -m pytest -q
+```
+
+Database-backed engine/RLS/bridge tests require the local Supabase stack:
+
+```bash
+supabase start
+supabase migration up --local
+```
+
+## Documentation
+
+- [Build status and resume guide](docs/STATUS.md)
+- [Active Decision Report design](docs/designs/ai-assisted-decision-report.md)
+- [Prospective prediction loop](docs/designs/prospective-prediction-loop.md)
+- [Decision graph](docs/designs/decision-graph.md)
+- [Original retrospective wedge](docs/designs/did-it-ship-did-it-work.md)
+- [Security and authentication](docs/designs/security-and-auth.md)
+- [Active backlog](TODOS.md)
+
+Historical `OVERNIGHT_REPORT*` documents are point-in-time build evidence and are intentionally not rewritten when the active plan changes.
