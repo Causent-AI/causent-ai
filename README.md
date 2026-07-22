@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Causent
 
-## Getting Started
+Causent is a decision-intelligence product that connects evidence, decisions, human predictions, shipped actions, and measured impact on one causal graph.
 
-First, run the development server:
+The product has two existing loops:
+
+- **Retrospective:** ingest a shipped action, connect it to a metric, and produce an honest Interrupted Time Series readout.
+- **Prospective:** record a decision and human prediction before shipping, watch the implementation lever, and resolve the prediction against measured evidence.
+
+The active product plan adds an **AI-assisted Decision Report** as the onboarding wedge. One initial prompt produces multiple coordinated assets: a partial report, sourced-evidence summary, metric hypothesis/chart, action-plan summary, one to seven draft actions, and a rendered supplied mock-up. Focused inline questions fill required gaps; this is structured generation, not a general chatbot.
+
+See [docs/STATUS.md](docs/STATUS.md) for the current build state and [docs/designs/ai-assisted-decision-report.md](docs/designs/ai-assisted-decision-report.md) for the approved active plan.
+
+## Stack
+
+- Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
+- Supabase PostgreSQL, Auth, RLS, and Storage
+- Anthropic API for bounded structured generation and summary polishing
+- Python/NumPy causal engine deployed as Vercel functions
+- Vercel application hosting
+
+The application lives at the repository root rather than under `src/`.
+
+## Product surfaces
+
+- `/onboarding` — current decision/prediction onboarding; target of the Decision Report plan
+- `/reports` — saved reports and future Decision Report home
+- `/actions` — decisions, predictions, actions, levers, drift, and scorecards
+- `/data-workshop` — metric connection and CSV input
+- `/impact` — causal impact readouts
+
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Before changing Next.js behavior, read the relevant bundled guide under `node_modules/next/dist/docs/`; this repository uses Next.js 16 conventions that may differ from older App Router documentation.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Verification
 
-## Learn More
+```bash
+# TypeScript/lib tests
+npm test
 
-To learn more about Next.js, take a look at the following resources:
+# Lint and production build
+npm run lint
+npm run build
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Python engine tests
+cd engine
+.venv/bin/python -m pytest -q
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Database-backed engine/RLS/bridge tests require the local Supabase stack:
 
-## Deploy on Vercel
+```bash
+supabase start
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Documentation
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Build status and resume guide](docs/STATUS.md)
+- [Active Decision Report design](docs/designs/ai-assisted-decision-report.md)
+- [Prospective prediction loop](docs/designs/prospective-prediction-loop.md)
+- [Decision graph](docs/designs/decision-graph.md)
+- [Original retrospective wedge](docs/designs/did-it-ship-did-it-work.md)
+- [Security and authentication](docs/designs/security-and-auth.md)
+- [Active backlog](TODOS.md)
+
+Historical `OVERNIGHT_REPORT*` documents are point-in-time build evidence and are intentionally not rewritten when the active plan changes.

@@ -1,14 +1,24 @@
 # Causent — Build Status & Resume Guide
 
-Last updated: 2026-07-18. Single source of truth for "where are we and how do I pick up."
+Last updated: 2026-07-21. Single source of truth for "where are we and how do I pick up."
 Product: **dual cold-start on one causal graph** — the retrospective wedge ("Did-It-Ship,
 Did-It-Work": tie each shipped action to a metric, honest ITS readout) PLUS the prospective
 on-ramp (human pre-registered prediction → drift watch → engine-measured resolution). See
 `docs/designs/prospective-prediction-loop.md` (approved 2026-07-11).
 
+**Active product plan:** replace form-like onboarding with an AI-assisted Decision Report
+that makes Causent's leverage visible immediately. One initial prompt produces multiple
+coordinated assets from one typed report aggregate: a partial three-section report,
+sourced-evidence summary, metric hypothesis/chart, action-plan summary, one to seven draft
+actions, and a supplied mock-up. Focused inline questions fill required gaps; this is not a
+general chatbot. One final idempotent operation materializes the decision, human prediction,
+metric relationship, and selected actions. Approved design:
+`docs/designs/ai-assisted-decision-report.md`.
+
 ## TL;DR
 
-**Both loops are on `main`.** The retrospective loop closed 2026-07-08 (PR #1) and the
+**Both existing loops are on `main`; the Decision Report partner wedge is the next build.**
+The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
 all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
 `predictions`/`prediction_revisions`/`transition_events`), the 8-state resolution verdict
@@ -19,8 +29,9 @@ readout), and seed exercising all six target verdicts through the REAL engine. E
 `docs/OVERNIGHT_REPORT_3.md`. **The baseline-metric-drift DEMO beat shipped (PR #22, 2026-07-13)** —
 reconciled through office-hours + CEO/Eng/Design review as the demo showcase (a change-point detector
 over the metric's own series), distinct from the still-gated webhook lever-descope drift (#18).
-**The connector completion and #18 stay gated on the zero-code design-partner mechanism-mapping test —
-that conversation, not code, is the critical path.** Remaining credential: a GitHub token (live ingestion).
+**The Decision Report is an unvalidated product thesis.** Build only the partner wedge first,
+then require observed unassisted use before starting broader URL/PDF ingestion, conversational
+delivery, or production automation.
 
 ```
 ✓ Plan     office-hours → CEO → Eng → Design reviews (all CLEARED)
@@ -28,7 +39,7 @@ that conversation, not code, is the critical path.** Remaining credential: a Git
 ✓ Schema   11 tables, RLS + RBAC memberships, tenant-isolation verified (0 leaks)
 ✓ Bridge   engine → evidence (append-only) → causal graph, live E2E verified
 ✓ CI       all gates re-run on every push (GitHub Actions + Supabase)
-✓ App/UI   approved shell (Next 16): 3 tabs + Core Metrics drawer, visual-QA'd vs mockups
+✓ App/UI   approved shell (Next 16): 4 tabs + Core Metrics drawer, visual-QA'd vs mockups
 ✓ Loop     seed → real bridge → Supabase → UI; /impact matches DB cell-for-cell (A1–A4, A-verify)
 ✓ Ingest   fixture-tested capped/idempotent GitHub → actions + live adapters/CLI (C1, C-verify)
 ✓ Summary  honest deterministic readout→prose + adversarial/regression eval (B1, B2, B-verify)
@@ -72,6 +83,7 @@ that conversation, not code, is the critical path.** Remaining credential: a Git
 ☐ CONNECT  SUPABASE_SERVICE_ROLE_KEY deliberately withheld from Vercel → webhook auto-detect
            + reconcile cron return 500 (paste-URL attribution works; deliberate, reversible)
 ☐ OPEN     #16 connector live (creds) · #18 drift-alert surface (gated) · ~~#19 Jira parity~~ (PR #25)
+☐ ACTIVE   AI-assisted Decision Report partner wedge: approved plan, implementation not started
 ```
 
 ## What's built (all on `main`, verified against live evidence)
@@ -87,7 +99,7 @@ that conversation, not code, is the critical path.** Remaining credential: a Git
     (Google's Bayesian structural method, which we do not use).
   - Verified by an AR(1) coverage gate: belief-1.0-on-noise ≤ 6%. scipy is a **test-only**
     oracle; shipped code is numpy-only (`t_ppf` matches scipy to ~1e-9).
-- **Schema + RLS** — `supabase/migrations/` (4 files, 11 tables): org→project→workspace
+- **Schema + RLS** — `supabase/migrations/`: org→project→workspace
   scope hierarchy, `memberships` (RBAC: owner/admin/member/viewer, inherits down), metrics +
   observations, actions (with `rationale_richtext`), clusters, nodes, `causal_edges`,
   append-only `evidence_objects`. RLS on every table via `has_scope_access()`. A live
@@ -327,65 +339,38 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 
 ## Next (priority order)
 
-**Critical path now (both human-only, no code):**
-- **Run the mechanism-mapping test with the design partner** using the seeded baseline-drift beat
-  as the prop — show it, then ask how often a baseline shift actually hits his real metrics and
-  what notification he'd act on. Gates the connector completion + #18 webhook lever-drift, and
-  tests whether drift is real demand or a founder hypothesis. **The live app at app.causent.ai
-  is now the demo surface** — invite the partner via `scripts/invite.ts` + Google test user.
-- ~~**~45-min console setup**~~ — **DONE 2026-07-15/16** (Google OAuth + GitHub App + PAT +
-  deploy; see "Production deployment" above). To arm connector automation: add
-  `SUPABASE_SERVICE_ROLE_KEY` to Vercel prod + redeploy.
+### 1. Lock the Decision Report contract
 
-**Overnight run 8 (2026-07-18) — MERGED + go-live started** (`docs/OVERNIGHT_REPORT_8.md`):
-PRs #24, #25, #26 all squash-MERGED to `main` (#19 CLOSED); app auto-deploys from main.
-- **PR #24 resolution port** — `api/resolve.py` (stateful sibling of the engine fn) + cron
-  rewired to HTTP-call it. **DEPLOYED** to its own Vercel project `causent-resolve` →
-  `https://causent-resolve.vercel.app/api/resolve`. `CAUSENT_RESOLVE_SECRET` set on BOTH
-  projects; `CAUSENT_RESOLVE_URL` set on the app. Guards smoke-tested (405/401 fail-closed).
-  **Remaining to arm:** add `DATABASE_URL` (Supabase **session** pooler, `postgres.<ref>@…:5432`)
-  on causent-resolve, then **redeploy both** `causent-resolve` and `causent-ai` (Vercel env
-  added after a deploy only takes effect on the next deploy). To redeploy: `vercel --prod`
-  from a dir linked to each project, or re-trigger from the dashboard.
-- **PR #25 Jira parity (closes #19)** — Jira read-only + write-scope auto-create for both
-  trackers; 27 new tests, 334 lib green, no migration. **Code LIVE on main; route INERT
-  until armed.** To arm (deferred — no Jira instance this session): set
-  `JIRA_BASE_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN`/`JIRA_WEBHOOK_SECRET` + `GITHUB_WRITE_TOKEN`
-  (Issues: Read+Write) on causent-ai, add a Jira webhook → `/api/webhooks/jira` with header
-  `x-causent-jira-secret`, then redeploy. Read-only deep-link + paste works with zero creds now.
-  NB the write lane reads `GITHUB_WRITE_TOKEN ?? GITHUB_TOKEN`; the existing `GITHUB_TOKEN`
-  is read-only, so a write-scoped PAT is required for GitHub auto-create.
+- Produce the golden “launch a video feature” input packet and ideal output.
+- Lock `DecisionReportV1`, provenance states, runtime validation, gap ordering, and typed edits.
+- Inspect current onboarding writes and define one final idempotent materialization operation.
+- Run the model/provider spike against the golden fixture.
 
-The four items above (UI↔Supabase, ingestion, engine deploy, summary layer) are now **BUILT
-and verified locally** on `overnight/wire-up`. What remains:
+### 2. Build the partner wedge
 
-0. ~~Merge `overnight/wire-up` → `main`~~ — **DONE** (PR #1, 2026-07-08). `main` is the loop.
-1. **Live credentials** — two of three now closed:
-   - ~~`ANTHROPIC_API_KEY`~~ — in `.env.local`; live guardrail already proven 19/19 (2026-07-04).
-   - ~~Vercel creds~~ — **engine DEPLOYED to production 2026-07-11**:
-     `https://causent-engine.vercel.app/api/engine`, standalone project `causent-engine`
-     (see `api/DEPLOY.md` for why it's split from the app project + the SSO-wall gotcha);
-     `CAUSENT_ENGINE_SECRET` set on prod+preview+`.env.local`; smoke-tested 405/401/200
-     with the AUTOCORRELATION guard firing correctly on synthetic data. Redeploy via
-     `scripts/deploy-engine.sh --prod`. (App itself still undeployed — needs cloud
-     Supabase envs; the root project `causent` is linked and `.vercelignore`-scoped.)
-   - ~~GitHub token~~ — **DONE 2026-07-15**: fine-grained PAT live as `GITHUB_TOKEN` on
-     Vercel prod + `.env.local` (per SEC3/T-TOK the durable wiring is still a
-     per-connection Vault token, later).
-2. **Per-request freshness** — dashboard routes are statically prerendered (DB read at build
-   time). Add `export const dynamic = "force-dynamic"` (or revalidation) when live freshness is
-   needed. Swap the demo service-role server client for a per-request `@supabase/ssr` RLS client
-   (TODO in `lib/supabase-server.ts`) once real auth/session wiring lands.
-3. ~~**Auth**~~ — **invite-only Google-OAuth allowlist LANDED (PR #21, 2026-07-13)**:
-   `proxy.ts` session refresh + route guard, `lib/auth/{invite,session}.ts`,
-   `scripts/invite.ts`, allowlist migration. Production demo stays open behind
-   `CAUSENT_LOCAL_DEMO=1` (flip off + configure Google OAuth in Supabase to arm the wall).
-   Multi-provider (email + GitHub + SSO) remains later work (SEC2).
-4. **Design polish** — run `/plan-design-review` → `/design-review`; also fix the stale "Last 30
-   Days vs Prior 30 Days" subtitle on the Impact-by-Metric panel (bars are net confident causal
-   ITS lift across all history, not period-over-period). ImpactBar axis ticks, static account menu.
-5. **Install the `server-only` npm package** so an errant client import of `lib/supabase-server.ts`
-   fails at build time, not just at request time (defense-in-depth; no leak today).
+- Partial three-section report plus coordinated evidence, metric, action, and mock-up views.
+- Inline focused gap questions rather than general chatbot infrastructure.
+- Existing metric/CSV and human prediction commitment reuse.
+- One final materialization step into decisions, predictions, metrics, and actions.
+- Feature-flagged rollout with legacy onboarding as rollback.
+
+Target: first interactive report in roughly one week; end-to-end partner flow in 2–3
+weeks; stabilized wedge in 3–5 weeks at 15–25 focused hours/week.
+
+### 3. Validate before production expansion
+
+Run at least three initially unassisted partner sessions. At least two must pass four of
+five checks: decision accurate, problem accurate, evidence traceable, metric mechanism
+plausible, next action usable. Only then begin URL/PDF ingestion, conversational delivery,
+richer revision workflows, model routing, or numeric Completion Outlook.
+
+### 4. Existing operational work
+
+- Arm `causent-resolve` with its session-pooler `DATABASE_URL`, then redeploy both projects.
+- Run the separate zero-code mechanism-mapping test before building the gated webhook
+  lever-drift alert.
+- Connector automation and Jira/GitHub write credentials remain deliberate operator choices;
+  read-only/deep-link paths continue to work.
 
 ## Open risks / TODO
 
@@ -408,7 +393,7 @@ and verified locally** on `overnight/wire-up`. What remains:
 - `docs/designs/did-it-ship-did-it-work.md` — the PRD / v1 build plan (+ review report).
 - `docs/designs/decision-graph.md` — the causal-graph data model + belief rules + roadmap (core asset).
 - `docs/designs/security-and-auth.md` — auth, RBAC, RLS, threat model, secrets.
-- `docs/ENGINEERING.md` — engineering standards (clean/atomic/component-tested/panel bar).
+- `docs/designs/ai-assisted-decision-report.md` — approved active onboarding/product plan.
 - `engine/OVERNIGHT_REPORT.md` — the engine build + honesty-fix + bridge build history.
 - `supabase/SCHEMA_REPORT.md` — schema/RLS report + residual risk.
 

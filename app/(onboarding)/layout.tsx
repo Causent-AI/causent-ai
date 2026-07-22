@@ -14,7 +14,7 @@ export default function OnboardingLayout({
       <header className="flex h-14 items-center border-b border-[var(--border)] bg-[var(--surface)] px-6">
         <Logo />
       </header>
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-4 sm:px-6 sm:py-8">
         {children}
       </main>
     </div>

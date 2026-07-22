@@ -1,98 +1,92 @@
-# TODOS
+# Causent active backlog
 
-Deferred work with enough context to pick up cold. Priority: P1 (blocks ship) →
-P3 (nice to have). Effort shown as human → with Claude Code.
+Last reconciled: 2026-07-21. Completed historical work is documented in `docs/STATUS.md` and the overnight reports. This file contains only active or deliberately deferred work.
 
-## From the 2026-07-04 overnight loop-close (branch `overnight/wire-up`)
+## P0 — AI-assisted Decision Report partner wedge
 
-Full evidence per item in `docs/OVERNIGHT_REPORT_2.md`. None are code-blocked.
+Approved design: `docs/designs/ai-assisted-decision-report.md`.
 
-### P1 — Land `overnight/wire-up` → `main`
-- **What:** Review the branch diff (loop wiring + ingestion + summary + engine fn) and merge
-  to `main`, then push. Nothing on the branch is pushed yet; `main` is untouched.
-- **Effort:** S (human) → S (CC via `/ship`). **Priority:** P1.
+### Contract and golden fixture
 
-### P1 — Live credential wiring (3 seams, all built + gated)
-- **Anthropic key** → the honest-summary live guardrail proof:
-  `ANTHROPIC_API_KEY=sk-ant-... RUN_LIVE_POLISH=1 node --test lib/summary/__tests__/live-polish.test.ts`.
-  Also swap `live-polish.ts`'s raw `fetch` for `@anthropic-ai/sdk` behind the same
-  `SummaryPolisher` interface for production.
-- **GitHub token/OAuth** → live ingestion. Per `security-and-auth.md` SEC3/T-TOK: replace the
-  `GITHUB_TOKEN` stand-in in `lib/ingest/github-transport.ts` with a per-connection token
-  encrypted in Vault, decoupled from login, 401/403 → reconnect on non-rate-limit auth failure.
-  Run under a trusted job identity via `lib/ingest/cli.ts` (needs `tsx`/Next runtime for `@/*`).
-- ~~**Vercel creds** → deploy `api/engine.py`~~ ✅ DONE 2026-07-11: LIVE at
-  `https://causent-engine.vercel.app/api/engine` as standalone project `causent-engine`
-  (`scripts/deploy-engine.sh --prod`); `CAUSENT_ENGINE_SECRET` on prod+preview+`.env.local`;
-  smoke-tested (405 / fail-closed 401 / 200 with honest AUTOCORRELATION cap). See
-  `api/DEPLOY.md` for the split-project rationale + preview SSO-wall gotcha.
-- **Effort:** M (human, mostly ops) → S (CC). **Priority:** P1.
+- Create the “launch a video feature” acceptance packet: exact initial prompt, pasted supporting text, one PNG/JPEG mock-up, and one metric CSV.
+- Manually author the ideal three-section Decision Report and no-more-than-seven-action plan.
+- Lock `DecisionReportV1`, claim/provenance states, runtime invariants, gap ordering, and typed edit commands.
+- Inspect the current onboarding writes and define the one final idempotent materialization operation.
+- Prove the selected Anthropic model can produce valid completed section events within acceptable latency and token usage.
 
-### P2 — Per-request freshness + RLS-scoped server client
-- **What:** Dashboard routes are statically prerendered (DB read at build time). Add
-  `export const dynamic = "force-dynamic"` (or revalidation) where live freshness is needed.
-  Swap the demo service-role client (`lib/supabase-server.ts`) for a per-request
-  `@supabase/ssr` RLS client (TODO documented in-file) once real auth/session wiring lands.
-- **Effort:** M (human) → M (CC). **Priority:** P2. **Depends on:** SEC2 auth.
+### Report persistence and security
 
-### ~~P2 — Fix stale honesty-label subtitle~~ ✅ DONE 2026-07-09
-- Impact-by-Metric subtitle now reads "Net confident causal lift (ITS, all history)"; the
-  Aggregated-Impact subtitle was corrected the same way. Both `page.tsx:20` and
-  `AggregatedImpact.tsx` no longer claim a fabricated period-over-period comparison.
+- Add report, report-revision, source, and asset persistence with scope-bound RLS and explicit grants.
+- Store append-only full snapshots for the partner wedge.
+- Add private Storage handling for one size-capped PNG/JPEG: magic-byte validation, decode/re-encode, scoped read, deletion, and failure states.
+- Feature-flag the new onboarding per user/workspace; preserve legacy onboarding as rollback.
 
-### ~~P2 — Wire up in-app navigation (buttons + cross-links)~~ ✅ MOSTLY DONE 2026-07-10 (overnight/ui-polish)
-- Done: Impact actions table deep-links to `/actions?selected=<id>` (ActionsPageClient
-  seeds + re-syncs from the param, Suspense-wrapped); drawer "Add / Layer Metric" →
-  `/data-workshop`; account chip is now a real dropdown (AccountMenu, honest disabled
-  sign-out pending SEC2).
-- **Still inert (intentionally — no destinations exist yet):** header "New Project" /
-  "Settings"; "Connect GitHub" (credentialed P1 flow) / "Add manual action"; the
-  DecisionEditor toolbar (rich-text mock). Wire these when their flows land.
+### Report generation and inline assistance
 
-### ~~P2 — DB-path parity for the 2026-07-09 UI changes~~ ✅ DONE 2026-07-10 (overnight/ui-polish)
-- `objectives` table (migration `20260710000000`), `lib/data/objective.ts` getter,
-  seed_demo.py row, RLS-isolation coverage; `getAggregatedImpact()` trimmed to the
-  improvement-rate figure. Verified live: North Star renders from Supabase; reports
-  remain seed-only (DB `reports` table still TODO — see dashboard.ts).
+- Generate the three prescribed sections: Decision, Supporting Evidence, and Implementation.
+- Generate coordinated views from one aggregate: evidence summary, metric hypothesis/chart, action-plan summary, one to seven draft actions, and supplied mock-up.
+- Mark claims `sourced`, `inferred`, `suggested`, `missing`, or `user_confirmed`; models/clients cannot self-promote content to `sourced`.
+- Implement deterministic gap ranking and inline focused questions. Do not build general chatbot or chat-history infrastructure.
+- Preserve an editable partial report through malformed output, refusal, timeout, and provider failure.
 
-### P3 — Ingestion + summary hardening (fail-safe today)
-- ~~**Ingest (LOW, from C-verify)**~~ ✅ DONE 2026-07-10 (overnight/ui-polish): within-run
-  dedup on `external_ref`; `parseArgs` (now `lib/ingest/cli-args.ts`) fails loudly on
-  missing/invalid flag values; `buildRationale` per-line cap (500 chars). +8 tests.
-- ~~**Defense-in-depth (`server-only`)**~~ ✅ DONE 2026-07-10: installed + imported in
-  `lib/supabase-server.ts`. Note: the ingest CLI now needs
-  `NODE_OPTIONS="--conditions react-server"` under tsx (documented in cli.ts).
-  Still optional: the two unreachable summary clamps (CONFOUNDED+belief-1.0, non-finite
-  nPre) in `resolveStrength` if the engine↔summary contract is ever loosened.
-- **Demo polish (still open):** tune the `seed_demo.py` Gross Profit generator — its organic
-  noise produces 2 incidental confident-NEGATIVE readouts at the landmark dates (honest engine
-  output, but off the intended narrative). Deliberately NOT done overnight: changing the
-  generator invalidates the documented cell-for-cell verification figures (Net +$249K etc.).
-  Optionally filter Phase-B UI edges to an action's `expected_metric`.
-- **Effort:** S (human) → S (CC). **Priority:** P3.
+### Editing and materialization
 
-### P3 — Design-review deferrals (2026-07-10 audit, fixed: 2 HIGH mobile + ticks + account menu)
-- **LineTimeSeries x-axis tick density** isn't viewport-aware — labels crowd at 375px
-  (`components/charts/LineTimeSeries.tsx`).
-- **Duplicate "Core Metrics Summary"** heading on `/data-workshop` when the drawer is open
-  (page panel + drawer panel both use it) — rename one or fold the page panel.
-- **Header touch targets** are 32–36px (< 44px) — fine desktop-first; revisit if mobile
-  becomes a real surface.
-- **Effort:** S (human) → S (CC). **Priority:** P3.
+- Build focused report components rather than a generic block editor.
+- Autosave draft snapshots and preserve state through refresh and Back.
+- Reuse existing metric selection/CSV and human prediction commitment behavior.
+- Materialize the canonical decision, prediction, metric relationship, and selected actions once after final approval.
+- Make retries idempotent and verify double-submit creates zero duplicates.
+- Store the approved report in Reports and surface the created work in Actions & Decisions.
 
-## P3 — Full-history GitHub backfill worker
-- **What:** Background worker to backfill a repo's entire PR/issue history beyond
-  the v1 capped window (default ~90 days / N PRs).
-- **Why:** v1 caps backfill to fit inside one Vercel request. A design partner who
-  wants their full multi-year history rendered on the causal graph will hit that
-  ceiling. The capped window is a documented v1 limitation, not a permanent one.
-- **Current state:** v1 backfills only the recent window inline on connect (decision
-  A2, CEO review 2026-07-02). No worker infra exists.
-- **Where to start:** Supabase scheduled function / cron or a queue worker that pages
-  GitHub REST/GraphQL with rate-limit backoff (respect `Retry-After`), writes a
-  resumable cursor, and upserts ACTION nodes idempotently (dedup on external_ref).
-- **Effort:** L (human) → M (CC). **Priority:** P3.
-- **Depends on:** a background-job mechanism the PRD deliberately deferred; land the
-  v1 capped-window path and a real partner request first.
-- **Source:** /plan-ceo-review 2026-07-02, finding A2 + CEO plan
-  `~/.gstack/projects/adam-causent-causent-ai/ceo-plans/2026-07-02-did-it-ship-did-it-work.md`
+### Partner verification
+
+- Unit-test schema, provenance invariants, gap ordering, and typed edits.
+- Integration-test RLS, snapshots, asset access, and idempotent materialization.
+- Browser-test partial generation, direct edits, inline questions, metric confirmation, approval, retry, refresh, Back, and feature-flag rollback.
+- Add at least nine adversarial unsupported-claim scenarios.
+- Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, metric mechanism plausible, next action usable.
+
+Estimated for the current builder profile: 3–5 calendar weeks at 15–25 focused hours per week. First interactive report target: roughly one week. End-to-end partner target: roughly 2–3 weeks.
+
+## P1 — Existing production operations
+
+- Arm `causent-resolve`: set the Supabase session-pooler `DATABASE_URL` on the `causent-resolve` Vercel project, then redeploy `causent-resolve` and `causent-ai`.
+- Decide whether to enable automated connector reconciliation. It currently fails closed because `SUPABASE_SERVICE_ROLE_KEY` is intentionally absent from Vercel; paste attribution remains available.
+- If Jira automation is needed, configure `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_WEBHOOK_SECRET`, and the Jira webhook.
+- If GitHub issue auto-create is needed, configure a write-scoped `GITHUB_WRITE_TOKEN`; the existing token is read-only.
+- Add `app/robots.ts` and the appropriate proxy behavior if `/login` should not be indexed.
+
+## P1 — Product validation outside the Decision Report
+
+- Run the existing zero-code mechanism-mapping test with the design partner before building the webhook-driven `LEVER_DROPPED` drift-alert surface.
+- Use the seeded baseline-drift beat as the prop and capture whether the partner recognizes the event, how often it occurs, and what notification would change behavior.
+
+## Conditional production ramp
+
+Only begin these after the Decision Report partner gate passes:
+
+- Bounded single-page URL retrieval with SSRF, redirect, byte, and timeout protection.
+- Text/PDF ingestion in a secret-free bounded extraction runtime.
+- Malware scanning/quarantine for broader file types.
+- Conversational delivery as another client of the report schema, gap scanner, and typed commands.
+- Richer revision/reapproval workflows for editing active reports.
+- Model routing, extraction caching, or selective model tiers after measured cost/latency evidence.
+- Numeric Completion Outlook after defining auditable inputs and calibration.
+- Automated governance enforcement.
+
+## P2 — Existing architecture and UX debt
+
+- Replace remaining demo service-role dashboard reads with per-request `@supabase/ssr` RLS clients where live freshness is required.
+- Add dynamic rendering or explicit revalidation to dashboard routes that must reflect per-request data.
+- Persist reports from the database; the current dashboard DB path still returns an empty reports collection.
+- Finish inert destinations only when their flows exist: New Project, Settings, manual action, and credentialed connector controls.
+- Make `LineTimeSeries` x-axis tick density viewport-aware.
+- Resolve the duplicate “Core Metrics Summary” heading on Data Workshop when the drawer is open.
+- Increase mobile header touch targets if mobile becomes a supported primary surface.
+- Tune the demo Gross Profit generator only if changing the documented verification baseline is worthwhile.
+
+## P3 — Deferred scale work
+
+- Full-history GitHub backfill worker with resumable cursors and rate-limit backoff.
+- Warehouse connectors such as Postgres/BigQuery after a real partner request.
+- Graph-scale policies for thousands of actions and edges.

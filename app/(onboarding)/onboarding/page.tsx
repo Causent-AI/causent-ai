@@ -1,19 +1,17 @@
 import type { Metadata } from "next";
-import { OnboardingFunnel } from "@/components/onboarding/OnboardingFunnel";
+import { DecisionReportOnboarding } from "@/components/decision-report/DecisionReportOnboarding";
 
-// The cold-start funnel, Steps 2-4 (C2/#15): paste -> structured decision card
-// + interrogation -> declared metric -> committed prediction. No connector
-// wall — the earned connector ask (Steps 5-6) is C3. The page is a thin shell;
-// all state lives in the client wizard and all writes go through the
-// server actions (scoped by lib/auth/session.ts).
+// Slice 1 of the AI-assisted onboarding: one deterministic brief generates an
+// editable, three-section Decision Report. Model calls and persistence remain
+// deliberately outside this route until the report experience is validated.
 
 export const metadata: Metadata = {
-  title: "Causent — What are you about to build?",
+  title: "Causent — Build a Decision Report",
 };
 
 // The funnel writes on every visit path; never prerender it at build time.
 export const dynamic = "force-dynamic";
 
 export default function OnboardingPage() {
-  return <OnboardingFunnel />;
+  return <DecisionReportOnboarding />;
 }

@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "./fixtures/gummy-alpha.ts";
+import {
+  cloneDecisionReport,
+  validateDecisionReport,
+} from "./schema.ts";
+
+test("Gummy Alpha is a valid versioned Decision Report fixture", () => {
+  const result = validateDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  assert.equal(result.success, true, result.success ? undefined : result.errors.join("\n"));
+});
+
+test("sourced claims require a source chunk", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  report.decision.decision[0].sourceChunkIds = [];
+
+  const result = validateDecisionReport(report);
+  assert.equal(result.success, false);
+  if (!result.success) {
+    assert.ok(result.errors.some((error) => error.includes("has no source chunk")));
+  }
+});
+
+test("missing claims cannot silently contain text", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  report.implementation.cost[0].text = "$25,000";
+
+  const result = validateDecisionReport(report);
+  assert.equal(result.success, false);
+  if (!result.success) {
+    assert.ok(result.errors.some((error) => error.includes("is missing but contains text")));
+  }
+});
+
+test("action plans cannot exceed seven actions", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  report.implementation.actions.push(structuredClone(report.implementation.actions[0]));
+
+  const result = validateDecisionReport(report);
+  assert.equal(result.success, false);
+  if (!result.success) {
+    assert.ok(result.errors.some((error) => error.includes("cannot exceed 7")));
+  }
+});
