@@ -3,7 +3,7 @@
 ## 2026-08-03 — Slice 10 review branch
 
 PR #28 merged the Slice 8/9 baseline into `main` as `c894451`. The separate
-`codex/decision-report-slice-10` branch packages the explicit iteration-series work, bounded URL/PDF
+`codex/decision-report-slice-10` branch and draft PR #29 package the explicit iteration-series work, bounded URL/PDF
 ingestion, automatic current-report recomputation, manual AI handoff preview, and the MVP completion
 guardrails described below for review. Publication does not apply migrations, configure or deploy the
 worker, satisfy the partner-session gate, or establish that the expanded hosted CI workflow passed.
@@ -72,7 +72,8 @@ manifest; the local guard passes and CI runs it immediately after the webpack bu
 Implementation proceeded under an explicit product-direction override before the normal Slice 9
 partner-session gate. The missing three initially unassisted sessions remain required release evidence;
 this override is not evidence that the gate passed. The implementation is packaged separately from
-merged PR #28 on `codex/decision-report-slice-10`; migration, deployment, and canary work remain open.
+merged PR #28 on `codex/decision-report-slice-10` in draft PR #29; migration, deployment, and canary
+work remain open.
 
 Last updated: 2026-08-03. Single source of truth for "where are we and how do I pick up."
 Product: **dual cold-start on one causal graph** — the retrospective wedge ("Did-It-Ship,

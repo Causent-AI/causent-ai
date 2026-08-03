@@ -6,9 +6,9 @@ The bounded Decision Report MVP implementation now includes the post-Slice-10 co
 for blank onboarding, explicit provider egress consent, content-free lifecycle measurement,
 future-date enforcement, sanitized automatic-recompute visibility, recoverable error surfaces, and
 production/CI guardrails. PR #28 later merged the Slice 8/9 baseline into `main` on 2026-08-03; this
-completion work is packaged separately on `codex/decision-report-slice-10`. Publication does not
-deploy the app or worker, apply migrations to the partner Supabase environment, or satisfy the
-remaining human release gates.
+completion work is packaged separately on `codex/decision-report-slice-10` in draft PR #29.
+Publication does not deploy the app or worker, apply migrations to the partner Supabase environment,
+or satisfy the remaining human release gates.
 
 Slice 10 and the later MVP expansions were implemented under the user's deliberate product-direction
 override before the normal Slice 9 partner-session gate. That authorization allowed implementation;

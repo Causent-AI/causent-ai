@@ -3,8 +3,9 @@
 Last reconciled: 2026-08-03. Completed historical work is documented in `docs/STATUS.md` and the overnight reports. This file contains only active or deliberately deferred work.
 
 PR #28 merged the Slice 8/9 baseline into `main` on 2026-08-03. Slice 10 and the bounded MVP
-expansions are packaged separately on `codex/decision-report-slice-10`; hosted CI, partner evidence,
-partner-environment migration/configuration, deployment, and canary work remain open below.
+expansions are packaged separately on `codex/decision-report-slice-10` in draft PR #29; hosted CI,
+partner evidence, partner-environment migration/configuration, deployment, and canary work remain
+open below.
 
 ## P0 — AI-assisted Decision Report partner wedge
 
