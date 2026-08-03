@@ -4,6 +4,11 @@ import { TabStrip } from "@/components/shell/TabStrip";
 import { CoreMetricsDrawer } from "@/components/shell/CoreMetricsDrawer";
 import { loadDashboardData } from "@/lib/data/dashboard";
 
+// Every dashboard route is workspace- and current-report-specific. Keep the
+// shared shell request-bound as well so a production build can never freeze a
+// seed or pre-activation snapshot into Reports, Impact, or the metrics drawer.
+export const dynamic = "force-dynamic";
+
 // Persistent shell: global header + tab strip on top, the active tab in the
 // scrolling middle, and the Core Metrics drawer pinned to the bottom on every tab.
 // Data (scope + metrics + actions) is read once here (Supabase, memoized per request)

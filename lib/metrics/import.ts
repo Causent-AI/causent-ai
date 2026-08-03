@@ -43,7 +43,15 @@ export type WorkspaceCoreMetricSelectionResult =
     }
   | { ok: false; code: "validation" | "forbidden" | "database"; error: string };
 
-type ActiveReportRow = { report_id: string; active_metric_id: string; status: string };
+type WorkspaceReportPointerRow = { current_decision_report_series_id: string | null };
+type ReportSeriesPointerRow = { current_active_report_id: string | null };
+type ActiveReportRow = {
+  report_id: string;
+  series_id: string;
+  active_metric_id: string;
+  status: string;
+  deleted_at: string | null;
+};
 type ImportRpcRow = {
   metric_id: string;
   metric_name: string;
@@ -204,18 +212,43 @@ export async function loadActiveReportMetricIdentity(
   scopeId: string,
 ): Promise<{ reportId: string; metricId: string } | null> {
   if (!validUuid(scopeId)) return null;
-  const response = await sb
-    .from("decision_reports")
-    .select("report_id, active_metric_id, status")
+  const workspaceResponse = await sb
+    .from("workspaces")
+    .select("current_decision_report_series_id")
+    .eq("workspace_id", scopeId)
+    .maybeSingle();
+  if (workspaceResponse.error) throw workspaceResponse.error;
+  const workspace = workspaceResponse.data as WorkspaceReportPointerRow | null;
+  if (!workspace || !validUuid(workspace.current_decision_report_series_id)) return null;
+
+  const seriesResponse = await sb
+    .from("decision_report_series")
+    .select("current_active_report_id")
     .eq("scope_id", scopeId)
-    .eq("status", "active")
-    .not("active_metric_id", "is", null)
-    .order("activated_at", { ascending: false })
-    .limit(1);
-  if (response.error) throw response.error;
-  const row = (response.data?.[0] ?? null) as ActiveReportRow | null;
-  if (!row || row.status !== "active" || !validUuid(row.report_id) || !validUuid(row.active_metric_id)) return null;
-  return { reportId: row.report_id, metricId: row.active_metric_id };
+    .eq("series_id", workspace.current_decision_report_series_id)
+    .maybeSingle();
+  if (seriesResponse.error) throw seriesResponse.error;
+  const series = seriesResponse.data as ReportSeriesPointerRow | null;
+  if (!series || !validUuid(series.current_active_report_id)) return null;
+
+  const reportResponse = await sb
+    .from("decision_reports")
+    .select("report_id, series_id, active_metric_id, status, deleted_at")
+    .eq("scope_id", scopeId)
+    .eq("series_id", workspace.current_decision_report_series_id)
+    .eq("report_id", series.current_active_report_id)
+    .maybeSingle();
+  if (reportResponse.error) throw reportResponse.error;
+  const report = reportResponse.data as ActiveReportRow | null;
+  if (
+    !report ||
+    report.status !== "active" ||
+    report.deleted_at !== null ||
+    report.series_id !== workspace.current_decision_report_series_id ||
+    !validUuid(report.report_id) ||
+    !validUuid(report.active_metric_id)
+  ) return null;
+  return { reportId: report.report_id, metricId: report.active_metric_id };
 }
 
 export async function importReportMetricObservations(

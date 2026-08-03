@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { randomUUID } from "node:crypto";
 import { OnboardingFunnel } from "@/components/onboarding/OnboardingFunnel";
 import {
   DecisionReportOnboarding,
@@ -38,6 +39,14 @@ export default async function OnboardingPage({
     flow?: string | string[];
   }>;
 }) {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const activationDateBounds = {
+    today: today.toISOString().slice(0, 10),
+    minimum: tomorrow.toISOString().slice(0, 10),
+  };
+  const initialTelemetrySessionKey = `dr-${randomUUID()}`;
   const params = await searchParams;
   const requestedReportId = Array.isArray(params.report) ? params.report[0] : params.report;
   const requestedFlow = Array.isArray(params.flow) ? params.flow[0] : params.flow;
@@ -70,7 +79,7 @@ export default async function OnboardingPage({
     activationMetrics = await loadReportActivationMetrics(
       sb,
       session.workspaceId,
-    ).catch(() => []);
+    );
   }
 
   if (requestedReportId) {
@@ -80,35 +89,57 @@ export default async function OnboardingPage({
       if (!isLocalDemo() && !session.userId) {
         initialLoadError = "Sign in to open this saved report.";
       } else {
-        const [loaded, scope, asset] = await Promise.all([
-          loadDecisionReport(
-            sb,
-            session.workspaceId,
-            requestedReportId,
-          ),
-          getScope(),
-          loadAttachedReportAsset(sb, requestedReportId),
-        ]).catch(() => [null, null, null] as const);
+        try {
+          const [loaded, scope, asset] = await Promise.all([
+            loadDecisionReport(
+              sb,
+              session.workspaceId,
+              requestedReportId,
+            ),
+            getScope(),
+            loadAttachedReportAsset(sb, requestedReportId),
+          ]);
 
-        if (loaded?.ok && scope) {
-          initialSavedReport = {
-            report: loaded.saved.report,
-            metricProjection: loaded.saved.metricProjection,
-            workspaceName: scope.project,
-            projectName: scope.workspace,
-            persistence: {
-              reportId: loaded.saved.reportId,
-              revisionId: loaded.saved.revisionId,
-              status: loaded.saved.status,
-              savedAt: loaded.saved.savedAt,
-              activation: loaded.saved.activation,
-            },
-            asset: asset ?? null,
-          };
-        } else {
-          initialLoadError = loaded && !loaded.ok
-            ? loaded.error
-            : "Causent could not load that saved report.";
+          if (loaded.ok && scope) {
+            initialSavedReport = {
+              report: loaded.saved.report,
+              metricProjection: loaded.saved.metricProjection,
+              workspaceName: scope.project,
+              projectName: scope.workspace,
+              sourceSummaries: loaded.saved.report.sourceSummaries,
+              persistence: {
+                reportId: loaded.saved.reportId,
+                revisionId: loaded.saved.revisionId,
+                status: loaded.saved.status,
+                savedAt: loaded.saved.savedAt,
+                activation: loaded.saved.activation,
+                lineage: loaded.saved.lineage
+                  ? {
+                      iterationNumber: loaded.saved.lineage.iterationNumber,
+                      iterationReason: loaded.saved.lineage.iterationReason,
+                    }
+                  : null,
+              },
+              asset: asset ?? null,
+            };
+          } else {
+            console.error("[decision-report onboarding] direct report load failed", {
+              reportId: requestedReportId,
+              workspaceId: session.workspaceId,
+              loadCode: loaded.ok ? "scope_unavailable" : loaded.code,
+              diagnostic: loaded.ok ? undefined : loaded.error,
+            });
+            initialLoadError =
+              "That report could not be opened. Return to Reports to confirm it is available in this workspace, then try again.";
+          }
+        } catch (error) {
+          console.error("[decision-report onboarding] direct report load failed", {
+            reportId: requestedReportId,
+            workspaceId: session.workspaceId,
+            error,
+          });
+          initialLoadError =
+            "That report could not be opened. Return to Reports to confirm it is available in this workspace, then try again.";
         }
       }
     }
@@ -119,6 +150,8 @@ export default async function OnboardingPage({
       initialSavedReport={initialSavedReport}
       initialLoadError={initialLoadError}
       activationMetrics={activationMetrics}
+      activationDateBounds={activationDateBounds}
+      initialTelemetrySessionKey={initialTelemetrySessionKey}
     />
   );
 }

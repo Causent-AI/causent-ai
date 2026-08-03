@@ -8,10 +8,17 @@ import type {
   MetricProjection,
 } from "./schema.ts";
 import { validateDecisionReport } from "./schema.ts";
+import {
+  INITIAL_PROMPT_SOURCE_ID,
+  type ReportSourceChunk,
+  type ReportSourceCorpus,
+  type ReportSourceSummary,
+} from "./sources/types.ts";
+import { createReportSourceCorpus } from "./sources/corpus.ts";
 
 export const DECISION_REPORT_PROMPT_MIN_CHARS = 20;
 export const DECISION_REPORT_PROMPT_MAX_CHARS = 6_000;
-export const INITIAL_PROMPT_SOURCE_ID = "initial-prompt";
+export { INITIAL_PROMPT_SOURCE_ID };
 
 export const MODEL_CLAIM_KINDS = [
   "supported",
@@ -26,6 +33,7 @@ export type ModelClaimDraft = {
   text: string;
   kind: ModelClaimKind;
   evidenceQuote: string;
+  evidenceSourceChunkId: string;
 };
 
 export type ModelActionDraft = {
@@ -62,8 +70,10 @@ export type ModelDecisionReportDraft = {
     definition: string;
     baselinePct: number | null;
     baselineEvidenceQuote: string;
+    baselineSourceChunkId: string;
     predictedPct: number | null;
     predictedEvidenceQuote: string;
+    predictedSourceChunkId: string;
   };
 };
 
@@ -72,6 +82,7 @@ export type DecisionReportGeneration = {
   metricProjection: MetricProjection;
   workspaceName: string;
   projectName: string;
+  sourceSummaries: ReportSourceSummary[];
 };
 
 type IdFactory = () => string;
@@ -83,8 +94,9 @@ const claimDraftSchema: JSONSchema7 = {
     text: { type: "string", maxLength: 500 },
     kind: { type: "string", enum: [...MODEL_CLAIM_KINDS] },
     evidenceQuote: { type: "string", maxLength: 500 },
+    evidenceSourceChunkId: { type: "string", maxLength: 120 },
   },
-  required: ["text", "kind", "evidenceQuote"],
+  required: ["text", "kind", "evidenceQuote", "evidenceSourceChunkId"],
 };
 
 const nullableClaimDraftSchema: JSONSchema7 = {
@@ -180,16 +192,20 @@ export const MODEL_DECISION_REPORT_JSON_SCHEMA: JSONSchema7 = {
         definition: { type: "string", minLength: 1, maxLength: 500 },
         baselinePct: { type: ["number", "null"], minimum: 0, maximum: 100 },
         baselineEvidenceQuote: { type: "string", maxLength: 1_500 },
+        baselineSourceChunkId: { type: "string", maxLength: 120 },
         predictedPct: { type: ["number", "null"], minimum: 0, maximum: 100 },
         predictedEvidenceQuote: { type: "string", maxLength: 1_500 },
+        predictedSourceChunkId: { type: "string", maxLength: 120 },
       },
       required: [
         "name",
         "definition",
         "baselinePct",
         "baselineEvidenceQuote",
+        "baselineSourceChunkId",
         "predictedPct",
         "predictedEvidenceQuote",
+        "predictedSourceChunkId",
       ],
     },
   },
@@ -212,7 +228,8 @@ function isModelClaim(value: unknown): value is ModelClaimDraft {
     isRecord(value) &&
     typeof value.text === "string" &&
     MODEL_CLAIM_KINDS.includes(value.kind as ModelClaimKind) &&
-    typeof value.evidenceQuote === "string"
+    typeof value.evidenceQuote === "string" &&
+    typeof value.evidenceSourceChunkId === "string"
   );
 }
 
@@ -271,10 +288,12 @@ export function validateModelDecisionReportDraft(
     typeof metric.definition !== "string" ||
     !isOptionalPercentage(metric.baselinePct) ||
     typeof metric.baselineEvidenceQuote !== "string" ||
+    typeof metric.baselineSourceChunkId !== "string" ||
     !isOptionalPercentage(metric.predictedPct) ||
-    typeof metric.predictedEvidenceQuote !== "string"
+    typeof metric.predictedEvidenceQuote !== "string" ||
+    typeof metric.predictedSourceChunkId !== "string"
   ) {
-    return { success: false, error: new Error("Generated report does not match the Slice 2 contract.") };
+    return { success: false, error: new Error("Generated report does not match the generation contract.") };
   }
 
   return { success: true, value: value as ModelDecisionReportDraft };
@@ -371,22 +390,32 @@ function isOptionalPercentage(value: unknown): value is number | null {
   return value === null || (typeof value === "number" && value >= 0 && value <= 100);
 }
 
-function normalized(value: string): string {
-  return value.toLocaleLowerCase().replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim();
-}
-
-function quoteIsSupported(quote: string, prompt: string): boolean {
-  const candidate = normalized(quote);
-  return candidate.length >= 8 && normalized(prompt).includes(candidate);
-}
-
 function numericTokens(value: string): string[] {
   return value.match(/\d+(?:[.,]\d+)?%?/g) ?? [];
 }
 
-function containsUnsupportedNumber(text: string, prompt: string): boolean {
-  const promptTokens = new Set(numericTokens(prompt).map((token) => token.replace(/,/g, "")));
-  return numericTokens(text).some((token) => !promptTokens.has(token.replace(/,/g, "")));
+function asCorpus(value: string | ReportSourceCorpus): ReportSourceCorpus {
+  return typeof value === "string" ? createReportSourceCorpus(value) : value;
+}
+
+function evidenceChunk(
+  quote: string,
+  chunkId: string,
+  corpus: ReportSourceCorpus,
+): ReportSourceChunk | null {
+  const candidate = quote.trim();
+  if (candidate.length < 8 || !chunkId) return null;
+  const chunk = corpus.chunks.find((item) => item.chunkId === chunkId);
+  return chunk && chunk.text.includes(candidate) ? chunk : null;
+}
+
+function containsUnsupportedNumber(text: string, corpus: ReportSourceCorpus): boolean {
+  const corpusTokens = new Set(
+    corpus.chunks
+      .flatMap((chunk) => numericTokens(chunk.text))
+      .map((token) => token.replace(/,/g, "")),
+  );
+  return numericTokens(text).some((token) => !corpusTokens.has(token.replace(/,/g, "")));
 }
 
 function missingClaim(id: string): Claim {
@@ -395,24 +424,26 @@ function missingClaim(id: string): Claim {
 
 function mapClaim(
   draft: ModelClaimDraft,
-  prompt: string,
+  corpus: ReportSourceCorpus,
   id: string,
   options: { sourceOnly?: boolean } = {},
 ): Claim {
   const text = draft.text.trim();
   if (draft.kind === "missing" || text === "") return missingClaim(id);
 
-  const supported =
-    draft.kind === "supported" && quoteIsSupported(draft.evidenceQuote, prompt);
-  if (containsUnsupportedNumber(text, prompt)) return missingClaim(id);
-  if (options.sourceOnly && !supported) return missingClaim(id);
+  const sourceChunk =
+    draft.kind === "supported"
+      ? evidenceChunk(draft.evidenceQuote, draft.evidenceSourceChunkId, corpus)
+      : null;
+  if (containsUnsupportedNumber(text, corpus)) return missingClaim(id);
+  if (options.sourceOnly && !sourceChunk) return missingClaim(id);
 
-  if (supported) {
+  if (sourceChunk) {
     return {
       id,
       text,
       status: "sourced",
-      sourceChunkIds: [INITIAL_PROMPT_SOURCE_ID],
+      sourceChunkIds: [sourceChunk.chunkId],
     };
   }
 
@@ -426,22 +457,22 @@ function mapClaim(
 
 function mapClaimOrMissing(
   draft: ModelClaimDraft | null,
-  prompt: string,
+  corpus: ReportSourceCorpus,
   id: string,
   options: { sourceOnly?: boolean } = {},
 ): Claim {
-  return draft === null ? missingClaim(id) : mapClaim(draft, prompt, id, options);
+  return draft === null ? missingClaim(id) : mapClaim(draft, corpus, id, options);
 }
 
 function mapClaimArray(
   drafts: ModelClaimDraft[],
-  prompt: string,
+  corpus: ReportSourceCorpus,
   prefix: string,
   idFactory: IdFactory,
   options: { sourceOnly?: boolean } = {},
 ): Claim[] {
   const mapped = drafts.map((draft) =>
-    mapClaim(draft, prompt, `${prefix}-${idFactory()}`, options),
+    mapClaim(draft, corpus, `${prefix}-${idFactory()}`, options),
   );
   const nonMissing = mapped.filter((claim) => claim.status !== "missing");
   return nonMissing.length > 0 ? nonMissing : [missingClaim(`${prefix}-${idFactory()}`)];
@@ -449,20 +480,20 @@ function mapClaimArray(
 
 function mapAction(
   draft: ModelActionDraft,
-  prompt: string,
+  corpus: ReportSourceCorpus,
   idFactory: IdFactory,
 ): DraftAction {
   const actionId = `action-${idFactory()}`;
-  const title = containsUnsupportedNumber(draft.title, prompt)
+  const title = containsUnsupportedNumber(draft.title, corpus)
     ? "Define the next implementation step"
     : draft.title.trim();
-  const owner = mapClaimOrMissing(draft.owner, prompt, `${actionId}-owner`, {
+  const owner = mapClaimOrMissing(draft.owner, corpus, `${actionId}-owner`, {
     sourceOnly: true,
   });
   return {
     sourceItemId: actionId,
     title: title || "Define the next implementation step",
-    summary: [mapClaimOrMissing(draft.summary, prompt, `${actionId}-summary`)],
+    summary: [mapClaimOrMissing(draft.summary, corpus, `${actionId}-summary`)],
     owner: owner.status === "missing" ? null : owner,
   };
 }
@@ -470,33 +501,40 @@ function mapAction(
 function supportedMetricValue(
   value: number | null,
   quote: string,
-  prompt: string,
+  sourceChunkId: string,
+  corpus: ReportSourceCorpus,
 ): number | null {
-  if (value === null || !quoteIsSupported(quote, prompt)) return null;
+  if (value === null || !evidenceChunk(quote, sourceChunkId, corpus)) return null;
   const normalizedQuoteTokens = numericTokens(quote).map((token) => token.replace(/[% ,]/g, ""));
   return normalizedQuoteTokens.includes(String(value)) ? value : null;
 }
 
 export function materializeModelDecisionReport(
   draft: ModelDecisionReportDraft,
-  prompt: string,
+  sourceInput: string | ReportSourceCorpus,
   options: { idFactory?: IdFactory; workspaceName?: string } = {},
 ): DecisionReportGeneration {
   const idFactory = options.idFactory ?? randomUUID;
+  const corpus = asCorpus(sourceInput);
+  const sourceSummaries = corpus.sources.map((source) => ({
+    ...source,
+    chunks: source.chunks.map((chunk) => ({ ...chunk })),
+  }));
   const report: DecisionReportV1 = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     title: draft.title.trim() || "Decision Report draft",
+    sourceSummaries,
     decision: {
-      decision: [mapClaimOrMissing(draft.decision.decision, prompt, `decision-${idFactory()}`)],
-      background: [mapClaimOrMissing(draft.decision.background, prompt, `background-${idFactory()}`)],
-      problem: [mapClaimOrMissing(draft.decision.problem, prompt, `problem-${idFactory()}`)],
+      decision: [mapClaimOrMissing(draft.decision.decision, corpus, `decision-${idFactory()}`)],
+      background: [mapClaimOrMissing(draft.decision.background, corpus, `background-${idFactory()}`)],
+      problem: [mapClaimOrMissing(draft.decision.problem, corpus, `problem-${idFactory()}`)],
     },
     supportingEvidence: {
-      factors: mapClaimArray(draft.supportingEvidence.factors, prompt, "factor", idFactory),
+      factors: mapClaimArray(draft.supportingEvidence.factors, corpus, "factor", idFactory),
       metricMechanism: [
         mapClaimOrMissing(
           draft.supportingEvidence.metricMechanism,
-          prompt,
+          corpus,
           `mechanism-${idFactory()}`,
         ),
       ],
@@ -505,19 +543,19 @@ export function materializeModelDecisionReport(
       actionPlanSummary: [
         mapClaimOrMissing(
           draft.implementation.actionPlanSummary,
-          prompt,
+          corpus,
           `action-summary-${idFactory()}`,
         ),
       ],
       actions: draft.implementation.actions
         .slice(0, 3)
-        .map((action) => mapAction(action, prompt, idFactory)),
-      customers: mapClaimArray(draft.implementation.customers, prompt, "customer", idFactory, {
+        .map((action) => mapAction(action, corpus, idFactory)),
+      customers: mapClaimArray(draft.implementation.customers, corpus, "customer", idFactory, {
         sourceOnly: true,
       }),
       stakeholders: mapClaimArray(
         draft.implementation.stakeholders,
-        prompt,
+        corpus,
         "stakeholder",
         idFactory,
         { sourceOnly: true },
@@ -531,14 +569,14 @@ export function materializeModelDecisionReport(
             : draft.implementation.governance.dataClassification,
         allowedDataSources: mapClaimArray(
           draft.implementation.governance?.allowedDataSources ?? [],
-          prompt,
+          corpus,
           "data-source",
           idFactory,
           { sourceOnly: true },
         ),
         approvedModelNotes: mapClaimArray(
           draft.implementation.governance?.approvedModelNotes ?? [],
-          prompt,
+          corpus,
           "model-note",
           idFactory,
           { sourceOnly: true },
@@ -555,18 +593,21 @@ export function materializeModelDecisionReport(
   const baselinePct = supportedMetricValue(
     draft.metric.baselinePct,
     draft.metric.baselineEvidenceQuote,
-    prompt,
+    draft.metric.baselineSourceChunkId,
+    corpus,
   );
   const predictedPct = supportedMetricValue(
     draft.metric.predictedPct,
     draft.metric.predictedEvidenceQuote,
-    prompt,
+    draft.metric.predictedSourceChunkId,
+    corpus,
   );
 
   return {
     report,
     workspaceName: options.workspaceName ?? "Orbit",
     projectName: draft.projectName.trim() || "New project",
+    sourceSummaries,
     metricProjection: {
       metricName: draft.metric.name.trim() || "Core metric needs confirmation",
       definition: draft.metric.definition.trim() || "Define how this metric is calculated.",
@@ -581,22 +622,31 @@ export function materializeModelDecisionReport(
 }
 
 export function createSafeFallbackReport(
-  prompt: string,
+  sourceInput: string | ReportSourceCorpus,
   options: { idFactory?: IdFactory; workspaceName?: string } = {},
 ): DecisionReportGeneration {
   const idFactory = options.idFactory ?? randomUUID;
+  const corpus = asCorpus(sourceInput);
+  const promptChunkIds = corpus.chunks
+    .filter((chunk) => chunk.sourceId === INITIAL_PROMPT_SOURCE_ID)
+    .map((chunk) => chunk.chunkId);
+  const sourceSummaries = corpus.sources.map((source) => ({
+    ...source,
+    chunks: source.chunks.map((chunk) => ({ ...chunk })),
+  }));
   const missing = (prefix: string) => missingClaim(`${prefix}-${idFactory()}`);
   const report: DecisionReportV1 = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     title: "Decision Report draft",
+    sourceSummaries,
     decision: {
       decision: [missing("decision")],
       background: [
         {
           id: `background-${idFactory()}`,
-          text: prompt.trim(),
+          text: corpus.brief.trim(),
           status: "sourced",
-          sourceChunkIds: [INITIAL_PROMPT_SOURCE_ID],
+          sourceChunkIds: promptChunkIds,
         },
       ],
       problem: [missing("problem")],
@@ -623,6 +673,7 @@ export function createSafeFallbackReport(
     report,
     workspaceName: options.workspaceName ?? "Orbit",
     projectName: "New project",
+    sourceSummaries,
     metricProjection: {
       metricName: "Core metric needs confirmation",
       definition: "Define the metric and how it is calculated.",

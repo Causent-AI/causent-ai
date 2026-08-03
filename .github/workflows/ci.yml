@@ -2,8 +2,8 @@ name: CI
 
 # Re-runs every gate on every change so they stay honest (closes the
 # "point-in-time" residual risk in supabase/SCHEMA_REPORT.md): the pure engine
-# tests, the RLS tenant-isolation gate, and the bridge end-to-end gate all run
-# against a real Supabase Postgres — the same stack verified locally.
+# tests, application contracts, RLS tenant-isolation gate, bridge end-to-end
+# gate, and Next.js production build all run against the same pinned toolchain.
 on:
   push:
     branches: [main]
@@ -15,10 +15,15 @@ concurrency:
 
 jobs:
   test:
-    name: engine + RLS + bridge gates
+    name: app + engine + RLS + bridge gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
 
       - uses: actions/setup-python@v5
         with:
@@ -31,16 +36,54 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.98.1
+
+      - name: Install app dependencies
+        run: npm ci
 
       - name: Start Supabase + apply migrations
         run: |
           supabase start
-          supabase db reset   # clean-slate apply of supabase/migrations, mirrors local verification
+          CAUSENT_ENGINE_PYTHON="$(command -v python)" npm run db:reset-demo
+
+      - name: Export local Supabase credentials for integration tests
+        run: |
+          eval "$(supabase status -o env)"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: App contracts and integration suite
+        run: |
+          set -o pipefail
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm test | tee "$RUNNER_TEMP/lib-tests.tap"
+          if grep -Eq '# .*(Supabase.*(unavailable|not reachable)|migration.*unavailable|seed not present|Storage is unavailable|provenance fixture is unavailable)' "$RUNNER_TEMP/lib-tests.tap"; then
+            echo "A database integration test skipped despite the reset local Supabase stack." >&2
+            exit 1
+          fi
+
+      - name: Database schema lint
+        run: supabase db lint --local --level error
 
       - name: Full suite (engine unit + RLS isolation + bridge E2E)
         working-directory: engine
         run: python -m pytest -q
+
+      - name: Recompute deployment bundle
+        run: |
+          stage_dir="$RUNNER_TEMP/causent-recompute-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          scripts/deploy-recompute.sh --stage-only "$stage_dir"
+          test -f "$stage_dir/api/recompute.py"
+          test -f "$stage_dir/engine/persistence/recompute.py"
+
+      - name: Next.js 16 webpack production build
+        run: |
+          npm run build:webpack
+          npm run check:dashboard-build
 
       - name: Stop Supabase
         if: always()

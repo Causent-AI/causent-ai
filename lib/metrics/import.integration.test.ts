@@ -78,8 +78,9 @@ before(async () => {
     reportId,
     revisionId: saved.saved.revisionId,
     confirmedMetricId: METRIC,
-    prediction: { direction: "POSITIVE", magnitudePctMean: 5, resolutionDate: "2027-01-15" },
+    prediction: { direction: "POSITIVE", magnitudePctMean: 5, resolutionDate: "2099-01-15" },
     selectedActionSourceItemIds: [GUMMY_ALPHA_GOLDEN_EXAMPLE.report.implementation.actions[0].sourceItemId],
+    primaryLeverActionSourceItemId: GUMMY_ALPHA_GOLDEN_EXAMPLE.report.implementation.actions[0].sourceItemId,
   }, null);
   assert.equal(activated.ok, true, activated.ok ? undefined : activated.error);
 });

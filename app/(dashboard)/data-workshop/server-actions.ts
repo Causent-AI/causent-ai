@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { kickCausalRecompute, logDeferredCausalRecompute } from "@/lib/causal/recompute";
 import { getSession } from "@/lib/auth/session";
 import { getServerSupabase, isLocalDemo } from "@/lib/supabase-server";
 import { METRIC_CSV_MAX_BYTES, parseMetricCsv } from "@/lib/metrics/csv";
@@ -142,6 +143,12 @@ export async function importWorkspaceMetricCsvAction(
   });
   if (!result.ok) return catalogErrorState(result.error);
 
+  logDeferredCausalRecompute(await kickCausalRecompute({
+    scopeId: session.workspaceId,
+    metricId: result.summary.metricId,
+    limit: 1,
+  }));
+
   revalidatePath("/data-workshop");
   revalidatePath("/onboarding");
   revalidatePath("/", "layout");
@@ -179,6 +186,12 @@ export async function importActiveReportMetricCsvAction(
     authoredBy: session.userId,
   });
   if (!result.ok) return errorState(result.error);
+
+  logDeferredCausalRecompute(await kickCausalRecompute({
+    scopeId: session.workspaceId,
+    metricId: result.summary.metricId,
+    limit: 1,
+  }));
 
   revalidatePath("/data-workshop");
   // Core Metrics is mounted in the shared dashboard layout on every tab.

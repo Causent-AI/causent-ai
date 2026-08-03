@@ -33,6 +33,7 @@ Invariants (docs/designs/decision-graph.md):
 from __future__ import annotations
 
 from bisect import bisect_left
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from uuid import UUID
@@ -104,10 +105,19 @@ def _load_metric(conn: Connection, metric_id: Id) -> _LoadedMetric | None:
     return _LoadedMetric(series, ordinals, rows[0][0], rows[-1][0])
 
 
-def _load_actions(conn: Connection, scope_id: Id, metric: _LoadedMetric) -> list[_Action]:
-    """The scope's actions whose effective_date falls within the series range,
+def _load_actions(
+    conn: Connection,
+    scope_id: Id,
+    metric: _LoadedMetric,
+) -> list[_Action]:
+    """All scope actions whose effective_date falls within the series range,
     each mapped to its split: bisect_left places the intervention at the first
-    observation on/after effective_date (that day is the first post point)."""
+    observation on/after effective_date (that day is the first post point).
+
+    This is intentionally the complete metric/action hypothesis family. Target
+    filtering happens only after ``batch_readout`` applies BH-FDR across this
+    family; narrowing this query to one report would lower the statistical bar.
+    """
     rows = conn.execute(
         "select action_id, external_ref, source, effective_date from public.actions "
         "where scope_id = %s and effective_date is not null "
@@ -235,12 +245,42 @@ def _upsert_cluster(conn: Connection, scope_id: Id, metric_id: Id, cluster: _Clu
 # ---------------------------------------------------------------------------
 
 
-def persist_metric_readouts(conn: Connection, scope_id: Id, metric_id: Id) -> None:
+def _assert_actions_in_scope(
+    conn: Connection, scope_id: Id, action_ids: Sequence[Id]
+) -> list[Id]:
+    """Fail closed unless every distinct requested action is visible in ``scope_id``."""
+    distinct = list(dict.fromkeys(action_ids))
+    if not distinct:
+        return []
+    rows = conn.execute(
+        "select action_id from public.actions where scope_id = %s and action_id = any(%s)",
+        (scope_id, distinct),
+    ).fetchall()
+    if {str(row[0]) for row in rows} != {str(action_id) for action_id in distinct}:
+        raise ValueError("requested action set is unavailable in the passed scope")
+    return distinct
+
+
+def persist_metric_readouts(
+    conn: Connection,
+    scope_id: Id,
+    metric_id: Id,
+    *,
+    action_ids: Sequence[Id] | None = None,
+    commit: bool = True,
+) -> None:
     """Run the engine for one metric and materialize the result into the graph.
 
-    Idempotent: nodes/edges/clusters upsert, evidence appends. Commits once at the
-    end so the whole materialization lands atomically. `conn` must be RLS-scoped
-    as the caller (member+ over `scope_id`) — never the service role.
+    Nodes/edges/clusters upsert while evidence appends. The queue worker provides
+    exact-input idempotency before entering this bridge. ``action_ids`` narrows
+    only the persisted outputs to an audited activation; computation always uses
+    the complete eligible action family so BH-FDR and collision detection retain
+    their original statistical floors. ``None`` persists the complete family for
+    explicit legacy/demo sweeps. ``commit=False`` lets a worker atomically update
+    its generation receipt in the surrounding transaction.
+
+    `conn` must be RLS-scoped as the caller (member+ over `scope_id`) — never the
+    service role.
     """
     metric = _load_metric(conn, metric_id)
     if metric is None:
@@ -263,16 +303,40 @@ def persist_metric_readouts(conn: Connection, scope_id: Id, metric_id: Id) -> No
         )
     metric_node_id = _upsert_node(conn, scope_id, "METRIC", metric_id, metric_display)
 
-    actions = _load_actions(conn, scope_id, metric)
-    clusters = _cluster(actions)
-    clustered_action_ids = {a.action_id for c in clusters for a in c.members}
+    scoped_action_ids = None
+    if action_ids is not None:
+        scoped_action_ids = _assert_actions_in_scope(conn, scope_id, action_ids)
 
-    if actions:
+    family_actions = _load_actions(conn, scope_id, metric)
+    family_clusters = _cluster(family_actions)
+    clustered_action_ids = {
+        action.action_id for cluster in family_clusters for action in cluster.members
+    }
+    if scoped_action_ids is None:
+        target_actions = family_actions
+        target_clusters = family_clusters
+    else:
+        target_ids = {str(action_id) for action_id in scoped_action_ids}
+        target_actions = [
+            action for action in family_actions if str(action.action_id) in target_ids
+        ]
+        # A mixed historical/current cluster is scientifically relevant to the
+        # current action (its evidence remains marked clustered), but materializing
+        # that overlay would mutate historical actions and graph rows. Persist only
+        # clusters made entirely from this audited target set.
+        target_clusters = [
+            cluster
+            for cluster in family_clusters
+            if all(str(action.action_id) in target_ids for action in cluster.members)
+        ]
+
+    if family_actions:
         readouts = batch_readout(
-            metric.series, [(str(a.action_id), a.split) for a in actions]
+            metric.series,
+            [(str(action.action_id), action.split) for action in family_actions],
         )
         by_ref = {r.action_ref: r for r in readouts}
-        for action in actions:
+        for action in target_actions:
             readout = by_ref[str(action.action_id)]
             action_node_id = _upsert_node(conn, scope_id, "ACTION", action.action_id, action.ref)
             edge_id = _upsert_edge(conn, scope_id, action_node_id, metric_node_id, readout.belief)
@@ -286,8 +350,11 @@ def persist_metric_readouts(conn: Connection, scope_id: Id, metric_id: Id) -> No
                 readout.before_after, clustered,
             )
 
-    _persist_clusters(conn, scope_id, metric_id, metric_node_id, metric, clusters)
-    conn.commit()
+    _persist_clusters(
+        conn, scope_id, metric_id, metric_node_id, metric, target_clusters
+    )
+    if commit:
+        conn.commit()
 
 
 def _persist_clusters(conn: Connection, scope_id: Id, metric_id: Id, metric_node_id: UUID,
@@ -323,7 +390,12 @@ def _persist_clusters(conn: Connection, scope_id: Id, metric_id: Id, metric_node
 
 
 def persist_lever_cluster_readout(
-    conn: Connection, scope_id: Id, metric_id: Id, action_ids: list[UUID]
+    conn: Connection,
+    scope_id: Id,
+    metric_id: Id,
+    action_ids: list[UUID],
+    *,
+    commit: bool = True,
 ) -> UUID | None:
     """Materialize the multi-lever cluster (C4/#17): a CLUSTER node +
     CLUSTER -> METRIC edge over exactly these lever actions, measured as ONE
@@ -350,11 +422,12 @@ def persist_lever_cluster_readout(
             f"scope {scope_id}; refusing cross-scope materialization"
         )
 
+    scoped_action_ids = _assert_actions_in_scope(conn, scope_id, action_ids)
     rows = conn.execute(
         "select action_id, external_ref, source, effective_date from public.actions "
-        "where action_id = any(%s) and effective_date is not null "
+        "where scope_id = %s and action_id = any(%s) and effective_date is not null "
         "order by effective_date, action_id",
-        (list(action_ids),),
+        (scope_id, scoped_action_ids),
     ).fetchall()
     members = [
         _Action(action_id, external_ref or source, eff,
@@ -373,5 +446,6 @@ def persist_lever_cluster_readout(
     cluster_ids = _persist_clusters(
         conn, scope_id, metric_id, metric_node_id, metric, [cluster]
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return cluster_ids[0]

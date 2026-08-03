@@ -31,18 +31,22 @@ The application lives at the repository root rather than under `src/`.
 
 ## Local development
 
+Use the repository's pinned Node version (`.node-version`, Node 22) and reset the
+entire local database before exercising Decision Report persistence:
+
 ```bash
-npm install
-npm run dev
+npm ci
+supabase start
+npm run db:reset-demo
+CAUSENT_LOCAL_DEMO=1 npm run dev
 ```
 
 Open `http://localhost:3000`.
 
-To review the Decision Report prototype without authentication:
-
-```bash
-CAUSENT_LOCAL_DEMO=1 npm run dev
-```
+`db:reset-demo` reapplies every migration, seeds the canonical workspace, and
+restores the local Decision Report rollout. `CAUSENT_LOCAL_DEMO` is a local-only
+escape hatch and must be absent from production, along with the fixture, seed,
+and local-rollout flags.
 
 Open `http://localhost:3000/onboarding`, select **Generate Decision Report**, and edit any report field. Slice 2 uses the Vercel AI Gateway through the core AI SDK. Authenticate locally with `VERCEL_OIDC_TOKEN` or `AI_GATEWAY_API_KEY`; override the default `anthropic/claude-sonnet-5` model with `CAUSENT_DECISION_REPORT_MODEL`. Set `CAUSENT_DECISION_REPORT_FIXTURE=1` to make the exact Gummy Alpha prompt deterministic.
 
@@ -62,11 +66,12 @@ date/explanation, removed reports are soft-deleted from visible history, and act
 `D1A1` coordinates. Short-history before/after evidence is labeled descriptive; authoritative ITS
 belief still requires at least 45 days on both sides.
 
-To exercise the Slice 5 handoff locally, start Supabase and apply migrations before opening the app:
+To exercise Decision Report activation and iteration locally, use the clean reset
+instead of applying only new migrations:
 
 ```bash
 supabase start
-supabase migration up --local
+npm run db:reset-demo
 CAUSENT_LOCAL_DEMO=1 npm run dev
 ```
 
@@ -77,15 +82,13 @@ Before changing Next.js behavior, read the relevant bundled guide under `node_mo
 ## Verification
 
 ```bash
-# TypeScript/lib tests
+# TypeScript, lint, and library/integration tests
+npm run typecheck
+npm run lint -- --max-warnings=0
 npm test
 
-# Lint and production build
-npm run lint
-npm run build
-
-# Supported fallback when Turbopack rejects engine/.venv symlinks
-npx next build --webpack
+# Reproducible Next.js 16 production build
+npm run build:webpack
 
 # Python engine tests
 cd engine
@@ -96,8 +99,26 @@ Database-backed engine/RLS/bridge tests require the local Supabase stack:
 
 ```bash
 supabase start
-supabase migration up --local
+npm run db:reset-demo
 ```
+
+Before a deliberate release, export the target's production environment into
+the shell and run the network-free checks below. They print variable names and
+error codes only, never values:
+
+```bash
+# Next.js project `causent-ai`
+npm run check:release-config
+
+# Standalone project `causent-recompute`
+npm run check:recompute-config
+```
+
+The app check requires the server-only `SUPABASE_SERVICE_ROLE_KEY` because new
+Decision Reports mint a single-use provenance receipt before their first save.
+It also checks the automatic-recompute URL/secrets and rejects every local-only
+flag. The worker check requires its own session-pooler `DATABASE_URL` and shared
+recompute secret.
 
 ## Documentation
 

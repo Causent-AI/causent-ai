@@ -117,9 +117,10 @@ test("activation atomically materializes once, reuses retries, and locks the rep
     prediction: {
       direction: "POSITIVE" as const,
       magnitudePctMean: 15,
-      resolutionDate: "2026-12-15",
+      resolutionDate: "2099-12-15",
     },
     selectedActionSourceItemIds: ["gummy-action-1", "gummy-action-3"],
+    primaryLeverActionSourceItemId: "gummy-action-1",
   };
 
   const first = await materializeReportActivation(sb, input, null);
@@ -127,6 +128,7 @@ test("activation atomically materializes once, reuses retries, and locks the rep
   if (!first.ok) return;
   assert.equal(first.activation.reused, false);
   assert.equal(first.activation.actionIds.length, 2);
+  assert.ok(first.activation.actionIds.includes(first.activation.primaryLeverActionId));
 
   const retry = await materializeReportActivation(sb, {
     ...input,
@@ -145,6 +147,16 @@ test("activation atomically materializes once, reuses retries, and locks the rep
   if (!changedRetry.ok) {
     assert.equal(changedRetry.code, "conflict");
     assert.equal(changedRetry.activationId, first.activation.activationId);
+  }
+
+  const changedPrimaryLever = await materializeReportActivation(sb, {
+    ...input,
+    primaryLeverActionSourceItemId: "gummy-action-3",
+  }, null);
+  assert.equal(changedPrimaryLever.ok, false);
+  if (!changedPrimaryLever.ok) {
+    assert.equal(changedPrimaryLever.code, "conflict");
+    assert.equal(changedPrimaryLever.activationId, first.activation.activationId);
   }
 
   const report = await sb
@@ -201,7 +213,7 @@ test("activation atomically materializes once, reuses retries, and locks the rep
       metricId: METRIC,
       direction: "POSITIVE",
       magnitude: 15,
-      resolutionDate: "2026-12-15",
+      resolutionDate: "2099-12-15",
     },
   );
 
@@ -238,7 +250,18 @@ test("activation atomically materializes once, reuses retries, and locks the rep
     sb.from("actions").select("*", { count: "exact", head: true }).in("action_id", first.activation.actionIds),
     sb.from("levers").select("*", { count: "exact", head: true }).eq("decision_id", first.activation.decisionId),
   ]);
-  assert.deepEqual(canonicalCounts.map((result) => result.count), [1, 1, 1, 2, 0]);
+  assert.deepEqual(canonicalCounts.map((result) => result.count), [1, 1, 1, 2, 1]);
+
+  const primaryLever = await sb
+    .from("levers")
+    .select("action_id, metric_id, target_source, status")
+    .eq("decision_id", first.activation.decisionId)
+    .single();
+  assert.equal(primaryLever.error, null, primaryLever.error?.message);
+  assert.equal(primaryLever.data?.action_id, first.activation.primaryLeverActionId);
+  assert.equal(primaryLever.data?.metric_id, METRIC);
+  assert.equal(primaryLever.data?.target_source, "manual");
+  assert.equal(primaryLever.data?.status, "DRAFTED");
 
   const loaded = await loadDecisionReport(sb, WORKSPACE, saved.saved.reportId);
   assert.equal(loaded.ok, true, loaded.ok ? undefined : loaded.error);
@@ -278,10 +301,25 @@ test("invalid selections and cross-workspace metrics roll back without canonical
     prediction: {
       direction: "POSITIVE" as const,
       magnitudePctMean: 15,
-      resolutionDate: "2026-12-15",
+      resolutionDate: "2099-12-15",
     },
     selectedActionSourceItemIds: ["forged-action-id"],
+    primaryLeverActionSourceItemId: "forged-action-id",
   };
+  const expired = await sb.rpc("activate_decision_report_v2", {
+    p_report_id: saved.saved.reportId,
+    p_revision_id: saved.saved.revisionId,
+    p_metric_id: METRIC,
+    p_prediction_direction: "POSITIVE",
+    p_prediction_magnitude_pct_mean: 15,
+    p_prediction_resolution_date: "2000-01-01",
+    p_selected_action_source_ids: ["gummy-action-1"],
+    p_primary_lever_source_id: "gummy-action-1",
+    p_activated_by: null,
+  });
+  assert.ok(expired.error);
+  assert.match(expired.error?.message ?? "", /must be in the future/i);
+
   const forged = await materializeReportActivation(sb, base, null);
   assert.equal(forged.ok, false);
   if (!forged.ok) assert.equal(forged.code, "validation");
@@ -290,6 +328,7 @@ test("invalid selections and cross-workspace metrics roll back without canonical
     ...base,
     confirmedMetricId: OTHER_METRIC,
     selectedActionSourceItemIds: ["gummy-action-1"],
+    primaryLeverActionSourceItemId: "gummy-action-1",
   }, null);
   assert.equal(otherMetric.ok, false);
   if (!otherMetric.ok) assert.equal(otherMetric.code, "forbidden");

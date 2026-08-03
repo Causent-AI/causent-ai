@@ -1,6 +1,80 @@
 # Causent — Build Status & Resume Guide
 
-Last updated: 2026-07-22. Single source of truth for "where are we and how do I pick up."
+## 2026-08-03 — Slice 10 review branch
+
+PR #28 merged the Slice 8/9 baseline into `main` as `c894451`. The separate
+`codex/decision-report-slice-10` branch packages the explicit iteration-series work, bounded URL/PDF
+ingestion, automatic current-report recomputation, manual AI handoff preview, and the MVP completion
+guardrails described below for review. Publication does not apply migrations, configure or deploy the
+worker, satisfy the partner-session gate, or establish that the expanded hosted CI workflow passed.
+
+## 2026-07-23 — Expanded Decision Report MVP completion
+
+Explicit post-activation iterations are implemented as linear series with a database-owned current
+report pointer and an explicit workspace series pointer. Successor start is checked, locked,
+retry-safe, and copies the reviewed snapshot without private asset identity. Activation creates a
+fresh canonical intent set and moves both pointers atomically; prior canonical and audit rows remain
+immutable. Reports presents the timeline and current-only start flow, while Actions & Decisions,
+Data Workshop, and Impact resolve through the explicit current report.
+
+The expanded MVP also accepts at most one bounded public HTTPS page and one bounded text-based PDF.
+It performs no crawl or OCR, stores no raw URL/PDF bytes, and persists provenance v2 source chunks,
+locators, and SHA-256 digests in the RLS-protected revision snapshot. The first sourced save consumes
+a private, 24-hour, one-use server-minted receipt bound to the actor, scope, exact source summaries,
+and sourced-claim multiset; later revisions cannot replace that corpus. Activation v2 records one
+selected action as the primary manual lever. Activation, current-report observation changes, and
+primary-action completion enqueue a private, coalescing causal-recompute job; the stateful worker
+revalidates the current pointers before materializing graph evidence. Its standalone Python 3.12
+deployment bundle is stage-tested but has not been linked or deployed.
+
+Actions & Decisions also contains a manual preview of the future agent loop. It exports only a
+bounded, redacted view of the explicit current report and accepts a fingerprint-matched structured
+review as transient browser state. Nothing is sent automatically, and the preview has no server
+write, report mutation, action-completion, recompute, or attribution path. An authenticated MCP/API
+connection for Claude or ChatGPT remains deferred until after partner review.
+
+The MVP finish starts onboarding blank, with the Gummy Alpha fixture behind an explicit **Load
+example** action. Before generation, the user must confirm that the project brief and extracted
+URL/PDF text may be sent to the configured AI provider; changing any source clears that confirmation.
+Generation, provider, and route failures preserve the user's input or durable revisions and expose
+retry or return-to-Reports recovery rather than implying data loss.
+
+Decision Report lifecycle telemetry is best-effort and content-free. It records only an opaque
+server-minted session key, elapsed time, bounded edit/follow-up/missing-field counts, and a small
+boolean allowlist. It contains no report, prompt, source, asset, or clipboard content. The aggregate
+measures distinct-session stage counts/drop-off, median time to editable/save/activation, median
+edit/follow-up counts, and failure events plus affected sessions. Data Workshop and Impact now show
+only the explicit current report's sanitized recompute state (`idle`, `queued`, `retrying`, `failed`,
+or `current`) and safe timestamps; private queue details remain inaccessible. Authenticated telemetry
+access is explicitly append-only at the privilege layer (`SELECT`/`INSERT` only), including revocation
+of `TRUNCATE`, which row policies cannot block.
+
+Prediction resolution dates must be strictly later than the current UTC date. The activation form
+starts at tomorrow, the shared server validator rejects today/past/invalid dates, and a database
+trigger independently rejects any activation insert whose date is not future-facing.
+
+Production configuration now fails closed: the app requires its Supabase URL, anon key, and
+server-only `SUPABASE_SERVICE_ROLE_KEY`, because provenance receipt minting is deliberately
+service-role-only. Release checks additionally require the recompute URL/secret and cron secret for
+the app, and `DATABASE_URL` plus the matching recompute secret for the worker. Local-only demo,
+seed, fixture, and local-rollout flags must be absent. Node is pinned to `22.23.0`; the expanded CI
+workflow pins Python 3.12 and Supabase CLI 2.98.1 and runs the complete local release gate. The
+expanded Slice 10 revision has not yet completed hosted CI.
+
+The shared dashboard layout is explicitly `force-dynamic`. This closes the production-cache defect
+found during completion browser acceptance: Reports and Impact had been eligible to freeze a seed or
+pre-activation snapshot at build time even though their data is workspace/current-report specific.
+The Next.js 16.2.11 webpack build now classifies `/actions`, `/data-workshop`, `/impact`,
+`/onboarding`, and `/reports` as dynamic routes. `check:dashboard-build` independently inspects the
+build manifests and fails unless the four dashboard pages exist and remain absent from the prerender
+manifest; the local guard passes and CI runs it immediately after the webpack build.
+
+Implementation proceeded under an explicit product-direction override before the normal Slice 9
+partner-session gate. The missing three initially unassisted sessions remain required release evidence;
+this override is not evidence that the gate passed. The implementation is packaged separately from
+merged PR #28 on `codex/decision-report-slice-10`; migration, deployment, and canary work remain open.
+
+Last updated: 2026-08-03. Single source of truth for "where are we and how do I pick up."
 Product: **dual cold-start on one causal graph** — the retrospective wedge ("Did-It-Ship,
 Did-It-Work": tie each shipped action to a metric, honest ITS readout) PLUS the prospective
 on-ramp (human pre-registered prediction → drift watch → engine-measured resolution). See
@@ -17,24 +91,19 @@ metric relationship, and selected actions. Approved design:
 
 ## TL;DR
 
-**Both existing loops and Decision Report Slices 1–7 are on `main`; Slice 8 and the accepted
-same-day partner-feedback follow-ups are prepared on `codex/decision-report-slice-8` for review. Bounded generation, durable report persistence, human-controlled
-metric/prediction/action activation, and the atomic Actions & Decisions handoff are
-live-validated. Report-native dashboard isolation, Reports-tab indexing, and authenticated
-daily CSV ingestion into the activated report metric, and the private sanitized supplied-image
-path are implemented. Named workspace CSV metric creation now feeds an in-place, up-to-five
-workspace-metric selector without widening report-owned decisions or impact; Data Workshop uses
-one consolidated uploader, onboarding exposes the same multi-select beside the report's one
-prediction metric, and the selected metrics drive the persistent bottom drawer. The report-native
-Actions view now starts with the durable Decision Summary, uses expandable action rows, explains
-the real GitHub/Jira handoff, and supports audited manual completion. Decision Report history now
-has checked, recoverable removal; action rows and chart flags share stable `D1A1` coordinates, and
-the drawer has working date-range and daily/weekly controls. Short-history action evidence now
-renders as an explicitly descriptive 14-day cross-check while the causal result remains withheld
-until ITS has 45 days on each side. Slice 9 now adds an operator-managed per-user
-Decision Report rollout with a pinned legacy rollback path; saved reports survive rollback.
-Local clean-state browser acceptance and the remaining sparse/keyboard/adversarial gates pass.
-Three real initially unassisted partner sessions remain the release gate.**
+**The Slice 10 review branch contains Decision Report Slices 1–10 plus the accepted
+partner-feedback follow-ups. It now covers bounded generation, focused completion, durable
+revisions, human-controlled activation, private sanitized images, CSV metrics, report-native
+dashboard isolation, action completion, recoverable report removal, controlled rollout, explicit
+linear iterations, bounded one-URL/one-PDF ingestion with provenance v2, and automatic
+current-report causal recomputation. A current-report-only manual AI copy/paste preview demonstrates
+the proposed external-agent loop without granting it a write path. Reports retains immutable lineage; the three operational tabs
+show only the workspace's explicit current report. The 45-day-per-side ITS confidence floor is
+unchanged. The current clean reset, schema lint, TypeScript, full lint, Node/Supabase, focused
+integration, engine/bridge, webpack production build, and four-iteration browser/console acceptance
+are green. Three real
+initially unassisted partner sessions, one final deep UI/workflow review, production
+migration/configuration, and deployment canaries remain human/operator gates.**
 The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
 all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
@@ -46,16 +115,17 @@ readout), and seed exercising all six target verdicts through the REAL engine. E
 `docs/OVERNIGHT_REPORT_3.md`. **The baseline-metric-drift DEMO beat shipped (PR #22, 2026-07-13)** —
 reconciled through office-hours + CEO/Eng/Design review as the demo showcase (a change-point detector
 over the metric's own series), distinct from the still-gated webhook lever-descope drift (#18).
-**The Decision Report is an unvalidated product thesis.** Build only the partner wedge first,
-then require observed unassisted use before starting broader URL/PDF ingestion, conversational
-delivery, or production automation.
+**The Decision Report remains an unvalidated product thesis.** The explicit product-direction
+override permitted bounded URL/PDF ingestion, iterations, and causal automation before partner
+evidence. Do not treat that override as permission for OCR, URL crawling, broad file ingestion,
+conversational delivery, or other production expansion before observed unassisted use.
 
 ```
 ✓ Plan     office-hours → CEO → Eng → Design reviews (all CLEARED)
 ✓ Engine   honest causal inference, 1058 tests (1078 with engine-fn), signed off 8/10
 ✓ Schema   11 tables, RLS + RBAC memberships, tenant-isolation verified (0 leaks)
 ✓ Bridge   engine → evidence (append-only) → causal graph, live E2E verified
-✓ CI       all gates re-run on every push (GitHub Actions + Supabase)
+◐ CI       expanded pinned workflow configured; Slice 10 review revision awaiting hosted CI
 ✓ App/UI   approved shell (Next 16): 4 tabs + Core Metrics drawer, visual-QA'd vs mockups
 ✓ Loop     seed → real bridge → Supabase → UI; /impact matches DB cell-for-cell (A1–A4, A-verify)
 ✓ Ingest   fixture-tested capped/idempotent GitHub → actions + live adapters/CLI (C1, C-verify)
@@ -74,7 +144,8 @@ delivery, or production automation.
 ✓ COLDSTART C1+C4 MERGED (PR #20, 2026-07-13): levers table (multi-lever, drops
            is_lever), declared metric + UNMEASURABLE_NO_METRIC, cluster-resolution path
 ✓ AUTH     #5 invite-only Google-OAuth allowlist + create-from-decision GitHub connector
-           scaffolding MERGED (PR #21, 2026-07-13); prod stays open via CAUSENT_LOCAL_DEMO=1
+           scaffolding MERGED (PR #21, 2026-07-13); local demo fallback retained, while the
+           later 2026-07-16 production deployment armed invite-only Google OAuth
 ✓ DRIFT    baseline-metric drift DEMO beat MERGED (PR #22, 2026-07-13): change-point detector
            (segmented_ols reuse) + calm assert-fact notice + stub Restate; seeded, 1147 pytest
 ✓ FUNNEL   #15 onboarding funnel CLOSED (PR #23, 2026-07-13): Step-1 auth wired + instrumentation
@@ -97,10 +168,11 @@ delivery, or production automation.
            (Issues:R+W) on causent-ai + a Jira webhook → /api/webhooks/jira (deferred: no Jira
            instance tonight). Read-only deep-link + paste works with zero creds now.
 ☐ PARTNER  zero-code mechanism-mapping test  ← gates T2 connector completion + #18 drift-alert surface
-☐ CONNECT  SUPABASE_SERVICE_ROLE_KEY deliberately withheld from Vercel → webhook auto-detect
-           + reconcile cron return 500 (paste-URL attribution works; deliberate, reversible)
+☐ CONFIG   production now requires a server-only SUPABASE_SERVICE_ROLE_KEY for provenance receipt
+           minting; set and canary it before release. Connector automation remains a separate
+           operator decision; paste-URL attribution still works without provider write automation.
 ☐ OPEN     #16 connector live (creds) · #18 drift-alert surface (gated) · ~~#19 Jira parity~~ (PR #25)
-◐ ACTIVE   AI-assisted Decision Report partner wedge: Slices 1–9 implementation complete. The 24.4s
+◐ ACTIVE   AI-assisted Decision Report partner wedge: Slices 1–10 implementation complete locally. The 24.4s
            six-action baseline triggered a sparse three-proof/three-action contract; live
            re-benchmark passed in 13.9s. Durable explicit save/reload is now verified;
            explicit metric/prediction/action activation now materializes atomically and
@@ -109,11 +181,15 @@ delivery, or production automation.
            confirmed metric. The workspace catalog feeds future report metric selection. One
            sanitized PNG/JPEG now
            attaches privately to an editable revision with scoped preview, safe replacement/
-           removal, and active-report locking. Controlled rollout and local acceptance pass;
-           three initially unassisted partner sessions remain before broader release.
+           removal, and active-report locking. Linear successors, bounded one-URL/one-text-PDF
+           sources, provenance v2, and automatic current-report recomputation are implemented.
+           A redacted, ephemeral manual AI copy/paste preview shows the proposed loop without MCP,
+           writes, or automatic sync. Controlled rollout and local PDF/URL acceptance pass; one final
+           deep UI/workflow review, three initially unassisted partner sessions, and production rollout
+           remain open.
 ```
 
-## What's built (all on `main`, verified against live evidence)
+## What's built (historical landed baseline plus the current local Slice 10 working tree)
 
 - **Causal engine** — `engine/causal/` (C1–C9): pure-numpy segmented-OLS Interrupted Time
   Series + a 7/14-day descriptive cross-check. **Honest by design:**
@@ -136,8 +212,12 @@ delivery, or production automation.
   stays stateless, no DB creds). Fetches metric+actions → `batch_readout` → appends evidence
   → materializes edges (direction/belief/reason from the authoritative ITS row) → cluster
   overlay. Live E2E gate + 3 integrity defects fixed and locked as regression guards.
-- **CI** — `.github/workflows/ci.yml`: on every push/PR, spins up Supabase and runs the full
-  suite (engine + RLS isolation + bridge E2E).
+- **CI** — `.github/workflows/ci.yml`: on every push to `main` and every PR, pins Node from
+  `.node-version` (`22.23.0`), Python 3.12, and Supabase CLI 2.98.1; starts a clean Supabase
+  stack; runs TypeScript, full lint, serialized Node/Supabase/RLS/Storage tests, schema lint,
+  complete engine/bridge/isolation tests, recompute bundle staging, and the Next.js 16 webpack
+  production build, then asserts that Actions, Data Workshop, Impact, and Reports are request-bound
+  rather than prerendered. The workflow is configured in this working tree; a hosted run is still pending.
 
 ## How to run it
 
@@ -145,8 +225,18 @@ delivery, or production automation.
 # DB-backed tests need the local Supabase stack (Docker must be running):
 supabase start            # or: supabase db reset  (clean-slate migration apply)
 
-# Full suite (1147 tests: engine + RLS isolation + bridge E2E):
+# Current full engine/bridge/RLS suite (1204 tests):
 cd engine && .venv/bin/python -m pytest -q
+
+# Current serial Node/Supabase/Storage suite (499 total; 480 pass, 19 live-model skips):
+node --test --test-concurrency=1 "lib/**/*.test.ts"
+
+# Network-free release checks (run only with the target's production env loaded):
+npm run check:release-config
+npm run check:recompute-config
+
+# After `npm run build:webpack`, assert dashboard routes are not prerendered:
+npm run check:dashboard-build
 
 # Engine-only (no DB): the non-test_rls_/test_bridge_ files.
 # Local DB URL used by the DB tests: postgresql://postgres:postgres@127.0.0.1:54322/postgres
@@ -166,8 +256,9 @@ the design was built around.
 ## Loop closed — as built (2026-07-04, branch `overnight/wire-up`)
 
 The dashboard now renders **from Supabase** (materialized `causal_edges` + authoritative ITS
-`evidence_objects`), not seed data. `lib/seed.ts` is retained only as a fallback behind
-`CAUSENT_USE_SEED=1` (or on any DB-read error, so the app never white-screens). Verified: a
+`evidence_objects`), not seed data. `lib/seed.ts` is retained only behind the explicit
+`CAUSENT_USE_SEED=1` development flag; database read failures surface instead of silently replacing
+current report data with old fixtures. Verified: a
 served `/impact` in DB mode matches an independent direct-SQL computation of the graph
 cell-for-cell (Actions 10, Confident 4/50, Net +$249K, Gathering 15, Win 50%, per-action
 lifts, all-dash sub-45-day May cohort), the 45/45 boundary is faithfully reflected, and the
@@ -178,8 +269,8 @@ service-role key does NOT reach the client bundle. New wiring:
   reachable, since no May-2025 action can reach 45 post-ship points before END_DATE 2025-05-23).
 - `engine/persistence/run_demo.py` — bridge runner over the seeded project.
 - `lib/supabase-server.ts` (server-only client, browser-import guard) + `lib/data/*` async
-  getters + `lib/data/dashboard.ts` (`loadDashboardData()`, React-`cache` memoized, seed
-  fallback). Impact cells show a signed number **only** for a confident directional edge;
+  getters + `lib/data/dashboard.ts` (`loadDashboardData()`, React-`cache` memoized, explicit
+  seed mode). Impact cells show a signed number **only** for a confident directional edge;
   withheld/insufficient readouts collapse to "—" — no engine figure is ever fabricated.
 - `lib/ingest/*` — fixture-tested, capped, idempotent GitHub → `actions` ingestion (pure core
   + live adapters + CLI, token-gated) with a `(scope_id, external_ref)` unique-index backstop.
@@ -342,14 +433,24 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   separate Astro marketing site). A second Vercel project `causent` (created 7/10 via CLI link)
   is redundant — the repo is re-linked to `causent-ai`; check `.vercel/project.json` before
   `vercel env` commands.
-- **Prod env (causent-ai)**: `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` (current publishable),
+- **Prod env snapshot (causent-ai, 2026-07-16)**: `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY`,
   `ANTHROPIC_API_KEY`, `CAUSENT_ENGINE_SECRET`, `CAUSENT_DEMO_TODAY=2025-05-23`,
-  `GITHUB_TOKEN` + `GITHUB_WEBHOOK_SECRET` + `CRON_SECRET`. **`SUPABASE_SERVICE_ROLE_KEY`
-  deliberately withheld** — its only consumers are the webhook receiver + reconcile cron (both
-  fail-closed-guarded); until it's added, auto-detection is off and the paste-URL fallback is
-  the detection path. `CAUSENT_LOCAL_DEMO` must stay UNSET in prod (its absence arms the wall;
-  NB the open-demo escape hatch requires the service key).
-- **Cloud Supabase `royftsqyawtyfjolfabd`**: all migrations applied; seeded 2026-07-16 through
+  `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `CRON_SECRET` were recorded. That snapshot omitted
+  `SUPABASE_SERVICE_ROLE_KEY`; this is no longer a valid release posture. Provenance-v2 generation
+  mints its one-use source receipt through a service-role-only RPC, so the production app must receive
+  the key as a server-only secret before this working tree is deployed. Its presence also enables
+  other service-role consumers, so webhook/reconciliation behavior must be canaried separately.
+  `CAUSENT_LOCAL_DEMO`, `CAUSENT_USE_SEED`, `CAUSENT_DECISION_REPORT_FIXTURE`, and
+  `CAUSENT_DECISION_REPORT_LOCAL_ROLLOUT` must all be absent in production.
+- **Expanded Slice 10 and the MVP-finish migration are not armed in production.** The stateful recompute function needs the
+  session-pooler `DATABASE_URL` and `CAUSENT_RECOMPUTE_SECRET`; `causent-ai` needs the matching
+  `CAUSENT_RECOMPUTE_SECRET`, `CAUSENT_RECOMPUTE_URL`, and existing `CRON_SECRET`. The app also
+  needs its Supabase URL, anon key, and server-only service-role key. Apply all five 2026-07-23
+  migrations (`20260723053444`, `20260723061012`, `20260723061925`, `20260723064500`, and
+  `20260723151939`) before deploying either side, then test immediate wake-up and the
+  five-minute recovery cron.
+- **Cloud Supabase `royftsqyawtyfjolfabd`**: migrations through the 2026-07-16 deployment are
+  applied; the local Slice 10 migrations are not. The environment was seeded 2026-07-16 through
   the real bridge (`DATABASE_URL=<session-pooler aws-1-us-east-1, user postgres.<ref>>
   seed_demo.py`, password via `PGPASSWORD` — never in the URL). Seed is teardown-then-reseed
   under the demo-org UUID: safe to re-run, can't touch real users. Invite-only auth live:
@@ -364,116 +465,85 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   indexable (no robots.txt — the proxy redirects it; CT logs make the hostname discoverable);
   add `app/robots.ts` + proxy exclusion if stealth matters.
 
+## Current local verification
+
+- Clean local Supabase reset: **PASS**. Error-level schema lint: **PASS**. All five local
+  2026-07-23 migrations are included in that reset.
+- Serialized Node library/Supabase/RLS/Storage suite: **499 total; 480 passed; 19 intentional
+  live-model skips; zero failures**.
+- Focused integration verification: **9/9 passed**.
+- Complete engine, bridge, isolation, recompute, function, and concurrency suite: **1,204/1,204
+  passed**.
+- TypeScript and full application lint: **PASS**.
+- Next.js `16.2.11` webpack production build: **PASS** after making the workspace/current-report
+  dashboard layout explicitly dynamic. `/actions`, `/data-workshop`, `/impact`, `/onboarding`, and
+  `/reports` all build as dynamic routes. The post-build `check:dashboard-build` manifest guard also
+  passes for Actions, Data Workshop, Impact, and Reports.
+- Browser/console acceptance: **PASS**. Blank-first onboarding, explicit Gummy example loading, and
+  provider confirmation were verified before generating, saving, and activating Iteration 1. Three
+  sequential successors were created and activated through Iteration 4 with `+12%`, `+14%`, and
+  `+16%` predictions; each predecessor remained current until its successor activated.
+- Reports showed all four iterations with Iteration 4 current and earlier active reports historical.
+  The original direct link remained reachable, activated, and read-only. Actions & Decisions showed
+  only the current decision/actions/prediction. Data Workshop showed the current metric hint and
+  sanitized `queued` recompute state. Impact showed the current report title, one confirmed metric,
+  current actions, an honest no-evidence state, and the same sanitized `queued` state.
+- `?flow=legacy` restored legacy onboarding. The browser warning/error log was empty. Acceptance
+  caught and fixed the static Reports/Impact cache defect with `dynamic = "force-dynamic"` on the
+  shared dashboard layout.
+- The local recompute worker endpoint was intentionally absent, so server logs recorded only the
+  sanitized `not_configured` deferred-kick outcome; source writes remained durable as designed.
+- Hosted CI for this working tree: **PENDING**. The expanded workflow is configured, but no cloud
+  result is claimed.
+- No production migrations, environment changes, deployment, or canary were performed.
+
 ## Next (priority order)
 
-### 1. Finish partner inputs and acceptance around the activation handoff
+### 1. Complete the final deep UI and workflow review
 
-- Slice 3 now deterministically completes required gaps without another model request. Its live
-  Gummy Alpha browser review caught and fixed misleading readiness copy: Decision, Problem, one
-  proof claim, the metric mechanism, the Action Plan summary, and one action produce **Ready for
-  review**; owners, customers, stakeholders, governance, and mock-ups remain visibly optional.
-- The remaining Slice 3 browser acceptance pass covers the sparse safe fallback and keyboard
-  focus. Unit coverage already verifies gap ordering, optional-field behavior, command rejection,
-  the three-action ceiling, ID preservation, edit/question parity, and fallback completion.
-- Slice 4 now adds only `decision_reports` and append-only `decision_report_revisions`, protected
-  by scope-bound RLS and checked RPCs. Explicit saves use a database-owned content hash for retry
-  idempotency, return an immediate HTTP 409 for stale bases, and reload the exact reviewed
-  `DecisionReportV1` plus metric projection from `?report=<id>`.
-- Slice 5 turns that packet into three explicit user controls: select an existing workspace
-  metric, enter a human prediction, and choose one to three report actions. The AI chart never
-  pre-fills the commitment or becomes metric observations.
-- One checked transaction validates the exact reviewed revision and atomically creates a decision,
-  prediction, planned manual actions, decision-action links, and append-only activation audit.
-  Exact retries reuse the same IDs; changed retries return HTTP 409; invalid inputs create zero
-  partial rows. No lever, tracker ticket, causal edge, evidence object, or impact claim is created.
-- Active reports are immutable and deep-link to the new decision in Actions & Decisions.
-  Report-created actions use UUID identities plus a `Planned` label instead of fake PR numbers.
-- Partner-feedback polish removes the empty report navigation column. The durable Decision Report
-  now supplies the Decision Summary and evidence box; report actions render as expandable rows with
-  tracker reference, completion state, details, owner, governance, and a member-only manual
-  completion date/explanation path. Connector copy states the current boundary honestly: there is
-  no account OAuth yet; configured workspace credentials, read-only create links, pasted URLs, and
-  webhooks are the supported paths.
-- Core metric selection is separate from report activation. Members can add up to five daily
-  workspace metrics in place from Data Workshop or onboarding; selected metrics appear across the
-  tabs and drawer, while the active report keeps its one confirmed prediction metric and continues
-  to isolate report-owned actions and impact. Trash removes a selected metric; a report-required
-  metric remains labeled and locked unless independently selected.
-- Decision Reports can be removed from visible history through one confirmed, member-only soft
-  delete. Revisions, supplied bytes, and an activated report's canonical graph remain audit-safe,
-  but RLS hides removed report/revision/asset surfaces and legacy fallback excludes orphaned
-  report-native graph rows. The next remaining live activated report becomes the boundary.
-- Report action coordinates are stable and human-readable (`D1A1`, `D1A2`, ...), following the
-  reviewed report order. The same coordinate appears in the expandable action header and on the
-  Core Metrics event flag; the flag deep-links to that opened action. Drawer controls now apply
-  30/60/90/all-data ranges and Daily/Weekly aggregation instead of rendering inert labels.
-- Impact now loads the stored descriptive cross-check as well as authoritative ITS evidence. When
-  ITS is below the 45-day-per-side confidence floor, the UI may show the 14-day mean shift as
-  **preliminary descriptive** while belief remains unknown and the aggregate causal summary stays
-  empty. The local Gummy Alpha path renders `+3.1pp` from 46 pre/15 post observations and labels
-  the overlapping-action limitation; this is not an isolated causal estimate.
-- Automated Slice 5 acceptance includes 376 library tests (337 passed, 39 environment-gated
-  skips, zero failures), 4/4 separate live persistence/activation integration cases, and 22/22
-  authenticated RLS isolation cases; the full engine suite passes 1,166/1,166. TypeScript,
-  focused lint, schema lint, and the documented webpack production build pass. The default
-  Turbopack build remains blocked by the existing `engine/.venv/bin/python` symlink escaping
-  its filesystem root.
-- The Slice 8 release gate passes 420 library tests (373 passed, 47 environment/live-model skips),
-  12/12 focused live Supabase persistence/activation/Storage/metric cases, and 40/40 combined
-  primary/adversarial RLS cases. TypeScript, focused lint, schema lint, `git diff --check`, and
-  the Next.js 16 webpack production build are green.
-- Slice 9 adds `decision_report_rollouts`, an operator-managed per-user assignment in the shared
-  workspace. New starts resolve to a canonical `?flow=decision-report|legacy` URL. A pinned legacy
-  session never migrates when the assignment is enabled; disabling it sends new/unsaved starts to
-  legacy; `?report=<id>` always opens an already-created durable report.
-- Local clean-state browser acceptance passed live generation, deterministic fallback, direct edits,
-  focused keyboard questions, save/reload, browser Back, private-image failure/success, named CSV
-  metric creation and selection, activation, manual completion, honest no-evidence Impact, and both
-  rollout directions. Existing retry and preliminary-descriptive regression gates remain green.
-- Nine report-specific fabricated-evidence cases now cover decision, background, problem, proof,
-  mechanism, action summary, owner, customer, and stakeholder claims; none can become sourced.
-- Next, run three real initially unassisted partner sessions and record the five-part rubric. Local
-  automation is acceptance evidence but does not satisfy the partner-demand gate.
-  Schema/provenance/gap tests, durable save/reload, metric selection, action completion, report
-  removal, chart controls, and preliminary descriptive impact are already complete and must not be
-  reopened as Slice 9 tasks. Warehouse connectors and automatic causal recomputation remain
-  separate follow-up work.
+- Review the whole first-run path, Reports iteration controls, Actions & Decisions, Data Workshop,
+  Impact, and the manual AI handoff preview as one experience. Capture confusing transitions,
+  hierarchy, responsive/accessibility issues, and any place where the product overstates evidence
+  or automation.
+- Keep the handoff preview powerless during this review: pasted external advice is transient and
+  cannot edit reports, complete actions, enqueue recomputation, or establish attribution.
 
-### 2. Finish the partner wedge
+### 2. Collect the missing partner evidence
 
-- Partial three-section report plus coordinated evidence, metric, action, and mock-up views.
-- Inline focused gap questions rather than general chatbot infrastructure.
-- Existing metric confirmation, named workspace CSV metric creation, and human prediction commitment
-  are implemented; active reports remain bound to one confirmed metric.
-- The final materialization step is implemented; lever/tracker selection stays separate.
-- Feature-flagged rollout with legacy onboarding as rollback is implemented. Real partner validation remains.
+- Run at least three initially unassisted partner sessions. At least two must pass four of five
+  checks: decision accurate, problem accurate, evidence traceable, metric mechanism plausible,
+  and next action usable.
+- Record facilitator intervention, abandonment, and time to completion. Local automation and the
+  product-direction override do not satisfy this demand-validation gate.
 
-Slices 1–9 plus the accepted partner-feedback follow-ups delivered the interactive report, bounded
-generation seam, deterministic completion layer, durable revisions, private supplied image,
-atomic activation, report-native isolation, named metric ingestion/selection, action completion,
-recoverable report removal, chart controls, and honest preliminary impact. Remaining target:
-recorded unassisted partner evidence.
+### 3. Deliberately activate production
 
-### 3. Validate before production expansion
+- Require a green hosted run of the expanded CI workflow for the exact release revision.
+- Apply `20260723053444`, `20260723061012`, `20260723061925`, `20260723064500`, and
+  `20260723151939` to the partner Supabase environment, then rerun schema lint and authenticated
+  RLS/Storage/recompute-status probes.
+- Deploy the stateful recompute function with `DATABASE_URL` and `CAUSENT_RECOMPUTE_SECRET`; configure
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, server-only
+  `SUPABASE_SERVICE_ROLE_KEY`, `CAUSENT_RECOMPUTE_URL`, the matching recompute secret, and
+  `CRON_SECRET` on the app. Ensure the demo, seed, fixture, and local-rollout flags are absent. Use
+  the stage-tested `scripts/deploy-recompute.sh`; its successful local stage is not a production
+  deployment.
+- Run one authenticated clean-account canary across URL/PDF generation, save/activate, three
+  successors, private-image reattachment, observation import, action completion, recompute status,
+  deletion rollback, direct links, and rollout disablement. Preserve the legacy-flow rollback.
 
-Run at least three initially unassisted partner sessions. At least two must pass four of
-five checks: decision accurate, problem accurate, evidence traceable, metric mechanism
-plausible, next action usable. Only then begin URL/PDF ingestion, conversational delivery,
-richer revision workflows, model routing, or numeric Completion Outlook.
-
-The prepared richer-revision boundary is Slice 10: an activated report may create one explicit
-linear successor iteration. The parent remains immutable and operational while the child is a
-draft; activating the child atomically advances an explicit series pointer without rewriting prior
-decisions, predictions, actions, evidence, or audit rows. This is a documented follow-up, not
-implemented code, and remains gated on the partner evidence above unless product direction changes.
-
-### 4. Existing operational work
+### 4. Existing operational and gated work
 
 - Arm `causent-resolve` with its session-pooler `DATABASE_URL`, then redeploy both projects.
 - Run the separate zero-code mechanism-mapping test before building the gated webhook
   lever-drift alert.
 - Connector automation and Jira/GitHub write credentials remain deliberate operator choices;
   read-only/deep-link paths continue to work.
+- Build the authenticated Claude/ChatGPT MCP/API loop only after partner review. That later work
+  needs scoped authentication, explicit tool contracts, reviewed writes, and durable attribution;
+  the current manual copy/paste preview is not live synchronization.
+- OCR, URL crawling, multiple documents, authenticated-page ingestion, lower statistical floors,
+  conversational delivery, richer revision/export UI, and numeric Completion Outlook remain gated.
 
 ## Open risks / TODO
 

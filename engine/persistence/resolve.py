@@ -427,8 +427,16 @@ def resolve_prediction(
 
     shipped = shipped_levers(levers, today)
 
-    # Measure through the real bridge (idempotent upsert; commits internally).
-    persist_metric_readouts(conn, scope_id, metric_id)
+    # Measure only the explicitly shipped levers for this prediction. The
+    # surrounding resolution transaction owns the commit so graph evidence and
+    # the verdict cannot land separately.
+    persist_metric_readouts(
+        conn,
+        scope_id,
+        metric_id,
+        action_ids=[lever.action_id for lever in shipped],
+        commit=False,
+    )
 
     if len(shipped) == 1:
         # Single lever — the unchanged single-intervention path.
@@ -444,7 +452,11 @@ def resolve_prediction(
         tuple_base["lever_refs"] = [lv.ref for lv in shipped]
         tuple_base["ship_span_days"] = ship_span_days(shipped)
         cluster_id = persist_lever_cluster_readout(
-            conn, scope_id, metric_id, [lv.action_id for lv in shipped]
+            conn,
+            scope_id,
+            metric_id,
+            [lv.action_id for lv in shipped],
+            commit=False,
         )
         tuple_base["cluster_id"] = None if cluster_id is None else str(cluster_id)
         edge = (

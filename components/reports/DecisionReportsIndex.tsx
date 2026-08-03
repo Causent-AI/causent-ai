@@ -1,27 +1,62 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { DashboardDecisionReport } from "@/lib/data/decision-reports";
 import { Panel } from "@/components/ui/Panel";
 import { ReportIcon, TrashIcon } from "@/components/ui/icons";
 import {
   deleteDecisionReportAction,
+  startDecisionReportIterationAction,
   type DeleteReportActionState,
+  type StartIterationActionState,
 } from "@/app/(dashboard)/reports/server-actions";
 
 function claimText(claims: Array<{ text: string; status: string }>): string {
   return claims.find((claim) => claim.status !== "missing" && claim.text.trim())?.text ?? "Not supplied";
 }
 
+function lifecycleLabel(report: DashboardDecisionReport): string {
+  if (report.isCurrent) return "Current active";
+  if (report.status === "active") return "Historical active";
+  return report.status.replace("_", " ");
+}
+
 const DELETE_INITIAL_STATE: DeleteReportActionState = { status: "idle" };
+const START_INITIAL_STATE: StartIterationActionState = { status: "idle" };
+
+function StartIterationControl({ reportId }: { reportId: string }) {
+  const router = useRouter();
+  const [state, action, pending] = useActionState(startDecisionReportIterationAction, START_INITIAL_STATE);
+  useEffect(() => {
+    if (state.status === "created") router.push(`/onboarding?report=${state.reportId}`);
+  }, [router, state]);
+  return (
+    <details className="relative">
+      <summary className="cursor-pointer list-none rounded-lg bg-[var(--brand-blue)] px-3 py-2 text-[12px] font-semibold text-white marker:hidden">Start next iteration</summary>
+      <form action={action} className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-[var(--border)] bg-white p-4 shadow-xl">
+        <input type="hidden" name="parentReportId" value={reportId} />
+        <p className="text-[12px] font-semibold">Why create the next iteration?</p>
+        <p className="mt-1 text-[11px] leading-4 text-[var(--text-muted)]">The current report stays live until this successor is activated. Private images are not copied; reattach one explicitly.</p>
+        <textarea name="reason" required minLength={1} maxLength={500} className="mt-3 min-h-20 w-full rounded-lg border border-[var(--border)] p-2 text-[12px]" />
+        {state.status === "error" ? <p role="alert" className="mt-2 text-[11px] text-red-700">{state.error}</p> : null}
+        <button disabled={pending} className="mt-3 w-full rounded-lg bg-[var(--brand-blue)] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-50">{pending ? "Starting…" : "Create successor"}</button>
+      </form>
+    </details>
+  );
+}
 
 function DeleteReportControl({
   reportId,
   active,
+  current,
+  iterationNumber,
 }: {
   reportId: string;
   active: boolean;
+  current: boolean;
+  iterationNumber: number;
 }) {
   const [state, action, pending] = useActionState(
     deleteDecisionReportAction,
@@ -36,9 +71,9 @@ function DeleteReportControl({
         <input type="hidden" name="reportId" value={reportId} />
         <p className="text-[12px] font-semibold text-[var(--text)]">Remove this report?</p>
         <p className="mt-1 text-[11px] leading-4 text-[var(--text-muted)]">
-          It disappears from workspace history. {active
-            ? "Its completed decision and actions remain in the audit record."
-            : "Its revisions and supplied files remain in the audit record."}
+          It disappears from workspace history. {current && active
+            ? `The series returns to the nearest active predecessor${iterationNumber === 1 ? ", or has no current report" : ""}; completed decisions and actions remain auditable.`
+            : active ? "Its completed decision and actions remain in the audit record." : "The current live report is unchanged; revisions and supplied files remain in the audit record."}
         </p>
         {state.status === "error" ? (
           <p className="mt-2 text-[11px] text-red-700" role="alert">{state.error}</p>
@@ -58,6 +93,20 @@ function DeleteReportControl({
 export function DecisionReportsIndex({ reports }: { reports: DashboardDecisionReport[] }) {
   const [selectedId, setSelectedId] = useState(reports[0]?.id ?? "");
   const selected = reports.find((report) => report.id === selectedId) ?? reports[0];
+  const grouped = useMemo(() => {
+    const groups = new Map<string, DashboardDecisionReport[]>();
+    for (const report of reports) {
+      groups.set(report.seriesId, [...(groups.get(report.seriesId) ?? []), report]);
+    }
+    return [...groups.entries()]
+      .map(([seriesId, items]) => ({
+        seriesId,
+        reports: items.sort((a, b) => a.iterationNumber - b.iterationNumber),
+        hasCurrent: items.some((report) => report.isCurrent),
+        hasActive: items.some((report) => report.status === "active"),
+      }))
+      .sort((a, b) => Number(b.hasCurrent) - Number(a.hasCurrent));
+  }, [reports]);
 
   return (
     <div className="mx-auto grid h-full max-w-[1360px] grid-cols-1 gap-4 p-5 lg:grid-cols-[340px_1fr]">
@@ -68,21 +117,51 @@ export function DecisionReportsIndex({ reports }: { reports: DashboardDecisionRe
             New Report
           </Link>
         </div>
-        <div className="scroll-slim -mx-1 min-h-0 flex-1 space-y-1.5 overflow-y-auto px-1">
-          {reports.map((report) => (
-            <button
-              key={report.id}
-              type="button"
-              onClick={() => setSelectedId(report.id)}
-              className={`w-full rounded-lg border px-3 py-2.5 text-left ${report.id === selected?.id ? "border-[var(--brand-blue)] bg-[var(--brand-blue)]/[0.05]" : "border-[var(--border)] hover:bg-black/[0.02]"}`}
+        <div className="scroll-slim -mx-1 min-h-0 flex-1 space-y-3 overflow-y-auto px-1">
+          {grouped.map((series) => (
+            <section
+              key={series.seriesId}
+              aria-label={
+                series.hasCurrent
+                  ? "Current Decision Report series"
+                  : series.hasActive
+                    ? "Historical Decision Report series"
+                    : "Draft Decision Report series"
+              }
+              className="rounded-xl border border-[var(--border)] bg-black/[0.015] p-1.5"
             >
-              <div className="flex items-center gap-2">
-                <ReportIcon className="shrink-0 text-[var(--text-subtle)]" />
-                <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{report.title}</span>
-                <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-subtle)]">{report.status.replace("_", " ")}</span>
+              <div className="flex items-center justify-between gap-2 px-1.5 pb-1.5 pt-0.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
+                  {series.hasCurrent ? "Current series" : series.hasActive ? "Historical series" : "Draft series"}
+                </p>
+                <span className="text-[10px] text-[var(--text-subtle)]">
+                  {series.reports.length} {series.reports.length === 1 ? "iteration" : "iterations"}
+                </span>
               </div>
-              <p className="mt-1.5 text-[11px] text-[var(--text-subtle)]">Updated {report.updatedAt.slice(0, 10)}</p>
-            </button>
+              <div className="space-y-1.5">
+                {series.reports.map((report) => (
+                  <button
+                    key={report.id}
+                    type="button"
+                    onClick={() => setSelectedId(report.id)}
+                    className={
+                      "w-full rounded-lg border bg-white px-3 py-2.5 text-left " +
+                      (report.id === selected?.id
+                        ? "border-[var(--brand-blue)] bg-[var(--brand-blue)]/[0.05]"
+                        : "border-[var(--border)] hover:bg-black/[0.02]")
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      <ReportIcon className="shrink-0 text-[var(--text-subtle)]" />
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-medium">Iteration {report.iterationNumber}: {report.title}</span>
+                      <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-subtle)]">{lifecycleLabel(report)}</span>
+                    </div>
+                    <p className="mt-1.5 truncate text-[11px] text-[var(--text-subtle)]">{report.iterationReason ?? "Original report"}</p>
+                    <p className="mt-1 text-[10px] text-[var(--text-subtle)]">Updated {report.updatedAt.slice(0, 10)}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       </Panel>
@@ -92,7 +171,9 @@ export function DecisionReportsIndex({ reports }: { reports: DashboardDecisionRe
           <article className="space-y-5">
             <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] pb-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Decision Report</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
+                  Iteration {selected.iterationNumber} · {lifecycleLabel(selected)}
+                </p>
                 <h1 className="mt-1 text-[24px] font-semibold tracking-tight">{selected.title}</h1>
                 <p className="mt-1 text-[12px] text-[var(--text-muted)]">Core metric: {selected.metricProjection.metricName}</p>
               </div>
@@ -100,9 +181,12 @@ export function DecisionReportsIndex({ reports }: { reports: DashboardDecisionRe
                 <Link href={`/onboarding?report=${selected.id}`} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--brand-blue)]">
                   Open full report
                 </Link>
+                {selected.isCurrent && selected.status === "active" ? <StartIterationControl reportId={selected.id} /> : null}
                 <DeleteReportControl
                   reportId={selected.id}
                   active={selected.status === "active"}
+                  current={selected.isCurrent}
+                  iterationNumber={selected.iterationNumber}
                 />
               </div>
             </header>

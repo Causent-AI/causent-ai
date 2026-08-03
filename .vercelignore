@@ -1,9 +1,10 @@
 # Upload set for the ROOT Vercel project ("causent" = the Next.js app only).
-# The Python causal engine deploys as its own project ("causent-engine") via
-# scripts/deploy-engine.sh — bundling it inside the app project sweeps the
-# remote build's node_modules/.next into the function bundle (>225MB cap), so
-# api/ + engine/ are excluded here entirely. requirements.txt stays for local
-# tooling but is harmless to exclude from the app upload too.
+# The Python causal services deploy as standalone projects via the scripts in
+# scripts/deploy-{engine,resolve,recompute}.sh. Bundling them inside the app
+# project sweeps the remote build's node_modules/.next into each Python function
+# bundle (>225MB cap), while the stateful workers also need separately scoped DB
+# credentials. Therefore api/ + engine/ are excluded from the root upload. The
+# root requirements.txt is local/engine tooling and is excluded as well.
 # NOTE: patterns are gitignore-style — root-anchored with a leading slash.
 # A bare `api` also matches app/api and silently strips every Next.js API
 # route (webhooks + crons 404'd in prod until 2026-07-16 because of this).

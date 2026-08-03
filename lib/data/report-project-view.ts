@@ -1,5 +1,62 @@
-import type { Action, Decision, ImpactStat, Metric, MetricImpact } from "@/lib/types";
-import type { DashboardDecisionReport } from "@/lib/data/decision-reports";
+import type { Action, Decision, ImpactStat, Metric, MetricImpact } from "../types.ts";
+import type { DashboardDecisionReport } from "./decision-reports.ts";
+import { formatImpactMagnitude } from "./readout.ts";
+
+function directionOf(value: number): "up" | "down" | "neutral" {
+  if (value > 0.0001) return "up";
+  if (value < -0.0001) return "down";
+  return "neutral";
+}
+
+/**
+ * Derive the report-level causal rollup from the already-isolated action list.
+ * Descriptive cells remain visible on each action, but never enter the causal
+ * aggregate. Workspace-wide aggregates are intentionally ignored here.
+ */
+export function deriveCurrentReportImpact(
+  actions: Action[],
+  metrics: Metric[],
+): Pick<ReportProjectView, "aggregatedImpact" | "impactByMetric"> {
+  const causalCells = actions.flatMap((action) =>
+    action.impact.filter(
+      (cell) => cell.evidence === "causal" && cell.value !== null,
+    ),
+  );
+  const confidentGood = causalCells.filter((cell) => cell.good).length;
+  const confident = causalCells.length;
+
+  const impactByMetric = metrics.map((metric): MetricImpact => {
+    const value = causalCells
+      .filter((cell) => cell.metricId === metric.id)
+      .reduce((sum, cell) => sum + (cell.value ?? 0), 0);
+    const hasCausalReadout = causalCells.some((cell) => cell.metricId === metric.id);
+    const direction = hasCausalReadout ? directionOf(value) : "neutral";
+    return {
+      metricId: metric.id,
+      value,
+      label: hasCausalReadout && direction !== "neutral"
+        ? formatImpactMagnitude(value, metric.format)
+        : "—",
+      direction,
+      good:
+        direction === "neutral" ||
+        (direction === "up") === metric.higherIsBetter,
+    };
+  });
+
+  const winRate = confident > 0
+    ? Math.round((confidentGood / confident) * 100)
+    : null;
+  return {
+    aggregatedImpact: [{
+      label: "Improvement Rate",
+      value: winRate === null ? "—" : `${winRate}%`,
+      comparison: `${confidentGood} / ${confident} confident readouts for this report`,
+      tone: winRate === null ? "plain" : winRate >= 50 ? "positive" : "negative",
+    }],
+    impactByMetric,
+  };
+}
 
 export type ReportProjectView = {
   activeReport: DashboardDecisionReport | null;
@@ -24,7 +81,7 @@ export function selectReportProjectView(input: {
   impactByMetric: MetricImpact[];
 }): ReportProjectView {
   const activeReport = input.reports.find(
-    (report) => report.status === "active" && report.decisionId && report.metricId,
+    (report) => report.isCurrent && report.status === "active" && report.decisionId && report.metricId,
   ) ?? null;
   if (!activeReport) {
     const removedReportDecisions = input.decisions.filter(
@@ -58,23 +115,14 @@ export function selectReportProjectView(input: {
   const metrics = metricUiId
     ? input.metrics.filter((metric) => metric.id === metricUiId)
     : [];
-  const impactByMetric = metricUiId
-    ? input.impactByMetric.filter((impact) => impact.metricId === metricUiId)
-    : [];
+  const reportImpact = deriveCurrentReportImpact(actions, metrics);
 
   return {
     activeReport,
     actions,
     decisions,
     metrics,
-    // Activation deliberately creates no evidence. Until this report's selected
-    // actions have readouts, a workspace-wide improvement rate would be a leak.
-    aggregatedImpact: [{
-      label: "Improvement Rate",
-      value: "—",
-      comparison: "0 / 0 confident readouts for this report",
-      tone: "plain",
-    }],
-    impactByMetric,
+    aggregatedImpact: reportImpact.aggregatedImpact,
+    impactByMetric: reportImpact.impactByMetric,
   };
 }

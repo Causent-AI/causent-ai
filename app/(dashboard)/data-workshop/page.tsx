@@ -8,6 +8,7 @@ import { summarizeMetricConnections } from "@/lib/data/metric-connections";
 import { getSession } from "@/lib/auth/session";
 import { loadReportActivationMetrics } from "@/lib/decision-reports/materialization";
 import { getServerSupabase } from "@/lib/supabase-server";
+import { CausalRecomputeStatus } from "@/components/causal/CausalRecomputeStatus";
 
 // The workspace catalog is session-scoped and must never be prerendered at build time.
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ function ProgressRing({ value, cap }: { value: number; cap: number }) {
   const c = 2 * Math.PI * r;
   const filled = cap > 0 ? (value / cap) * c : 0;
   return (
-    <svg width="52" height="52" viewBox="0 0 52 52">
+    <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
       <circle cx="26" cy="26" r={r} fill="none" stroke="var(--border)" strokeWidth="5" />
       <circle
         cx="26"
@@ -53,12 +54,12 @@ export default async function DataWorkshopPage({
   const returnTo = requestedReturn && /^\/onboarding\?report=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedReturn)
     ? requestedReturn
     : null;
-  const [{ metrics, activeDecisionReport }, session, sb] = await Promise.all([
+  const [{ metrics, activeDecisionReport, causalRecomputeStatus }, session, sb] = await Promise.all([
     loadDashboardData(),
     getSession(),
     getServerSupabase(),
   ]);
-  const workspaceMetrics = await loadReportActivationMetrics(sb, session.workspaceId).catch(() => []);
+  const workspaceMetrics = await loadReportActivationMetrics(sb, session.workspaceId);
   const removableMetricIdByName = Object.fromEntries(
     workspaceMetrics.filter((metric) => metric.isCore).map((metric) => [metric.name, metric.metricId]),
   );
@@ -73,7 +74,7 @@ export default async function DataWorkshopPage({
     : summarizeMetricConnections(metrics.length);
 
   return (
-    <div className="mx-auto flex max-w-[1360px] flex-col gap-4 p-5">
+    <div className="mx-auto flex max-w-[1360px] flex-col gap-4 p-4 sm:p-5">
       {returnTo ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/70 px-4 py-3">
           <div>
@@ -86,6 +87,9 @@ export default async function DataWorkshopPage({
             Return to Decision Report
           </Link>
         </div>
+      ) : null}
+      {activeDecisionReport && causalRecomputeStatus ? (
+        <CausalRecomputeStatus status={causalRecomputeStatus} />
       ) : null}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
         <div className="space-y-4">
@@ -123,7 +127,7 @@ export default async function DataWorkshopPage({
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-[14px] font-semibold text-[var(--text)]">
-              Core Metrics Summary
+              Connection Summary
             </h3>
             <div className="mt-2 flex items-baseline gap-1.5">
               <span className="text-[28px] font-bold tabular-nums text-[var(--text)]">

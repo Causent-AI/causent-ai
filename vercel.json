@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/resolve",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/recompute",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

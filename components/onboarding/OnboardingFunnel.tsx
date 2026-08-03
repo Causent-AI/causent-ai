@@ -160,6 +160,7 @@ export function OnboardingFunnel() {
   const [priorsLoading, setPriorsLoading] = useState(false);
 
   const [committed, setCommitted] = useState<Committed | null>(null);
+  const [mountedAt] = useState(() => Date.now());
   // Step 7 — the watched lever ref once the drift watch is armed (ship state).
   const [shipped, setShipped] = useState<{ ref: string; url: string } | null>(null);
 
@@ -210,7 +211,6 @@ export function OnboardingFunnel() {
   useEffect(() => {
     if (step !== "commit" || !declared) return;
     let stale = false;
-    setPriorsLoading(true);
     fetchOnboardingPriors({ metricId: declared.metricId, mechanismCategory })
       .then((p) => {
         if (!stale) setPriors(p);
@@ -227,8 +227,8 @@ export function OnboardingFunnel() {
     if (!committed) return null;
     const due = Date.parse(committed.resolutionDate);
     if (Number.isNaN(due)) return null;
-    return Math.max(0, Math.ceil((due - Date.now()) / 86_400_000));
-  }, [committed]);
+    return Math.max(0, Math.ceil((due - mountedAt) / 86_400_000));
+  }, [committed, mountedAt]);
 
   function applyCard(c: DecisionCard) {
     setCard(c);
@@ -269,6 +269,8 @@ export function OnboardingFunnel() {
         setErrors([res.error]);
         return;
       }
+      setPriors(null);
+      setPriorsLoading(true);
       setDeclared(res);
       setMetricName(res.name);
       setStep("commit");
@@ -584,6 +586,8 @@ export function OnboardingFunnel() {
                 setPaste("");
                 setCard(null);
                 setDeclared(null);
+                setPriors(null);
+                setPriorsLoading(false);
                 setCommitted(null);
                 setShipped(null);
                 setMagnitude("");

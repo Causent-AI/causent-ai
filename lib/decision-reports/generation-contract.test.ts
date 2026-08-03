@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  INITIAL_PROMPT_SOURCE_ID,
   createSafeFallbackReport,
   materializeModelDecisionReport,
   recoverStringifiedModelDecisionReportDraft,
@@ -9,6 +10,7 @@ import {
   type ModelClaimDraft,
   type ModelDecisionReportDraft,
 } from "./generation-contract.ts";
+import { createReportSourceCorpus } from "./sources/corpus.ts";
 import {
   DecisionReportGenerationTimeoutError,
   runWithSingleRetry,
@@ -21,8 +23,9 @@ function claim(
   text: string,
   kind: ModelClaimDraft["kind"] = "suggestion",
   evidenceQuote = "",
+  evidenceSourceChunkId = kind === "supported" ? INITIAL_PROMPT_SOURCE_ID : "",
 ): ModelClaimDraft {
-  return { text, kind, evidenceQuote };
+  return { text, kind, evidenceQuote, evidenceSourceChunkId };
 }
 
 function draft(): ModelDecisionReportDraft {
@@ -68,8 +71,10 @@ function draft(): ModelDecisionReportDraft {
       definition: "Completed checkouts divided by checkout starts",
       baselinePct: 40,
       baselineEvidenceQuote: "Baseline completion is 40%",
+      baselineSourceChunkId: INITIAL_PROMPT_SOURCE_ID,
       predictedPct: 55,
       predictedEvidenceQuote: "the founder prediction is 55%",
+      predictedSourceChunkId: INITIAL_PROMPT_SOURCE_ID,
     },
   };
 }
@@ -115,6 +120,99 @@ test("server materialization assigns IDs and verifies exact prompt evidence", ()
   assert.equal(result.report.implementation.actions[0].owner?.status, "sourced");
   assert.equal(result.metricProjection.baselinePct, 40);
   assert.equal(result.metricProjection.predictedPct, 55);
+  assert.deepEqual(result.sourceSummaries.map((source) => source.kind), ["brief"]);
+  assert.deepEqual(result.report.sourceSummaries, result.sourceSummaries);
+});
+
+test("supported claims and metrics must quote the exact named source chunk", () => {
+  let sourceId = 0;
+  const corpus = createReportSourceCorpus(
+    PROMPT,
+    [
+      {
+        kind: "url",
+        label: "Experiment notes",
+        locator: "https://example.com/experiment",
+        pageCount: null,
+        sections: [
+          {
+            text: "The controlled experiment reached 62% checkout completion.",
+            locator: "https://example.com/experiment",
+          },
+        ],
+      },
+    ],
+    { idFactory: () => `source-${++sourceId}` },
+  );
+  const urlChunk = corpus.chunks.find((chunk) => chunk.kind === "url");
+  assert.ok(urlChunk);
+
+  const generated = draft();
+  generated.decision.background = claim(
+    "The controlled experiment reached 62% checkout completion.",
+    "supported",
+    "The controlled experiment reached 62% checkout completion.",
+    urlChunk.chunkId,
+  );
+  generated.metric.baselinePct = 62;
+  generated.metric.baselineEvidenceQuote =
+    "The controlled experiment reached 62% checkout completion.";
+  generated.metric.baselineSourceChunkId = urlChunk.chunkId;
+
+  const result = materializeModelDecisionReport(generated, corpus, {
+    idFactory: () => "claim",
+  });
+  assert.equal(result.report.decision.background[0].status, "sourced");
+  assert.deepEqual(result.report.decision.background[0].sourceChunkIds, [urlChunk.chunkId]);
+  assert.equal(result.metricProjection.baselinePct, 62);
+
+  generated.decision.background.evidenceSourceChunkId = INITIAL_PROMPT_SOURCE_ID;
+  generated.metric.baselineSourceChunkId = INITIAL_PROMPT_SOURCE_ID;
+  const forged = materializeModelDecisionReport(generated, corpus, {
+    idFactory: () => "forged",
+  });
+  assert.notEqual(forged.report.decision.background[0].status, "sourced");
+  assert.equal(forged.metricProjection.baselinePct, null);
+});
+
+test("quotes cannot span chunks and numeric claims are checked across the whole corpus", () => {
+  const corpus = createReportSourceCorpus(PROMPT, [
+    {
+      kind: "pdf",
+      label: "Study.pdf",
+      locator: "Study.pdf",
+      pageCount: 2,
+      sections: [
+        { text: "Page one ends with conversion", locator: "Page 1" },
+        { text: "rose to 61% in the cohort.", locator: "Page 2" },
+      ],
+    },
+  ]);
+  const pdfChunks = corpus.chunks.filter((chunk) => chunk.kind === "pdf");
+  assert.equal(pdfChunks.length, 2);
+
+  const generated = draft();
+  generated.decision.background = claim(
+    "Conversion rose to 61%.",
+    "supported",
+    "conversion rose to 61%",
+    pdfChunks[0].chunkId,
+  );
+  generated.supportingEvidence.metricMechanism = claim(
+    "The supplied study reported 61%.",
+    "inference",
+  );
+  const result = materializeModelDecisionReport(generated, corpus, {
+    idFactory: () => "bounded",
+  });
+  assert.notEqual(result.report.decision.background[0].status, "sourced");
+  assert.equal(result.report.supportingEvidence.metricMechanism[0].status, "inferred");
+
+  generated.supportingEvidence.metricMechanism = claim("The study reported 99%.", "inference");
+  const invented = materializeModelDecisionReport(generated, corpus, {
+    idFactory: () => "invented",
+  });
+  assert.equal(invented.report.supportingEvidence.metricMechanism[0].status, "missing");
 });
 
 test("invented metrics, customers, owners, and numeric claims are removed", () => {
@@ -229,6 +327,7 @@ test("safe fallback preserves the brief and leaves unsupported fields missing", 
   assert.equal(fallback.report.decision.background[0].status, "sourced");
   assert.equal(fallback.report.decision.decision[0].status, "missing");
   assert.equal(fallback.metricProjection.evidenceState, "missing");
+  assert.deepEqual(fallback.report.sourceSummaries, fallback.sourceSummaries);
 });
 
 test("generation policy retries exactly once after a refusal", async () => {

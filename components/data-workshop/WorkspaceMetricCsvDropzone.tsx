@@ -31,6 +31,9 @@ export function WorkspaceMetricCsvDropzone({
             Name the metric, choose its unit, and import one daily <span className="font-mono">date,value</span> CSV. Then add it to the shared Core Metrics surface from the list below.
             {activeMetricName ? ` To update the current report metric, use its exact name: ${activeMetricName}.` : ""}
           </p>
+          <p className="mt-2 max-w-2xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-950">
+            Reusing an existing metric name updates values on matching dates. Dates that are not present in this CSV remain unchanged.
+          </p>
         </div>
       </div>
 
@@ -44,7 +47,7 @@ export function WorkspaceMetricCsvDropzone({
             maxLength={120}
             defaultValue={activeMetricName ?? undefined}
             placeholder="e.g. AI assistant adoption rate"
-            className="mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--brand-blue)]"
+            className="mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-base text-[var(--text)] outline-none focus:border-[var(--brand-blue)] md:text-[12px]"
           />
         </label>
         <label className="text-[11px] font-medium text-[var(--text-muted)]" htmlFor="workspace-metric-unit">
@@ -53,7 +56,7 @@ export function WorkspaceMetricCsvDropzone({
             id="workspace-metric-unit"
             name="unit"
             defaultValue="count"
-            className="mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--brand-blue)]"
+            className="mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-base text-[var(--text)] outline-none focus:border-[var(--brand-blue)] md:text-[12px]"
           >
             <option value="percent">Percent</option>
             <option value="count">Count</option>

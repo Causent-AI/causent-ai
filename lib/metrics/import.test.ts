@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   importReportMetricObservations,
   importWorkspaceMetricCsv,
+  loadActiveReportMetricIdentity,
   setWorkspaceCoreMetric,
 } from "./import.ts";
 
@@ -14,9 +15,71 @@ const IDS = {
   actor: "ca5e0000-0000-0000-0000-000000000074",
 };
 
+const SERIES = "ca5e0000-0000-0000-0000-000000000075";
+
 function client(response: { data: unknown; error: unknown }, calls: Array<Record<string, unknown>>): SupabaseClient {
   return { async rpc(name: string, args: Record<string, unknown>) { calls.push({ name, args }); return response; } } as unknown as SupabaseClient;
 }
+
+function selectorClient(
+  responses: Array<{ data: unknown; error: unknown }>,
+  calls: Array<Record<string, unknown>>,
+): SupabaseClient {
+  return {
+    from(table: string) {
+      const call: Record<string, unknown> = { table, filters: [] as unknown[] };
+      calls.push(call);
+      const builder = {
+        select(columns: string) { call.select = columns; return builder; },
+        eq(column: string, value: unknown) {
+          (call.filters as unknown[]).push([column, value]);
+          return builder;
+        },
+        async maybeSingle() {
+          const response = responses.shift();
+          if (!response) throw new Error("missing selector response");
+          return response;
+        },
+      };
+      return builder;
+    },
+  } as unknown as SupabaseClient;
+}
+
+test("active metric selection follows the explicit workspace and series pointers", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const result = await loadActiveReportMetricIdentity(selectorClient([
+    { data: { current_decision_report_series_id: SERIES }, error: null },
+    { data: { current_active_report_id: IDS.report }, error: null },
+    { data: {
+      report_id: IDS.report,
+      series_id: SERIES,
+      active_metric_id: IDS.metric,
+      status: "active",
+      deleted_at: null,
+    }, error: null },
+  ], calls), IDS.scope);
+  assert.deepEqual(result, { reportId: IDS.report, metricId: IDS.metric });
+  assert.deepEqual(calls.map((call) => call.table), [
+    "workspaces",
+    "decision_report_series",
+    "decision_reports",
+  ]);
+  assert.deepEqual(calls[2].filters, [
+    ["scope_id", IDS.scope],
+    ["series_id", SERIES],
+    ["report_id", IDS.report],
+  ]);
+});
+
+test("active metric selection never falls back to activation timestamp inference", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const result = await loadActiveReportMetricIdentity(selectorClient([
+    { data: { current_decision_report_series_id: null }, error: null },
+  ], calls), IDS.scope);
+  assert.equal(result, null);
+  assert.equal(calls.length, 1);
+});
 
 test("repository sends one scope/report/metric-bound RPC and maps its update summary", async () => {
   const calls: Array<Record<string, unknown>> = [];

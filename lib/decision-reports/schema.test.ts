@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "./fixtures/gummy-alpha.ts";
 import {
   cloneDecisionReport,
+  upgradeLegacyDecisionReportForEditing,
   validateDecisionReport,
   validateMetricProjection,
 } from "./schema.ts";
@@ -55,6 +56,51 @@ test("supporting evidence cannot exceed three proof claims", () => {
   if (!result.success) {
     assert.ok(result.errors.some((error) => error.includes("supportingEvidence.factors cannot exceed 3")));
   }
+});
+
+test("sanitized source metadata persists the chunk-to-source mapping", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  assert.equal(validateDecisionReport(report).success, true);
+
+  report.sourceSummaries![0].chunks[0].chunkId = "unrelated-chunk";
+  const forged = validateDecisionReport(report);
+  assert.equal(forged.success, false);
+  if (!forged.success) {
+    assert.ok(
+      forged.errors.some((error) =>
+        error.includes("sourced claims must reference a persisted source chunk"),
+      ),
+    );
+  }
+});
+
+test("new reports cannot omit or forge durable source provenance", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  delete report.sourceSummaries;
+  const missing = validateDecisionReport(report);
+  assert.equal(missing.success, false);
+  if (!missing.success) {
+    assert.ok(missing.errors.some((error) => error.includes("sourceSummaries is required")));
+  }
+
+  const forged = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  forged.sourceSummaries![0].chunks[0].contentSha256 = "not-a-digest";
+  const invalidDigest = validateDecisionReport(forged);
+  assert.equal(invalidDigest.success, false);
+});
+
+test("legacy v1 snapshots remain readable without claiming v2 provenance", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  report.schemaVersion = 1;
+  delete report.sourceSummaries;
+  assert.equal(validateDecisionReport(report).success, true);
+
+  const upgraded = upgradeLegacyDecisionReportForEditing(report);
+  assert.equal(upgraded.schemaVersion, 2);
+  assert.deepEqual(upgraded.sourceSummaries, []);
+  assert.equal(upgraded.decision.decision[0].status, "user_confirmed");
+  assert.deepEqual(upgraded.decision.decision[0].sourceChunkIds, []);
+  assert.equal(validateDecisionReport(upgraded).success, true);
 });
 
 test("metric projections validate bounded percentages and evidence state", () => {

@@ -58,16 +58,22 @@ let sb: SupabaseClient | null = null;
 let available = false;
 
 async function teardown(client: SupabaseClient) {
-  await client.from("orgs").delete().eq("org_id", ORG); // cascades the tenant
+  const result = await client.from("orgs").delete().eq("org_id", ORG); // cascades the tenant
+  assert.equal(result.error, null, result.error?.message);
 }
 
 async function seedTenant(client: SupabaseClient) {
-  await client.from("orgs").insert({ org_id: ORG, name: "C6_TEST_org" });
-  await client.from("projects").insert({ project_id: PROJ, org_id: ORG, name: "p" });
-  await client.from("workspaces").insert({ workspace_id: WS, project_id: PROJ, name: "w" });
-  await client.from("metrics").insert({ metric_id: METRIC, scope_id: WS, name: "Activation", source: "declared" });
-  await client.from("decisions").insert({ decision_id: DECISION, scope_id: WS, title: "New onboarding checklist" });
-  await client.from("predictions").insert({
+  const org = await client.from("orgs").insert({ org_id: ORG, name: "C6_TEST_org" });
+  assert.equal(org.error, null, org.error?.message);
+  const project = await client.from("projects").insert({ project_id: PROJ, org_id: ORG, name: "p" });
+  assert.equal(project.error, null, project.error?.message);
+  const workspace = await client.from("workspaces").insert({ workspace_id: WS, project_id: PROJ, name: "w" });
+  assert.equal(workspace.error, null, workspace.error?.message);
+  const metric = await client.from("metrics").insert({ metric_id: METRIC, scope_id: WS, name: "Activation", source: "declared" });
+  assert.equal(metric.error, null, metric.error?.message);
+  const decision = await client.from("decisions").insert({ decision_id: DECISION, scope_id: WS, title: "New onboarding checklist" });
+  assert.equal(decision.error, null, decision.error?.message);
+  const prediction = await client.from("predictions").insert({
     prediction_id: PREDICTION,
     scope_id: WS,
     decision_id: DECISION,
@@ -76,6 +82,7 @@ async function seedTenant(client: SupabaseClient) {
     magnitude_pct_mean: 6,
     resolution_date: "2026-12-31",
   });
+  assert.equal(prediction.error, null, prediction.error?.message);
 }
 
 before(async () => {
