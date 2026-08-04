@@ -77,7 +77,7 @@ Vercel project — which also gives it separate scaling, logs, and secrets.
    ```
    Expect `200` with `rows`; a wrong/absent secret must return `401`.
 
-The root Vercel project (`causent`) is the Next.js app only — `.vercelignore`
+The root Vercel project (`causent-ai`) is the Next.js app only — `.vercelignore`
 excludes `api/` + `engine/`, and the root `vercel.json` carries no function config.
 
 ## Local verification (no creds needed)
@@ -129,7 +129,7 @@ Guards: `401` (missing/wrong/unset secret), `413` (body cap), `400` (bad JSON /
 date / uuid), `500` (a genuine DB/driver fault — type name only, no message leaked),
 `405` (non-POST).
 
-## Deploy steps (project `causent-resolve`) — NOT YET DEPLOYED
+## Deploy steps (project `causent-resolve`) — AS DEPLOYED 2026-07-18
 
 1. **Deploy** (stages `api/resolve.py` + `engine/**` + a minimal `vercel.json` +
    `pyproject.toml`, links project `causent-resolve`, deploys):
@@ -159,4 +159,106 @@ date / uuid), `500` (a genuine DB/driver fault — type name only, no message le
 
 ```
 cd engine && .venv/bin/python -m pytest tests/test_resolve_function.py -q
+```
+
+---
+
+# Deploying the automatic causal recomputation worker (`api/recompute.py`)
+
+The stateful queue worker behind automatic Decision Report recomputation. The
+Next.js app commits source changes and activation transitions to the private
+Postgres queue, then makes a best-effort immediate request to this worker. The
+root app's `/api/cron/recompute` route repeats that request every five minutes,
+so a missed immediate wake-up does not lose committed work.
+
+The worker re-resolves the workspace's explicit current report pointer while
+holding the queue and target locks, switches to the job's stored member identity,
+and runs the same `persistence.bridge.persist_metric_readouts` code covered by the
+engine integration suite. Its generation receipt and graph writes commit
+atomically. It never accepts a report ID, action IDs, or an acting user from the
+caller; optional workspace and metric IDs only narrow which already-queued job
+may be claimed.
+
+Like `causent-resolve`, this function holds a Postgres DSN and therefore deploys
+as a separate Vercel project (`causent-recompute`). It must not be folded into
+the credential-free engine or the root Next.js app.
+
+## What ships
+
+| File | Role |
+| --- | --- |
+| `api/recompute.py` | Secret-guarded HTTP entrypoint and bounded queue drain (`limit` 1–20). |
+| `engine/persistence/recompute.py` | Transactional claim, current-pointer validation, stored-actor switch, retry/receipt logic. |
+| `engine/persistence/bridge.py` | RLS-scoped causal graph materialization. |
+| Required `engine/causal/**` readout modules | Numpy causal engine dependency chain; drift, demo, and resolution runners are excluded. |
+| `numpy==2.5.0`, `psycopg[binary]==3.3.4` | Reproducible Python 3.12 runtime dependencies generated in the staging directory. |
+
+## Request contract
+
+`POST /api/recompute` with header
+`x-causent-recompute-secret: <shared secret>` and an optional JSON body:
+
+```json
+{ "limit": 20, "scope_id": "<uuid>", "metric_id": "<uuid>" }
+```
+
+Empty body drains up to 10 due jobs. `limit` is capped at 20. The optional IDs
+are queue filters only and cannot redirect work to a caller-selected report.
+Response `200` summarizes `processed`, `unchanged`, `superseded`, and scheduled
+retries when no terminal job failed. A batch containing a terminal `FAILED` job
+returns `500` with the same bounded summary and `ok: false`, so both the app cron
+and platform monitoring see a failure. Guards: `401` (missing/wrong/unset secret),
+`413` (body cap), `400` (bad JSON / unknown fields / invalid limit or UUID), `503`
+(missing `DATABASE_URL`), `500` (terminal job or non-sensitive exception class
+only), and `405` (non-POST).
+
+## Deploy steps (project `causent-recompute`) — NOT YET DEPLOYED
+
+1. **Stage and deploy** the minimal standalone project:
+   ```
+   scripts/deploy-recompute.sh            # preview
+   scripts/deploy-recompute.sh preview    # explicit preview
+   scripts/deploy-recompute.sh --prod     # production
+   ```
+   The script links only the staging directory to `causent-recompute`; it does
+   not alter the root app's `.vercel/project.json`. For a network-free content
+   audit, use `scripts/deploy-recompute.sh --stage-only <new-directory>`.
+2. **Set worker env** on `causent-recompute` for preview and production:
+   - `DATABASE_URL` — Supabase **session-pooler** DSN. Store the password only in
+     Vercel's encrypted environment; never commit it.
+   - `CAUSENT_RECOMPUTE_SECRET` — random shared secret, for example from
+     `openssl rand -hex 32`.
+   - With those values exported locally, run `npm run check:recompute-config`.
+     The worker no longer falls back to a localhost database when the DSN is
+     missing.
+3. **Set app env** on the root `causent-ai` project:
+   - `CAUSENT_RECOMPUTE_URL` — the worker endpoint, normally
+     `https://causent-recompute.vercel.app/api/recompute` in production.
+   - `CAUSENT_RECOMPUTE_SECRET` — the same worker secret.
+   - `CRON_SECRET` — Vercel Cron bearer secret protecting
+     `/api/cron/recompute`; this is distinct from the worker secret.
+   - The app also requires `NEXT_PUBLIC_SUPABASE_URL`,
+     `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and server-only
+     `SUPABASE_SERVICE_ROLE_KEY` for Decision Report source-receipt minting.
+     Export the production values and run `npm run check:release-config`; all
+     local demo/fixture/seed/rollout flags must be absent.
+4. **Smoke-test after an authorized deploy:** an absent/wrong worker secret must
+   return `401`; a correct secret and `{ "limit": 1 }` must return `200` with a
+   bounded summary. Then enqueue a current-report generation and confirm the
+   app cron drains it exactly once.
+
+The root `.vercelignore` intentionally excludes `/api` and `/engine`: all Python
+functions are deployed from minimal standalone stages, avoiding the hybrid
+Next/Python bundle-size failure and keeping stateful DB credentials out of the
+credential-free engine project. The root `app/api/**` Next.js routes are not
+matched by the anchored `/api` pattern and remain in the app deployment.
+
+## Local verification (no network or credentials needed)
+
+```
+bash -n scripts/deploy-recompute.sh
+stage_dir="$(mktemp -d)/causent-recompute"
+scripts/deploy-recompute.sh --stage-only "$stage_dir"
+find "$stage_dir" -type f | sort
+cd engine && .venv/bin/python -m pytest tests/test_recompute_function.py -q
 ```

@@ -45,6 +45,7 @@ M_C1A = uuid.UUID("cccc0000-0000-0000-0000-00000000c1a1")
 M_C1B = uuid.UUID("cccc0000-0000-0000-0000-00000000c1b1")
 M_C2 = uuid.UUID("cccc0000-0000-0000-0000-00000000c201")
 M_D = uuid.UUID("dddd0000-0000-0000-0000-00000000d101")
+REPORT_C1A = uuid.UUID("cccc0000-0000-0000-0000-00000000c1a2")
 
 # users
 U_WS_MEMBER = uuid.UUID("cccc1111-0000-0000-0000-0000000000f1")   # member @ WS_C1A only
@@ -128,6 +129,11 @@ def _seed(conn):
             "insert into public.metrics (metric_id, scope_id, name, source) values "
             "(%s,%s,'m','csv'),(%s,%s,'m','csv'),(%s,%s,'m','csv'),(%s,%s,'m','csv')",
             (M_C1A, WS_C1A, M_C1B, WS_C1B, M_C2, WS_C2, M_D, WS_D),
+        )
+        cur.execute(
+            "insert into public.decision_reports (report_id, scope_id, title, status) "
+            "values (%s,%s,'pointer guard report','draft')",
+            (REPORT_C1A, WS_C1A),
         )
 
 
@@ -272,6 +278,80 @@ def test_update_cannot_move_row_cross_tenant(seeded):
             cur.execute(
                 "update public.metrics set scope_id = %s where metric_id = %s",
                 (WS_D, M_C1A),
+            )
+        conn.rollback()
+
+
+def test_even_workspace_admin_cannot_mutate_database_owned_report_pointers(seeded):
+    with seeded.cursor() as cur:
+        cur.execute(
+            "select series_id from public.decision_reports where report_id=%s",
+            (REPORT_C1A,),
+        )
+        series_id = cur.fetchone()[0]
+        cur.execute(
+            "select "
+            "has_table_privilege('authenticated', "
+            "'private.decision_report_pointer_transitions', 'INSERT'), "
+            "has_function_privilege('authenticated', "
+            "'private.guard_workspace_decision_report_series_pointer()', 'EXECUTE'), "
+            "has_function_privilege('authenticated', "
+            "'private.assert_current_decision_report_iteration_parent(uuid,uuid)', 'EXECUTE')"
+        )
+        assert cur.fetchone() == (False, False, False)
+
+    # The admin can otherwise update this workspace, so this exercises the
+    # pointer guard rather than merely failing the workspace UPDATE policy.
+    with as_user(U_ORG_ADMIN, autocommit=False) as conn, conn.cursor() as cur:
+        with pytest.raises(pgerr.InsufficientPrivilege):
+            cur.execute(
+                "update public.workspaces set current_decision_report_series_id=%s "
+                "where workspace_id=%s",
+                (series_id, WS_C1A),
+            )
+        conn.rollback()
+
+    # Custom settings are caller-controlled and therefore never authorize the
+    # new one-use transition. This is the exact bypass the former GUC guard
+    # allowed.
+    with as_user(U_ORG_ADMIN, autocommit=False) as conn, conn.cursor() as cur:
+        cur.execute("select set_config('causent.allow_series_pointer_write','1',true)")
+        with pytest.raises(pgerr.InsufficientPrivilege):
+            cur.execute(
+                "update public.workspaces set current_decision_report_series_id=%s "
+                "where workspace_id=%s",
+                (series_id, WS_C1A),
+            )
+        conn.rollback()
+
+    # Neither the private capability nor its helper can be invoked through the
+    # Data API role directly.
+    with as_user(U_ORG_ADMIN, autocommit=False) as conn, conn.cursor() as cur:
+        with pytest.raises(pgerr.InsufficientPrivilege):
+            cur.execute(
+                "insert into private.decision_report_pointer_transitions "
+                "(transaction_id,workspace_id,target_series_id,target_report_id) "
+                "values (pg_current_xact_id(),%s,%s,%s)",
+                (WS_C1A, series_id, REPORT_C1A),
+            )
+        conn.rollback()
+
+    with as_user(U_ORG_ADMIN, autocommit=False) as conn, conn.cursor() as cur:
+        with pytest.raises(pgerr.InsufficientPrivilege):
+            cur.execute(
+                "select private.assert_current_decision_report_iteration_parent(%s,%s)",
+                (WS_C1A, series_id),
+            )
+        conn.rollback()
+
+    # Series pointers are read-only through the Data API for every
+    # authenticated role, including workspace admins.
+    with as_user(U_ORG_ADMIN, autocommit=False) as conn, conn.cursor() as cur:
+        with pytest.raises(pgerr.InsufficientPrivilege):
+            cur.execute(
+                "update public.decision_report_series set current_active_report_id=%s "
+                "where series_id=%s",
+                (REPORT_C1A, series_id),
             )
         conn.rollback()
 

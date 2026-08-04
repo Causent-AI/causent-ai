@@ -5,6 +5,10 @@ import type {
 } from "@/lib/decision-reports/schema";
 
 const BRIEF_SOURCE = "gummy-alpha-founder-brief";
+const INITIAL_PROMPT =
+  "Deploy an AI shopping assistant on the Gummy Alpha website. The product mixer already exists, but customers abandon it while combining flavors. They also ask where to find the mixer and commonly choose only one flavor. Mixed-box unit purchases increased 25% quarter over quarter. The assistant should recommend valid combinations, explain how they taste, clarify product rules, and help shoppers complete the mixer. Gummy Alpha offers strawberry, orange, vanilla, chocolate, blueberry, and hazelnut in spheres, squares, stars, and puppy-face shapes. Each gummy may use one or two flavors. Orders are $15 per pound with a one-pound minimum.";
+const INITIAL_PROMPT_SHA256 =
+  "f0f7f8016599ed6ac7af508ac9cdfdaed343b90ceddb69357558e226b6faa8e6";
 
 function claim(
   id: string,
@@ -27,11 +31,30 @@ function action(index: number, title: string, summary: string): DraftAction {
 export const GUMMY_ALPHA_GOLDEN_EXAMPLE: DecisionReportGoldenExample = {
   workspaceName: "Orbit",
   projectName: "Gummy Alpha",
-  initialPrompt:
-    "Deploy an AI shopping assistant on the Gummy Alpha website. The product mixer already exists, but customers abandon it while combining flavors. They also ask where to find the mixer and commonly choose only one flavor. Mixed-box unit purchases increased 25% quarter over quarter. The assistant should recommend valid combinations, explain how they taste, clarify product rules, and help shoppers complete the mixer. Gummy Alpha offers strawberry, orange, vanilla, chocolate, blueberry, and hazelnut in spheres, squares, stars, and puppy-face shapes. Each gummy may use one or two flavors. Orders are $15 per pound with a one-pound minimum.",
+  initialPrompt: INITIAL_PROMPT,
   report: {
-    schemaVersion: 1,
+    schemaVersion: 2,
     title: "AI guidance for the Gummy Alpha flavor mixer",
+    sourceSummaries: [
+      {
+        sourceId: BRIEF_SOURCE,
+        kind: "brief",
+        label: "Project brief",
+        locator: null,
+        finalOrigin: null,
+        pageCount: null,
+        retrievedAt: "2026-07-22T00:00:00.000Z",
+        contentSha256: INITIAL_PROMPT_SHA256,
+        chunks: [
+          {
+            chunkId: BRIEF_SOURCE,
+            locator: null,
+            contentSha256: INITIAL_PROMPT_SHA256,
+            text: INITIAL_PROMPT,
+          },
+        ],
+      },
+    ],
     decision: {
       decision: [
         claim(

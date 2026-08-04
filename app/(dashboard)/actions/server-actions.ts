@@ -28,6 +28,7 @@ import {
   type PredictionInput,
 } from "@/lib/predictions";
 import { completeManualAction } from "@/lib/actions/manual-completion";
+import { kickCausalRecompute, logDeferredCausalRecompute } from "@/lib/causal/recompute";
 
 type ActionResult = { ok: true } | { ok: false; errors: string[] };
 
@@ -62,6 +63,11 @@ export async function completeManualActionAction(
     authoredBy: session.userId,
   });
   if (!result.ok) return { status: "error", error: result.error };
+
+  logDeferredCausalRecompute(await kickCausalRecompute({
+    scopeId: session.workspaceId,
+    limit: 1,
+  }));
 
   revalidatePath("/actions");
   revalidatePath("/impact");

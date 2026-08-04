@@ -16,9 +16,10 @@ const INPUT: ReportActivationInputV1 = {
   prediction: {
     direction: "POSITIVE",
     magnitudePctMean: 15,
-    resolutionDate: "2026-12-15",
+    resolutionDate: "2099-12-15",
   },
   selectedActionSourceItemIds: ["gummy-action-1", "gummy-action-2"],
+  primaryLeverActionSourceItemId: "gummy-action-1",
 };
 
 const IDS = {
@@ -49,6 +50,7 @@ test("activation sends one complete packet to the checked materialization RPC", 
       decision_id: IDS.decision,
       prediction_id: IDS.prediction,
       action_ids: [IDS.action1, IDS.action2],
+      primary_lever_action_id: IDS.action1,
       reused: false,
       activated_at: "2026-07-22T06:30:00.000Z",
     }],
@@ -61,15 +63,17 @@ test("activation sends one complete packet to the checked materialization RPC", 
   assert.equal(result.activation.decisionId, IDS.decision);
   assert.deepEqual(result.activation.actionIds, [IDS.action1, IDS.action2]);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].name, "activate_decision_report_v1");
+  assert.equal(result.activation.primaryLeverActionId, IDS.action1);
+  assert.equal(calls[0].name, "activate_decision_report_v2");
   assert.deepEqual(calls[0].args, {
     p_report_id: INPUT.reportId,
     p_revision_id: INPUT.revisionId,
     p_metric_id: INPUT.confirmedMetricId,
     p_prediction_direction: "POSITIVE",
     p_prediction_magnitude_pct_mean: 15,
-    p_prediction_resolution_date: "2026-12-15",
+    p_prediction_resolution_date: "2099-12-15",
     p_selected_action_source_ids: ["gummy-action-1", "gummy-action-2"],
+    p_primary_lever_source_id: "gummy-action-1",
     p_activated_by: null,
   });
 });
@@ -119,6 +123,7 @@ test("malformed canonical identities fail closed", async () => {
       decision_id: "not-a-uuid",
       prediction_id: IDS.prediction,
       action_ids: [IDS.action1],
+      primary_lever_action_id: IDS.action1,
       reused: false,
       activated_at: "2026-07-22T06:30:00.000Z",
     }],

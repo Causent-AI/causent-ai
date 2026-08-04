@@ -55,12 +55,18 @@ export function ReportActivationPanel({
   persistence,
   hasUnsavedChanges,
   metrics,
+  telemetrySessionKey,
+  telemetryStartedAtMs,
+  activationDateBounds,
 }: {
   report: DecisionReportV1;
   projection: MetricProjection;
   persistence: ActivationPersistence | null;
   hasUnsavedChanges: boolean;
   metrics: ReportActivationMetric[];
+  telemetrySessionKey: string;
+  telemetryStartedAtMs: number;
+  activationDateBounds: { today: string; minimum: string };
 }) {
   const router = useRouter();
   const [metricId, setMetricId] = useState("");
@@ -68,6 +74,7 @@ export function ReportActivationPanel({
   const [magnitude, setMagnitude] = useState("");
   const [resolutionDate, setResolutionDate] = useState("");
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const [primaryLever, setPrimaryLever] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -102,17 +109,26 @@ export function ReportActivationPanel({
   }
 
   const exactSavedRevision =
-    persistence?.status === "report_ready" && !hasUnsavedChanges;
+    persistence?.status === "report_ready" &&
+    report.schemaVersion === 2 &&
+    !hasUnsavedChanges;
   const magnitudeNumber = Number(magnitude);
   const inputComplete =
     metricId !== "" &&
     Number.isFinite(magnitudeNumber) &&
     magnitudeNumber > 0 &&
     /^\d{4}-\d{2}-\d{2}$/.test(resolutionDate) &&
+    resolutionDate > activationDateBounds.today &&
     selectedActions.length >= 1 &&
-    selectedActions.length <= 3;
+    selectedActions.length <= 3 &&
+    selectedActions.includes(primaryLever);
 
   function toggleAction(sourceItemId: string) {
+    const removing = selectedActions.includes(sourceItemId);
+    if (removing && primaryLever === sourceItemId) setPrimaryLever("");
+    if (!removing && !primaryLever && selectedActions.length < 3) {
+      setPrimaryLever(sourceItemId);
+    }
     setSelectedActions((current) =>
       current.includes(sourceItemId)
         ? current.filter((id) => id !== sourceItemId)
@@ -139,6 +155,10 @@ export function ReportActivationPanel({
             resolutionDate,
           },
           selectedActionSourceItemIds: selectedActions,
+          primaryLeverActionSourceItemId: primaryLever,
+        }, {
+          sessionKey: telemetrySessionKey,
+          msSinceStart: Math.max(0, Math.round(performance.now() - telemetryStartedAtMs)),
         });
         if (!result.ok) {
           setError(result.error);
@@ -267,6 +287,7 @@ export function ReportActivationPanel({
                 id="activation-date"
                 className="mt-1 w-full rounded-lg border border-[var(--border)] px-3 py-2 text-[12px]"
                 type="date"
+                min={activationDateBounds.minimum}
                 value={resolutionDate}
                 onChange={(event) => setResolutionDate(event.target.value)}
               />
@@ -279,30 +300,43 @@ export function ReportActivationPanel({
             3 · Choose actions
           </legend>
           <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">
-            Select one to three generated actions. You can flesh them out in Actions &amp; Decisions.
+            Select one to three generated actions, then explicitly choose the primary lever the prediction will resolve against.
           </p>
           <div className="mt-2 flex flex-col gap-2">
             {report.implementation.actions.map((action) => {
               const checked = selectedActions.includes(action.sourceItemId);
               return (
-                <label
+                <div
                   key={action.sourceItemId}
-                  className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-[11px] leading-4 ${
+                  className={`rounded-lg border px-2.5 py-2 text-[11px] leading-4 ${
                     checked ? "border-teal-300 bg-teal-50/60" : "border-[var(--border)]"
                   }`}
                 >
-                  <input
-                    className="mt-0.5"
-                    type="checkbox"
-                    checked={checked}
-                    disabled={!checked && selectedActions.length >= 3}
-                    onChange={() => toggleAction(action.sourceItemId)}
-                  />
-                  <span>
-                    <span className="block font-semibold text-[var(--text)]">{action.title}</span>
-                    <span className="text-[var(--text-muted)]">{action.summary[0]?.text}</span>
-                  </span>
-                </label>
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <input
+                      className="mt-0.5"
+                      type="checkbox"
+                      checked={checked}
+                      disabled={!checked && selectedActions.length >= 3}
+                      onChange={() => toggleAction(action.sourceItemId)}
+                    />
+                    <span>
+                      <span className="block font-semibold text-[var(--text)]">{action.title}</span>
+                      <span className="text-[var(--text-muted)]">{action.summary[0]?.text}</span>
+                    </span>
+                  </label>
+                  {checked ? (
+                    <label className="mt-2 flex cursor-pointer items-center gap-2 border-t border-teal-200 pt-2 font-semibold text-teal-900">
+                      <input
+                        type="radio"
+                        name="primary-lever"
+                        checked={primaryLever === action.sourceItemId}
+                        onChange={() => setPrimaryLever(action.sourceItemId)}
+                      />
+                      Primary causal lever
+                    </label>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -317,7 +351,7 @@ export function ReportActivationPanel({
               One explicit materialization
             </p>
             <p className="text-[10px] leading-4 text-[var(--text-muted)]">
-              Creates one decision, one prediction, and {selectedActions.length || "your selected"} planned {selectedActions.length === 1 ? "action" : "actions"}. It does not claim impact or create tracker tickets.
+              Creates one decision, one prediction, {selectedActions.length || "your selected"} planned {selectedActions.length === 1 ? "action" : "actions"}, and one explicit primary lever. It does not claim impact or create tracker tickets.
             </p>
           </div>
           <button

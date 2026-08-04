@@ -11,6 +11,7 @@ export type ReportActivationInputV1 = {
     resolutionDate: string;
   };
   selectedActionSourceItemIds: string[];
+  primaryLeverActionSourceItemId: string;
 };
 
 export type ReportActivationInputValidation =
@@ -23,6 +24,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function validateReportActivationInputV1(
   value: unknown,
+  options: { today?: string } = {},
 ): ReportActivationInputValidation {
   const errors: string[] = [];
   if (!isRecord(value)) {
@@ -53,14 +55,19 @@ export function validateReportActivationInputV1(
     const parsedResolutionDate = typeof resolutionDate === "string"
       ? new Date(`${resolutionDate}T00:00:00Z`)
       : null;
-    if (
+    const invalidResolutionDate =
       typeof resolutionDate !== "string" ||
       !/^\d{4}-\d{2}-\d{2}$/.test(resolutionDate) ||
       !parsedResolutionDate ||
       Number.isNaN(parsedResolutionDate.getTime()) ||
-      parsedResolutionDate.toISOString().slice(0, 10) !== resolutionDate
-    ) {
+      parsedResolutionDate.toISOString().slice(0, 10) !== resolutionDate;
+    if (invalidResolutionDate) {
       errors.push("prediction.resolutionDate must be a valid YYYY-MM-DD date");
+    } else {
+      const today = options.today ?? new Date().toISOString().slice(0, 10);
+      if (resolutionDate <= today) {
+        errors.push("prediction.resolutionDate must be in the future");
+      }
     }
   }
 
@@ -77,6 +84,17 @@ export function validateReportActivationInputV1(
     if (new Set(actionIds).size !== actionIds.length) {
       errors.push("selectedActionSourceItemIds cannot contain duplicates");
     }
+  }
+  if (
+    typeof value.primaryLeverActionSourceItemId !== "string" ||
+    value.primaryLeverActionSourceItemId.trim() === ""
+  ) {
+    errors.push("primaryLeverActionSourceItemId must identify one selected action");
+  } else if (
+    Array.isArray(value.selectedActionSourceItemIds) &&
+    !value.selectedActionSourceItemIds.includes(value.primaryLeverActionSourceItemId)
+  ) {
+    errors.push("primaryLeverActionSourceItemId must be one of the selected actions");
   }
 
   return errors.length === 0

@@ -17,8 +17,10 @@ import {
 import { actionReferenceLabel } from "@/components/actions/ActionReference";
 import { LeverCreate } from "@/components/onboarding/LeverCreate";
 import { ManualCompletionForm } from "@/components/actions/ManualCompletionForm";
+import { DecisionLoopHandoff } from "@/components/actions/DecisionLoopHandoff";
 import { CheckIcon, ChevronIcon } from "@/components/ui/icons";
 import type { Claim, DecisionReportV1, DraftAction } from "@/lib/decision-reports/schema";
+import type { DecisionLoopHandoff as DecisionLoopHandoffContract } from "@/lib/decision-reports/loop-handoff";
 
 // The decision detail view (replaces the action-centric DecisionEditor):
 // intent (rationale) → the actions carrying it (lever marked) → the
@@ -250,10 +252,15 @@ function DecisionSummary({ report }: { report: DecisionReportV1 }) {
 function ReportActionRows({
   actions,
   report,
+  decisionLoopHandoffs,
   selectedActionId,
 }: {
   actions: Action[];
   report: DecisionReportV1;
+  decisionLoopHandoffs: Array<{
+    actionId: string;
+    handoff: DecisionLoopHandoffContract;
+  }>;
   selectedActionId: string | null;
 }) {
   const governanceSources = presentClaims(report.implementation.governance.allowedDataSources);
@@ -266,6 +273,9 @@ function ReportActionRows({
           const detail = reportActionFor(action, report);
           const summaries = detail ? presentClaims(detail.summary) : [];
           const reference = actionReferenceLabel(action);
+          const loopHandoff = decisionLoopHandoffs.find(
+            (candidate) => candidate.actionId === action.id,
+          )?.handoff;
           return (
             <details
               key={action.id}
@@ -319,6 +329,11 @@ function ReportActionRows({
                     : "Data classification not set. "}
                   {[...governanceSources, ...governanceNotes].map((claim) => claim.text).join(" ") || "No additional governance notes."}
                 </div>
+                {loopHandoff && !action.shippedAt ? (
+                  <div className="mt-3">
+                    <DecisionLoopHandoff handoff={loopHandoff} />
+                  </div>
+                ) : null}
                 {action.manualCompletion ? (
                   <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
                     Completed {action.manualCompletion.completedOn}: {action.manualCompletion.explanation}
@@ -356,6 +371,7 @@ export function DecisionDetail({
   onSelectAction,
   connectorMetricId,
   report = null,
+  decisionLoopHandoffs = [],
   selectedActionId = null,
 }: {
   decision: Decision;
@@ -364,6 +380,10 @@ export function DecisionDetail({
   onSelectAction: (id: string) => void;
   connectorMetricId: string | null;
   report?: DecisionReportV1 | null;
+  decisionLoopHandoffs?: Array<{
+    actionId: string;
+    handoff: DecisionLoopHandoffContract;
+  }>;
   selectedActionId?: string | null;
 }) {
   const metricById = new Map(metrics.map((m) => [m.id, m]));
@@ -400,6 +420,7 @@ export function DecisionDetail({
         <ReportActionRows
           actions={decision.actionIds.flatMap((id) => actionById.get(id) ?? [])}
           report={report}
+          decisionLoopHandoffs={decisionLoopHandoffs}
           selectedActionId={selectedActionId}
         />
       ) : <section>

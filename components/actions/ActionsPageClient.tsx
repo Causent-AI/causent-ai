@@ -12,6 +12,7 @@ import { ObjectivePanel } from "@/components/actions/ObjectivePanel";
 import { PredictionCapture } from "@/components/actions/PredictionCapture";
 import { selectActionPlanView } from "@/lib/data/action-plan-view";
 import type { DecisionReportV1 } from "@/lib/decision-reports/schema";
+import type { DecisionLoopHandoff } from "@/lib/decision-reports/loop-handoff";
 
 // Client half of the Actions & Decisions tab, restructured around the intent
 // layer (epic #6, #10): DECISIONS are the top-level list (each parenting its
@@ -32,6 +33,7 @@ export function ActionsPageClient({
   objective,
   connectorMetricId,
   decisionReport,
+  decisionLoopHandoffs,
 }: {
   actions: Action[];
   decisions: Decision[];
@@ -39,6 +41,10 @@ export function ActionsPageClient({
   objective: ProjectObjective | null;
   connectorMetricId: string | null;
   decisionReport: DecisionReportV1 | null;
+  decisionLoopHandoffs: Array<{
+    actionId: string;
+    handoff: DecisionLoopHandoff;
+  }>;
 }) {
   const searchParams = useSearchParams();
   const paramId = searchParams.get("selected");
@@ -112,6 +118,7 @@ export function ActionsPageClient({
               onSelectAction={() => undefined}
               connectorMetricId={connectorMetricId}
               report={decisionReport}
+              decisionLoopHandoffs={decisionLoopHandoffs}
               selectedActionId={visibleActions.some((action) => action.id === paramId) ? paramId : null}
             />
           ) : (

@@ -1,10 +1,76 @@
 # Causent active backlog
 
-Last reconciled: 2026-07-22. Completed historical work is documented in `docs/STATUS.md` and the overnight reports. This file contains only active or deliberately deferred work.
+Last reconciled: 2026-08-03. Completed historical work is documented in `docs/STATUS.md` and the overnight reports. This file contains only active or deliberately deferred work.
+
+PR #28 merged the Slice 8/9 baseline into `main` on 2026-08-03. Slice 10 and the bounded MVP
+expansions are packaged separately on `codex/decision-report-slice-10` in draft PR #29; hosted CI,
+partner evidence, partner-environment migration/configuration, deployment, and canary work remain
+open below.
 
 ## P0 — AI-assisted Decision Report partner wedge
 
 Approved design: `docs/designs/ai-assisted-decision-report.md`.
+
+### Completed Slice 10 — explicit report iteration series and current-report boundary
+
+- [x] Backfill reports into explicit linear series with one current-active pointer, iteration numbers, predecessors, and successor reasons.
+- [x] Add checked, locked, idempotent successor start that preserves logical IDs while stripping private asset IDs.
+- [x] Advance the pointer atomically with activation while preserving all prior canonical and audit rows.
+- [x] Add a database-owned workspace series pointer and select report-native dashboard data only through that explicit current identity; group Reports by series.
+- [x] Reuse the editor/activation/image paths and support safe same-series removal rollback.
+- [x] Fail closed when onboarding targets a missing workspace instead of surfacing the `decision_report_series_scope_id_fkey` implementation detail; remove silent seed-data fallback on database errors.
+- [x] Guard pointer, activation, action-completion, and primary-lever transitions with private one-use transaction capabilities rather than caller-forgeable state.
+
+Implementation proceeded before the Slice 9 partner-session gate by explicit user authorization. The three initially unassisted sessions remain a human release gate and are not marked complete.
+
+### Completed MVP expansion — bounded URL/PDF sources and provenance v2
+
+- [x] Accept at most one public HTTPS page and one text-based PDF alongside the bounded project brief.
+- [x] Bound URL retrieval by public-only DNS/IP checks, DNS pinning, redirect revalidation, response type/encoding, 1 MiB, three redirects, and a 10-second timeout. Retain no credentials, cookies, query string, fragment, or response bytes.
+- [x] Bound PDF extraction to one 5 MiB, 40-page, text-based PDF in a 12-second, resource-limited worker; reject encryption, active content, embedded files, malformed input, and image-only scans. No OCR or crawling was added.
+- [x] Persist report schema v2 source summaries as bounded chunks with text, locators, SHA-256 digests, and claim-to-chunk references. A private 24-hour, one-use server-minted receipt binds scope, actor, exact source summaries, and the sourced-claim multiset to the first save; exact lost-ack retries reuse it, changed retries conflict, and later revisions freeze the corpus while allowing sourced claims only to remain or be removed. Rehashed forged corpora fail closed; source-free reports with no sourced claims do not require a receipt. Historical v1 snapshots remain readable.
+- [x] Require a legacy-derived successor to be explicitly saved as provenance v2 before activation. Private image IDs and Storage paths remain report-bound and are never copied to a successor.
+
+### Completed MVP expansion — automatic current-report causal recomputation
+
+- [x] Require one selected report action as the primary manual lever during v2 activation and enqueue recomputation after activation, current-report metric observation changes, and primary-action completion.
+- [x] Coalesce work by immutable activation in a private generation-counted queue; exact unchanged inputs produce no duplicate graph writes and failures retry with bounded backoff.
+- [x] Re-resolve and lock report → series → workspace → activation in the worker before graph materialization so historical or superseded iterations cannot receive new causal output.
+- [x] Compute the full eligible workspace hypothesis family for BH-FDR while persisting only the explicit current activation's action/metric graph. The 45-day-per-side causal confidence floor remains unchanged.
+- [x] Keep source writes durable when the immediate worker wake-up is unavailable; the five-minute authenticated cron is the recovery path.
+- [x] Add a network-free `scripts/deploy-recompute.sh --stage-only` path plus `api/DEPLOY.md` and `.vercelignore`; the 18-file Python 3.12 stage pins exact NumPy/psycopg versions and a 300-second function limit. Nine recompute-function tests pass. Nothing was linked or deployed.
+
+### Completed MVP loop preview — manual AI copy/paste
+
+- [x] Add a current-report-only **Manual AI handoff preview** to Actions & Decisions. A user can copy one bounded, deterministic, redacted context packet for Claude or ChatGPT and paste the matching structured review back into Causent.
+- [x] Keep the handoff advisory and transient: copy is an explicit browser action, private/organization/unknown data requires a second confirmation, pasted JSON is strictly bounded and rendered as plain text, and refresh/navigation clears it.
+- [x] Exclude workspace/report/revision/canonical IDs, source and receipt content, private asset identities and paths, raw observations, credentials, and unrelated report data. A context fingerprint detects stale paste-back but is not authentication.
+- [x] Give the preview no write path. It cannot edit a report, complete an action, enqueue recomputation, attribute a PR, or claim that Claude/ChatGPT is connected to Causent.
+
+The authenticated MCP/API loop, provider OAuth, automatic context delivery, trusted write tools,
+and PR/artifact attribution remain deferred until after the partner review. The manual preview is a
+prop for testing whether that future loop is understandable and useful; it is not a partial MCP.
+
+### Completed MVP finish — consent, observability, recovery, and release guardrails
+
+- [x] Start Decision Report onboarding blank. The Gummy Alpha fixture is now an explicit **Load example** action rather than an implicit user input.
+- [x] Require an explicit source-egress confirmation before generation and clear it whenever the brief, URL, or PDF changes. The confirmation names the project brief and extracted URL/PDF text that may be sent to the configured AI provider; a provider or network failure preserves the user's inputs and editable fallback.
+- [x] Instrument the report lifecycle with content-free, best-effort events for landing, generation start/editable/failure, save/failure, and activation/failure. Payloads accept only a server-minted opaque session key, elapsed time, bounded edit/follow-up/missing-field counts, source/fallback/retry booleans, and no report, prompt, source, asset, or clipboard content. The aggregate reports distinct-session stages/drop-off, median time to editable/save/activation, median edit/follow-up counts, and failure events plus affected sessions.
+- [x] Enforce a future prediction resolution date in the browser, the shared runtime validator, and a database trigger using the UTC statement date.
+- [x] Expose only the explicit current report's sanitized causal-recompute state (`idle`, `queued`, `retrying`, `failed`, or `current`) and safe timestamps in Data Workshop and Impact. The private queue, errors, attempts, hashes, and identities remain ungranted.
+- [x] Add retry-oriented route recovery boundaries for the app, onboarding, and Data Workshop; failures state which durable data was not changed and keep navigation back to Reports available.
+- [x] Pin Node `22.23.0`, add network-free app/worker release-config checks, and fail closed with a no-store `503` when a production app is missing its Supabase URL, anon key, or server-only service-role key, or retains a local-only flag. The service-role key is required because provenance receipt minting is intentionally unavailable to ordinary authenticated callers.
+- [x] Expand the local CI contract to run TypeScript, full lint, the serialized Node/Supabase/RLS/Storage suite, schema lint, the complete engine/bridge suite, recompute bundle staging, a Next.js 16 webpack build, and a post-build dashboard-manifest guard on pinned Node/Python/Supabase versions. Explicitly revoke `UPDATE`, `DELETE`, and `TRUNCATE` capability from Decision Report lifecycle telemetry by granting authenticated users only `SELECT` and `INSERT`.
+- [x] Keep the shared dashboard layout request-bound with `dynamic = "force-dynamic"`; production builds cannot freeze a seed or pre-activation snapshot into Reports, Actions & Decisions, Data Workshop, Impact, or the Core Metrics drawer.
+- [x] Pass the Next.js 16.2.11 webpack build with all five product routes dynamic and pass `check:dashboard-build`, which asserts that Actions, Data Workshop, Impact, and Reports exist but are absent from the prerender manifest. Then browser-activate the initial report plus three sequential successors through Iteration 4. Verify predecessor/current semantics, four-item Reports lineage, historical direct-link read-only access, current isolation across all three operational tabs, sanitized queued recompute state, legacy-flow rollback, and an empty browser warning/error log.
+
+### Remaining MVP release gates — human/operator work
+
+- [ ] Require a green expanded hosted-CI run for the exact Slice 10 review revision. The workflow is configured, but no successful hosted run of that revision is claimed yet.
+- [ ] Complete one final deep review of the end-to-end UI experience and workflow, including the manual handoff preview, before declaring the MVP interaction complete.
+- [ ] Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, metric mechanism plausible, next action usable.
+- [ ] After applying the migrations and runtime configuration to the partner environment, run one authenticated clean-account acceptance pass including one URL, one text-based PDF, three successor activations, direct historical links, private-image reattachment, deletion rollback, and rollout-flag rollback. Local engineering acceptance does not replace partner evidence.
+- [ ] Apply `20260723053444`, `20260723061012`, `20260723061925`, `20260723064500`, and `20260723151939` to the partner environment. Configure the app's Supabase URL, anon key, server-only service-role key, recompute URL/secret, and cron secret; configure the worker's session-pooler `DATABASE_URL` and matching recompute secret; ensure all four local-only flags are absent. Then deploy deliberately and run migration/RLS/Storage/recompute canaries. No production deployment is claimed by this run.
 
 ### Completed Slice 1 — interaction prototype
 
@@ -204,31 +270,16 @@ Acceptance status: the controlled rollout, rollback, durable-report survival, an
 
 Slice 9 non-goals: lever-flow redesign, account-level GitHub/Atlassian OAuth, warehouse connectors, automatic causal recomputation, a lower causal confidence floor, hard report deletion/restoration, autosave, revision-history/export UI, URL/PDF ingestion, OCR, or conversational delivery.
 
+Later Slice 10 MVP-expansion work implements the bounded URL/PDF and automatic recomputation items without changing the remaining Slice 9 release gate.
+
 Already complete and not Slice 9 work: schema/provenance/gap/edit unit coverage, explicit durable save/reload, retry-safe activation, report-native isolation, private image handling, named CSV metrics, multi-metric selection, manual action completion, report soft deletion, action coordinates/deep links, chart controls, and preliminary descriptive impact rendering.
-
-### Prepared Slice 10 — explicit active-report iterations; gated on partner evidence
-
-Goal: let a user start, review, and activate a linear successor iteration from an active Decision Report without mutating the activated report or its canonical decision, prediction, actions, evidence, or audit rows.
-
-- [ ] Add an explicit report-series identity and checked, retry-safe `active parent -> draft successor` transition. Existing reports backfill as one-iteration series; a non-deleted report may have at most one direct successor.
-- [ ] Seed the successor from the exact activated revision, retain stable claim/action source IDs for unchanged logical items, record a required iteration reason, and remove report-bound `assetIds` so private bytes and object paths are never reused across reports.
-- [ ] Keep the prior active iteration operational while its successor is draft. On successor activation, atomically move the series current pointer to the new active report while preserving every prior canonical row unchanged.
-- [ ] Group iterations in Reports, label current versus historical state, expose **Start next iteration** only on the current active iteration, and keep direct links to every non-deleted iteration.
-- [ ] Make removal semantics explicit: removing a draft successor leaves the current active pointer unchanged; removing the current active successor selects the nearest non-deleted active predecessor or leaves the series without a current report. It must never select a report from another series.
-- [ ] Extend repository, activation, asset, soft-delete, RLS, stale-retry, and browser coverage through at least three sequential iterations, including a rolled-back draft and a current-iteration removal.
-
-Entry condition: prepare the contracts now, but do not implement this conditional production-ramp slice until the Slice 9 partner gate passes or a later explicit product decision overrides that gate.
-
-Acceptance: one active report can create iteration 2, iteration 2 can be edited and activated, and iteration 3 can repeat the cycle. Actions & Decisions, Data Workshop, and Impact resolve only through the series' explicit current active report; Reports retains the readable lineage; parent rows and private assets remain unchanged; exact retries create no duplicate report, revision, activation, or canonical graph rows.
-
-Slice 10 non-goals: branching or merging iteration trees, in-place edits to active reports, rewriting prior decisions/actions/predictions, automatic action cancellation, cross-report asset reuse, revision diff/restore/export UI, general chat, connectors, automatic causal recomputation, or broader ingestion.
-
-Estimated for the current builder profile: 3–5 calendar weeks at 15–25 focused hours per week. First interactive report target: roughly one week. End-to-end partner target: roughly 2–3 weeks.
 
 ## P1 — Existing production operations
 
 - Arm `causent-resolve`: set the Supabase session-pooler `DATABASE_URL` on the `causent-resolve` Vercel project, then redeploy `causent-resolve` and `causent-ai`.
-- Decide whether to enable automated connector reconciliation. It currently fails closed because `SUPABASE_SERVICE_ROLE_KEY` is intentionally absent from Vercel; paste attribution remains available.
+- Deploy and arm the causal recompute worker with the Supabase session-pooler `DATABASE_URL` and `CAUSENT_RECOMPUTE_SECRET`; set `CAUSENT_RECOMPUTE_URL`, the matching `CAUSENT_RECOMPUTE_SECRET`, and `CRON_SECRET` on `causent-ai`, then verify the five-minute cron and immediate wake-up paths.
+- Configure `SUPABASE_SERVICE_ROLE_KEY` as a server-only production app secret before releasing provenance-v2 generation; the source-receipt mint RPC requires it and ordinary authenticated clients cannot call that RPC. Never expose the key to the browser.
+- Decide separately whether to enable automated connector reconciliation and canary its webhook/cron consumers after the service-role key is present. Paste attribution remains available without connector write automation.
 - If Jira automation is needed, configure `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_WEBHOOK_SECRET`, and the Jira webhook.
 - If GitHub issue auto-create is needed, configure a write-scoped `GITHUB_WRITE_TOKEN`; the existing token is read-only.
 - Add `app/robots.ts` and the appropriate proxy behavior if `/login` should not be indexed.
@@ -238,13 +289,13 @@ Estimated for the current builder profile: 3–5 calendar weeks at 15–25 focus
 - Run the existing zero-code mechanism-mapping test with the design partner before building the webhook-driven `LEVER_DROPPED` drift-alert surface.
 - Use the seeded baseline-drift beat as the prop and capture whether the partner recognizes the event, how often it occurs, and what notification would change behavior.
 
-## Conditional production ramp
+## Remaining conditional production ramp
 
 Only begin these after the Decision Report partner gate passes:
 
-- Bounded single-page URL retrieval with SSRF, redirect, byte, and timeout protection.
-- Text/PDF ingestion in a secret-free bounded extraction runtime.
+- Authenticated Causent MCP/API tools for Claude and ChatGPT, including scoped OAuth, automatic context delivery, reviewed mutation commands, and durable PR/artifact attribution. The MVP manual copy/paste preview must not be mistaken for this connection.
 - Malware scanning/quarantine for broader file types.
+- OCR for scanned PDFs, multi-document upload, URL crawling, authenticated pages, and broader ingestion.
 - Conversational delivery as another client of the report schema, gap scanner, and typed commands.
 - Richer revision/reapproval workflows for editing active reports.
 - Model routing, extraction caching, or selective model tiers after measured cost/latency evidence.
@@ -254,11 +305,9 @@ Only begin these after the Decision Report partner gate passes:
 ## P2 — Existing architecture and UX debt
 
 - Replace remaining demo service-role dashboard reads with per-request `@supabase/ssr` RLS clients where live freshness is required.
-- Add dynamic rendering or explicit revalidation to dashboard routes that must reflect per-request data.
 - Add revision-history and export surfaces only if report-index partner use calls for them.
 - Finish inert destinations only when their flows exist: New Project, Settings, and account-level credentialed connector controls.
 - Make `LineTimeSeries` x-axis tick density viewport-aware.
-- Resolve the duplicate “Core Metrics Summary” heading on Data Workshop when the drawer is open.
 - Increase mobile header touch targets if mobile becomes a supported primary surface.
 - Tune the demo Gross Profit generator only if changing the documented verification baseline is worthwhile.
 

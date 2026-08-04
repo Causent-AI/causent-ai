@@ -4,9 +4,17 @@ import { AggregatedImpact } from "@/components/impact/AggregatedImpact";
 import { ActionsTable } from "@/components/impact/ActionsTable";
 import { TrustCaveat } from "@/components/impact/TrustCaveat";
 import { ImpactBar } from "@/components/charts/ImpactBar";
+import { CausalRecomputeStatus } from "@/components/causal/CausalRecomputeStatus";
 
 export default async function ImpactPage() {
-  const { actions, aggregatedImpact, impactByMetric, metrics, activeDecisionReport } =
+  const {
+    actions,
+    aggregatedImpact,
+    impactByMetric,
+    impactMetrics,
+    activeDecisionReport,
+    causalRecomputeStatus,
+  } =
     await loadDashboardData();
 
   return (
@@ -19,10 +27,13 @@ export default async function ImpactPage() {
           </p>
         </div>
       ) : null}
+      {activeDecisionReport && causalRecomputeStatus ? (
+        <CausalRecomputeStatus status={causalRecomputeStatus} />
+      ) : null}
       <AggregatedImpact
         stats={aggregatedImpact}
         impactByMetric={impactByMetric}
-        metrics={metrics}
+        metrics={impactMetrics}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -34,12 +45,12 @@ export default async function ImpactPage() {
           <div className="mb-4">
             <TrustCaveat />
           </div>
-          <ImpactBar rows={impactByMetric} metrics={metrics} />
+          <ImpactBar rows={impactByMetric} metrics={impactMetrics} />
         </Panel>
 
         <Panel>
           <PanelHeader title="Actions" />
-          <ActionsTable actions={actions} metrics={metrics} />
+          <ActionsTable actions={actions} metrics={impactMetrics} />
         </Panel>
       </div>
     </div>

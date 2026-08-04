@@ -19,6 +19,11 @@ export type DashboardDecisionReport = {
   decisionId: string | null;
   predictionId: string | null;
   metricId: string | null;
+  seriesId: string;
+  iterationNumber: number;
+  predecessorReportId: string | null;
+  iterationReason: string | null;
+  isCurrent: boolean;
 };
 
 type ReportRow = {
@@ -30,7 +35,14 @@ type ReportRow = {
   active_prediction_id: string | null;
   active_metric_id: string | null;
   updated_at: string;
+  series_id: string;
+  iteration_number: number;
+  predecessor_report_id: string | null;
+  iteration_reason: string | null;
 };
+
+type SeriesRow = { series_id: string; current_active_report_id: string | null };
+type WorkspacePointerRow = { current_decision_report_series_id: string | null };
 
 type RevisionRow = {
   revision_id: string;
@@ -43,11 +55,25 @@ export const getDecisionReports = cache(async function getDecisionReports(): Pro
   DashboardDecisionReport[]
 > {
   const sb = await getServerSupabase();
+  const [seriesRes, workspaceRes] = await Promise.all([
+    sb.from("decision_report_series")
+      .select("series_id, current_active_report_id")
+      .eq("scope_id", DEMO_SCOPE_ID),
+    sb.from("workspaces")
+      .select("current_decision_report_series_id")
+      .eq("workspace_id", DEMO_SCOPE_ID)
+      .single(),
+  ]);
+  if (seriesRes.error) throw seriesRes.error;
+  if (workspaceRes.error) throw workspaceRes.error;
+  const currentBySeries = new Map(((seriesRes.data ?? []) as SeriesRow[]).map((row) => [row.series_id, row.current_active_report_id]));
+  const workspaceCurrentSeriesId = (workspaceRes.data as WorkspacePointerRow).current_decision_report_series_id;
   const reportsRes = await sb
     .from("decision_reports")
     .select(
       "report_id, title, status, current_revision_id, active_decision_id, " +
-        "active_prediction_id, active_metric_id, updated_at",
+        "active_prediction_id, active_metric_id, updated_at, series_id, iteration_number, " +
+        "predecessor_report_id, iteration_reason",
     )
     .eq("scope_id", DEMO_SCOPE_ID)
     .is("deleted_at", null)
@@ -88,6 +114,11 @@ export const getDecisionReports = cache(async function getDecisionReports(): Pro
       decisionId: row.active_decision_id,
       predictionId: row.active_prediction_id,
       metricId: row.active_metric_id,
+      seriesId: row.series_id,
+      iterationNumber: row.iteration_number,
+      predecessorReportId: row.predecessor_report_id,
+      iterationReason: row.iteration_reason,
+      isCurrent: row.series_id === workspaceCurrentSeriesId && currentBySeries.get(row.series_id) === row.report_id,
     }];
   });
 });

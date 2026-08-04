@@ -1,7 +1,7 @@
 import type { Claim, ClaimStatus } from "@/lib/decision-reports/schema";
 
 const STATUS_LABELS: Record<ClaimStatus, string> = {
-  sourced: "From your brief",
+  sourced: "From supplied source",
   inferred: "AI inference",
   suggested: "AI suggestion",
   missing: "Needs your input",

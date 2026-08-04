@@ -62,8 +62,10 @@ before(async () => {
   await teardown(sb);
   const org = await sb.from("orgs").insert({ org_id: ORG, name: "ONBOARDING_TEST_org" });
   assert.equal(org.error, null, org.error?.message);
-  await sb.from("projects").insert({ project_id: PROJ, org_id: ORG, name: "p" });
-  await sb.from("workspaces").insert({ workspace_id: WS, project_id: PROJ, name: "w" });
+  const project = await sb.from("projects").insert({ project_id: PROJ, org_id: ORG, name: "p" });
+  assert.equal(project.error, null, project.error?.message);
+  const workspace = await sb.from("workspaces").insert({ workspace_id: WS, project_id: PROJ, name: "w" });
+  assert.equal(workspace.error, null, workspace.error?.message);
 });
 
 after(async () => {
@@ -123,7 +125,7 @@ test("commitPrediction inserts decision + UNATTRIBUTED prediction in the scope",
     metricId: metric.metricId,
     direction: "POSITIVE",
     magnitudePctMean: 4,
-    resolutionDate: "2027-01-15",
+    resolutionDate: "2099-01-15",
   });
   assert.equal(blocked.ok, false);
 
@@ -135,7 +137,7 @@ test("commitPrediction inserts decision + UNATTRIBUTED prediction in the scope",
     metricId: metric.metricId,
     direction: "POSITIVE",
     magnitudePctMean: 4,
-    resolutionDate: "2027-01-15",
+    resolutionDate: "2099-01-15",
   });
   assert.ok(res.ok, res.ok ? "" : res.errors.join("; "));
 
@@ -161,7 +163,7 @@ test("commitPrediction inserts decision + UNATTRIBUTED prediction in the scope",
   assert.equal(predRow.metric_id, metric.metricId);
   assert.equal(predRow.direction, "POSITIVE");
   assert.equal(predRow.magnitude_pct_mean, 4);
-  assert.equal(predRow.resolution_date, "2027-01-15");
+  assert.equal(predRow.resolution_date, "2099-01-15");
   // UNATTRIBUTED state: unresolved, and NO lever rows exist for the decision.
   assert.equal(predRow.resolved_verdict, null);
   assert.equal(predRow.resolved_at, null);

@@ -1,7 +1,8 @@
 // The single entry point the (dashboard) Server Components read. It fetches the whole
-// dashboard payload from Supabase (via the lib/data/* mappers) in one shot, and — so
-// the app can never white-screen — falls back to the deterministic seed dataset when
-// CAUSENT_USE_SEED=1 is set OR any DB read throws. Wrapped in React cache() so the
+// dashboard payload from Supabase (via the lib/data/* mappers) in one shot. The
+// deterministic seed dataset is an explicit CAUSENT_USE_SEED=1 mode. Database
+// failures stay visible instead of silently presenting an obsolete UI in any
+// environment. Wrapped in React cache() so the
 // shared layout and the active page that both render for one request share one load
 // instead of each re-querying.
 //
@@ -32,6 +33,8 @@ import {
 } from "@/lib/data/decision-reports";
 import { selectReportProjectView } from "@/lib/data/report-project-view";
 import { numberDecisionActions } from "@/lib/data/action-numbering";
+import type { CausalRecomputeStatus } from "@/lib/data/causal-recompute-status";
+import { getCurrentCausalRecomputeStatus } from "@/lib/data/causal-recompute-status-server";
 import * as seed from "@/lib/seed";
 
 /** The 30-day-ish reporting window shown in the drawer/impact headers. */
@@ -46,6 +49,8 @@ export type DashboardData = {
   decisions: Decision[];
   aggregatedImpact: ImpactStat[];
   impactByMetric: MetricImpact[];
+  /** Metrics permitted on the Impact tab; one confirmed metric for an active report. */
+  impactMetrics: Metric[];
   impactWindow: ImpactWindow;
   /** The project north-star document (null when the workspace has none yet). */
   objective: ProjectObjective | null;
@@ -55,6 +60,8 @@ export type DashboardData = {
   decisionReports: DashboardDecisionReport[];
   /** The activated report currently defining the dashboard project boundary. */
   activeDecisionReport: DashboardDecisionReport | null;
+  /** Sanitized state for the explicitly current report's background analysis. */
+  causalRecomputeStatus: CausalRecomputeStatus | null;
   /** Which source actually served this payload (for diagnostics/telemetry). */
   source: "db" | "seed";
 };
@@ -80,11 +87,13 @@ function seedData(): DashboardData {
     decisions: seed.decisions,
     aggregatedImpact: seed.aggregatedImpact,
     impactByMetric: seed.impactByMetric,
+    impactMetrics: seed.metrics,
     impactWindow: { start: seed.impactWindow.start, end: seed.impactWindow.end },
     objective: seed.projectObjective,
     reports: seed.reports,
     decisionReports: [],
     activeDecisionReport: null,
+    causalRecomputeStatus: null,
     source: "seed",
   };
 }
@@ -95,8 +104,9 @@ function seedForced(): boolean {
 }
 
 /**
- * Load the full dashboard payload. Reads Supabase unless CAUSENT_USE_SEED=1; on ANY DB
- * error it logs and falls back to seed so a tab never white-screens. Memoized per
+ * Load the full dashboard payload. Reads Supabase unless CAUSENT_USE_SEED=1. All
+ * errors are rethrown so missing migrations/seeds cannot masquerade as an older product.
+ * Memoized per
  * request (React cache): layout + page share the same load.
  */
 export const loadDashboardData = cache(async function loadDashboardData(): Promise<
@@ -105,7 +115,7 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
   if (seedForced()) return seedData();
 
   try {
-    const [scope, metricRecords, actions, decisions, aggregatedImpact, impactByMetric, objective, decisionReports] =
+    const [scope, metricRecords, actions, decisions, aggregatedImpact, impactByMetric, objective, decisionReports, causalRecomputeStatus] =
       await Promise.all([
         getScope(),
         getMetricRecords(),
@@ -115,6 +125,7 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
         getImpactByMetric(),
         getObjective(),
         getDecisionReports(),
+        getCurrentCausalRecomputeStatus(),
       ]);
     const allMetrics = metricRecords.map((record) => record.metric);
     const project = selectReportProjectView({
@@ -160,6 +171,7 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
       decisions: project.decisions,
       aggregatedImpact: project.aggregatedImpact,
       impactByMetric: project.impactByMetric,
+      impactMetrics: project.activeReport ? project.metrics : dashboardMetrics,
       impactWindow: deriveImpactWindow(project.metrics),
       objective: project.activeReport ? null : objective,
       // TODO: source reports from a project-level `reports` table once the
@@ -167,6 +179,7 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
       reports: [],
       decisionReports,
       activeDecisionReport: project.activeReport,
+      causalRecomputeStatus,
       source: "db",
     };
   } catch (err) {
@@ -174,10 +187,6 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
     // errors during prerender. They are not Supabase failures and must remain
     // visible to Next so the route is correctly deferred to request time.
     unstable_rethrow(err);
-    console.error(
-      "[dashboard] Supabase read failed — serving seed fallback so the app stays up:",
-      err,
-    );
-    return seedData();
+    throw err;
   }
 });

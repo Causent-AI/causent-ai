@@ -19,7 +19,12 @@ import { after, before, test, type TestContext } from "node:test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { parsePasteWithLLM } from "../llm.ts";
 import { commitPrediction, declareMetric } from "../commit.ts";
-import { recordFunnelEvent, getFunnelMetrics } from "../../data/funnel.ts";
+import {
+  getDecisionReportFunnelMetrics,
+  getFunnelMetrics,
+  recordDecisionReportFunnelEvent,
+  recordFunnelEvent,
+} from "../../data/funnel.ts";
 import { TIME_TO_FIRST_TYPE_TARGET_MS } from "../../funnel/events.ts";
 
 function loadEnvLocal(): Record<string, string> {
@@ -67,8 +72,10 @@ before(async () => {
   await teardown(sb);
   const org = await sb.from("orgs").insert({ org_id: ORG, name: "E2E_AUTH_TEST_org" });
   assert.equal(org.error, null, org.error?.message);
-  await sb.from("projects").insert({ project_id: PROJ, org_id: ORG, name: "p" });
-  await sb.from("workspaces").insert({ workspace_id: WS, project_id: PROJ, name: "w" });
+  const project = await sb.from("projects").insert({ project_id: PROJ, org_id: ORG, name: "p" });
+  assert.equal(project.error, null, project.error?.message);
+  const workspace = await sb.from("workspaces").insert({ workspace_id: WS, project_id: PROJ, name: "w" });
+  assert.equal(workspace.error, null, workspace.error?.message);
 });
 
 after(async () => {
@@ -152,7 +159,7 @@ test("E2E: paste -> interrogate -> commit -> prediction card, with instrumentati
     metricId: metric.metricId,
     direction: "POSITIVE",
     magnitudePctMean: 3,
-    resolutionDate: "2027-02-01",
+    resolutionDate: "2099-02-01",
   });
   assert.ok(res.ok, res.ok ? "" : res.errors.join("; "));
   await recordFunnelEvent(client, WS, null, { sessionKey, eventType: "COMMITTED", step: "done" });
@@ -173,7 +180,7 @@ test("E2E: paste -> interrogate -> commit -> prediction card, with instrumentati
   };
   assert.equal(row.direction, "POSITIVE");
   assert.equal(row.magnitude_pct_mean, 3);
-  assert.equal(row.resolution_date, "2027-02-01");
+  assert.equal(row.resolution_date, "2099-02-01");
   assert.equal(row.resolved_verdict, null); // UNATTRIBUTED until a lever is armed
   assert.equal(row.metric.name, "New-User Activation");
 
@@ -189,6 +196,42 @@ test("E2E: paste -> interrogate -> commit -> prediction card, with instrumentati
   assert.equal(metrics.dropOffByStep.paste, 0); // (no explicit paste STEP_VIEW in this walk)
   assert.equal(metrics.dropOffByStep.card, 1);
   assert.equal(metrics.dropOffByStep.commit, 1);
+
+  const reportSession = "dr-01234567-89ab-4def-8123-456789abcdef";
+  for (const event of [
+    { eventType: "REPORT_LANDED" as const, msSinceStart: 0 },
+    { eventType: "REPORT_GENERATION_STARTED" as const, msSinceStart: 250 },
+    {
+      eventType: "REPORT_EDITABLE" as const,
+      msSinceStart: 2_000,
+      meta: { usedUrl: true, usedPdf: false, usedFallback: false },
+    },
+    {
+      eventType: "REPORT_SAVED" as const,
+      msSinceStart: 8_000,
+      meta: { editCount: 3, followUpCount: 1, reused: false },
+    },
+  ]) {
+    const result = await recordDecisionReportFunnelEvent(client, WS, null, {
+      sessionKey: reportSession,
+      ...event,
+    });
+    assert.deepEqual(result, { ok: true });
+  }
+  const reportMetrics = await getDecisionReportFunnelMetrics(client, WS);
+  assert.deepEqual(reportMetrics.stageCounts, {
+    landed: 1,
+    generationStarted: 1,
+    editable: 1,
+    saved: 1,
+    activated: 0,
+  });
+  assert.equal(reportMetrics.timingMs.timeToSave.median, 8_000);
+  assert.equal(reportMetrics.engagement.editCount.median, 3);
+
+  // Sharing the table never changes the legacy funnel denominator.
+  const legacyAfterReportEvents = await getFunnelMetrics(client, WS);
+  assert.equal(legacyAfterReportEvents.landedRuns, 1);
 });
 
 test("shadow path: a garbage paste falls back to manual entry, never a dead-end", async (t) => {

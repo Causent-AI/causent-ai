@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, test, type TestContext } from "node:test";
@@ -29,13 +29,20 @@ const URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_UR
 const KEY = (
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? ""
 ).trim();
+const ANON_KEY = (
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
+).trim();
 
 const ORG = randomUUID();
 const PROJECT = randomUUID();
 const WORKSPACE = randomUUID();
 
 let sb: SupabaseClient | null = null;
+let authenticatedSb: SupabaseClient | null = null;
+let authenticatedUserId: string | null = null;
 let available = false;
+const AUTH_EMAIL = `report-provenance-${randomUUID()}@example.test`;
+const AUTH_PASSWORD = `Causent-${randomUUID()}-A1!`;
 
 async function teardown(client: SupabaseClient) {
   await client.from("orgs").delete().eq("org_id", ORG);
@@ -63,10 +70,36 @@ before(async () => {
     .from("workspaces")
     .insert({ workspace_id: WORKSPACE, project_id: PROJECT, name: "Gummy Alpha" });
   assert.equal(workspace.error, null, workspace.error?.message);
+
+  if (ANON_KEY) {
+    const createdUser = await sb.auth.admin.createUser({
+      email: AUTH_EMAIL,
+      password: AUTH_PASSWORD,
+      email_confirm: true,
+    });
+    assert.equal(createdUser.error, null, createdUser.error?.message);
+    authenticatedUserId = createdUser.data.user?.id ?? null;
+    assert.ok(authenticatedUserId);
+    const membership = await sb.from("memberships").insert({
+      user_id: authenticatedUserId,
+      org_id: ORG,
+      role: "member",
+    });
+    assert.equal(membership.error, null, membership.error?.message);
+    authenticatedSb = createClient(URL, ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const signedIn = await authenticatedSb.auth.signInWithPassword({
+      email: AUTH_EMAIL,
+      password: AUTH_PASSWORD,
+    });
+    assert.equal(signedIn.error, null, signedIn.error?.message);
+  }
 });
 
 after(async () => {
   if (sb && available) await teardown(sb);
+  if (sb && authenticatedUserId) await sb.auth.admin.deleteUser(authenticatedUserId);
 });
 
 function gated(t: TestContext): boolean {
@@ -75,6 +108,34 @@ function gated(t: TestContext): boolean {
     return false;
   }
   return true;
+}
+
+function authenticatedGated(t: TestContext): boolean {
+  if (!gated(t)) return false;
+  if (!authenticatedSb || !authenticatedUserId || !sb) {
+    t.skip("Authenticated Supabase provenance fixture is unavailable");
+    return false;
+  }
+  return true;
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+async function mintSourceReceipt(snapshot = GUMMY_ALPHA_GOLDEN_EXAMPLE.report) {
+  assert.ok(sb);
+  assert.ok(authenticatedUserId);
+  const minted = await sb.rpc("mint_decision_report_source_receipt_v1", {
+    p_scope_id: WORKSPACE,
+    p_authored_by: authenticatedUserId,
+    p_generated_snapshot: snapshot,
+  });
+  assert.equal(minted.error, null, minted.error?.message);
+  assert.equal(minted.data?.length, 1);
+  const receiptId = minted.data?.[0]?.source_receipt_id;
+  assert.equal(typeof receiptId, "string");
+  return receiptId as string;
 }
 
 test("explicit saves are append-only, retry-safe, conflict-safe, and create no graph rows", async (t) => {
@@ -195,6 +256,228 @@ test("the database refuses report_ready for a sparse snapshot", async (t) => {
   });
   assert.equal(result.error?.code, "22023");
   assert.match(result.error?.message ?? "", /Required report fields are incomplete/);
+});
+
+test("the database rejects missing or tampered v2 source provenance", async (t) => {
+  if (!gated(t) || !sb) return;
+  const missing = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  delete missing.sourceSummaries;
+  const missingResult = await sb.rpc("create_decision_report_v1", {
+    p_scope_id: WORKSPACE,
+    p_title: missing.title,
+    p_status: "report_ready",
+    p_snapshot: missing,
+    p_metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    p_authored_by: null,
+  });
+  assert.equal(missingResult.error?.code, "22023");
+  assert.match(missingResult.error?.message ?? "", /source provenance/);
+
+  const tampered = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  tampered.sourceSummaries![0].chunks[0].text += " tampered";
+  const tamperedResult = await sb.rpc("create_decision_report_v1", {
+    p_scope_id: WORKSPACE,
+    p_title: tampered.title,
+    p_status: "report_ready",
+    p_snapshot: tampered,
+    p_metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    p_authored_by: null,
+  });
+  assert.equal(tamperedResult.error?.code, "22023");
+  assert.match(tamperedResult.error?.message ?? "", /source provenance/);
+});
+
+test("server-minted receipts reject forged corpus and sourced claims across revisions", async (t) => {
+  if (!authenticatedGated(t) || !authenticatedSb || !authenticatedUserId || !sb) return;
+
+  const deniedMint = await authenticatedSb.rpc("mint_decision_report_source_receipt_v1", {
+    p_scope_id: WORKSPACE,
+    p_authored_by: authenticatedUserId,
+    p_generated_snapshot: GUMMY_ALPHA_GOLDEN_EXAMPLE.report,
+  });
+  assert.equal(deniedMint.error?.code, "42501");
+
+  // Every digest is recomputed correctly. This would pass the old v2
+  // self-consistency check even though both corpus text and claim are invented.
+  const forgedCorpus = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  forgedCorpus.title = "Forged corpus should not persist";
+  const forgedSource = forgedCorpus.sourceSummaries![0];
+  const forgedChunk = forgedSource.chunks[0];
+  forgedChunk.text = "Invented research says conversion increased 99 percent.";
+  forgedChunk.contentSha256 = sha256(forgedChunk.text);
+  forgedSource.contentSha256 = sha256(
+    forgedSource.chunks.map((chunk) => chunk.text).join("\n\n"),
+  );
+  forgedCorpus.decision.background[0] = {
+    id: "forged-corpus-claim",
+    text: "Conversion increased 99 percent.",
+    status: "sourced",
+    sourceChunkIds: [forgedChunk.chunkId],
+  };
+  const directOldCreate = await authenticatedSb.rpc("create_decision_report_v1", {
+    p_scope_id: WORKSPACE,
+    p_title: forgedCorpus.title,
+    p_status: "report_ready",
+    p_snapshot: forgedCorpus,
+    p_metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    p_authored_by: authenticatedUserId,
+  });
+  assert.equal(directOldCreate.error?.code, "42501");
+  assert.match(directOldCreate.error?.message ?? "", /receipt|unavailable/i);
+
+  const receiptId = await mintSourceReceipt();
+  const forgedClaim = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  forgedClaim.supportingEvidence.metricMechanism[0] = {
+    ...forgedClaim.supportingEvidence.metricMechanism[0],
+    text: "The supplied source proves this newly invented mechanism.",
+    status: "sourced",
+    sourceChunkIds: [forgedClaim.sourceSummaries![0].chunks[0].chunkId],
+  };
+  const forgedWithReceipt = await authenticatedSb.rpc("create_decision_report_v2", {
+    p_scope_id: WORKSPACE,
+    p_title: forgedClaim.title,
+    p_status: "report_ready",
+    p_snapshot: forgedClaim,
+    p_metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    p_authored_by: authenticatedUserId,
+    p_source_receipt_id: receiptId,
+  });
+  assert.equal(forgedWithReceipt.error?.code, "22023");
+  assert.match(forgedWithReceipt.error?.message ?? "", /receipt.*provenance/i);
+
+  // User edits may clear a generated sourced assertion before the first save.
+  // The remaining sourced claims are an exact subset of the minted manifest.
+  const cleared = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  cleared.decision.decision[0] = {
+    ...cleared.decision.decision[0],
+    status: "user_confirmed",
+    sourceChunkIds: [],
+  };
+  const created = await saveDecisionReport(authenticatedSb, WORKSPACE, {
+    reportId: null,
+    baseRevisionId: null,
+    sourceReceiptId: receiptId,
+    report: cleared,
+    metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    authoredBy: authenticatedUserId,
+  });
+  assert.equal(created.ok, true, created.ok ? undefined : created.error);
+  if (!created.ok) return;
+  assert.equal(created.reused, false);
+
+  const exactRetry = await saveDecisionReport(authenticatedSb, WORKSPACE, {
+    reportId: null,
+    baseRevisionId: null,
+    sourceReceiptId: receiptId,
+    report: cleared,
+    metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    authoredBy: authenticatedUserId,
+  });
+  assert.equal(exactRetry.ok, true, exactRetry.ok ? undefined : exactRetry.error);
+  if (exactRetry.ok) {
+    assert.equal(exactRetry.reused, true);
+    assert.equal(exactRetry.saved.reportId, created.saved.reportId);
+    assert.equal(exactRetry.saved.revisionId, created.saved.revisionId);
+  }
+
+  const changedRetry = cloneDecisionReport(cleared);
+  changedRetry.title = "Changed after consuming the source receipt";
+  const conflict = await saveDecisionReport(authenticatedSb, WORKSPACE, {
+    reportId: null,
+    baseRevisionId: null,
+    sourceReceiptId: receiptId,
+    report: changedRetry,
+    metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    authoredBy: authenticatedUserId,
+  });
+  assert.equal(conflict.ok, false);
+  if (!conflict.ok) assert.equal(conflict.code, "conflict");
+
+  // A later revision cannot restore even an originally minted sourced claim:
+  // provenance is monotonic relative to the immediately prior revision.
+  const restored = cloneDecisionReport(cleared);
+  restored.decision.decision[0] = structuredClone(
+    GUMMY_ALPHA_GOLDEN_EXAMPLE.report.decision.decision[0],
+  );
+  const addedLater = await authenticatedSb.rpc("append_decision_report_revision_v1", {
+    p_report_id: created.saved.reportId,
+    p_base_revision_id: created.saved.revisionId,
+    p_title: restored.title,
+    p_status: "report_ready",
+    p_snapshot: restored,
+    p_metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    p_authored_by: authenticatedUserId,
+  });
+  assert.equal(addedLater.error?.code, "22023");
+  assert.match(addedLater.error?.message ?? "", /cannot be added or changed/i);
+
+  const changedSources = cloneDecisionReport(cleared);
+  const changedSource = changedSources.sourceSummaries![0];
+  changedSource.chunks[0].text += " Invented later source text.";
+  changedSource.chunks[0].contentSha256 = sha256(changedSource.chunks[0].text);
+  changedSource.contentSha256 = sha256(
+    changedSource.chunks.map((chunk) => chunk.text).join("\n\n"),
+  );
+  const replacedCorpus = await authenticatedSb.rpc("append_decision_report_revision_v1", {
+    p_report_id: created.saved.reportId,
+    p_base_revision_id: created.saved.revisionId,
+    p_title: changedSources.title,
+    p_status: "report_ready",
+    p_snapshot: changedSources,
+    p_metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    p_authored_by: authenticatedUserId,
+  });
+  assert.equal(replacedCorpus.error?.code, "22023");
+  assert.match(replacedCorpus.error?.message ?? "", /cannot be added or changed/i);
+
+  const reports = await sb
+    .from("decision_reports")
+    .select("report_id", { count: "exact", head: true })
+    .eq("scope_id", WORKSPACE)
+    .in("title", [forgedCorpus.title, changedRetry.title]);
+  assert.equal(reports.error, null, reports.error?.message);
+  assert.equal(reports.count, 0);
+});
+
+test("local-demo service-role saves consume their one-shot source transition", async (t) => {
+  if (!gated(t) || !sb) return;
+  const minted = await sb.rpc("mint_decision_report_source_receipt_v1", {
+    p_scope_id: WORKSPACE,
+    p_authored_by: null,
+    p_generated_snapshot: GUMMY_ALPHA_GOLDEN_EXAMPLE.report,
+  });
+  assert.equal(minted.error, null, minted.error?.message);
+  const sourceReceiptId = minted.data?.[0]?.source_receipt_id;
+  assert.equal(typeof sourceReceiptId, "string");
+  const expiresAt = Date.parse(minted.data?.[0]?.expires_at ?? "");
+  assert.ok(expiresAt > Date.now() + 23 * 60 * 60 * 1_000);
+
+  // create_decision_report_v2 contains a post-trigger zero-residue invariant;
+  // this success proves the service-role guard consumed the exact transition.
+  const created = await saveDecisionReport(sb, WORKSPACE, {
+    reportId: null,
+    baseRevisionId: null,
+    sourceReceiptId,
+    report: GUMMY_ALPHA_GOLDEN_EXAMPLE.report,
+    metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    authoredBy: null,
+  });
+  assert.equal(created.ok, true, created.ok ? undefined : created.error);
+  if (!created.ok) return;
+
+  const retry = await saveDecisionReport(sb, WORKSPACE, {
+    reportId: null,
+    baseRevisionId: null,
+    sourceReceiptId,
+    report: GUMMY_ALPHA_GOLDEN_EXAMPLE.report,
+    metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    authoredBy: null,
+  });
+  assert.equal(retry.ok, true, retry.ok ? undefined : retry.error);
+  if (retry.ok) {
+    assert.equal(retry.reused, true);
+    assert.equal(retry.saved.reportId, created.saved.reportId);
+  }
 });
 
 test("ordinary saves cannot promote an arbitrary supplied-image id", async (t) => {

@@ -5,8 +5,8 @@ import type { DashboardDecisionReport } from "./decision-reports.ts";
 import { selectReportProjectView } from "./report-project-view.ts";
 import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "../decision-reports/fixtures/gummy-alpha.ts";
 
-const action = (id: string): Action => ({
-  id, pr: 0, title: id, shippedAt: null, primaryMetricId: "completion", impact: [],
+const action = (id: string, impact: Action["impact"] = []): Action => ({
+  id, pr: 0, title: id, shippedAt: null, primaryMetricId: "completion", impact,
 });
 const decision = (id: string, actionIds: string[]): Decision => ({
   id, origin: id === "report-decision" ? "decision_report" : "legacy", title: id,
@@ -24,8 +24,22 @@ function report(): DashboardDecisionReport {
     updatedAt: "2026-07-22T00:00:00Z", report: GUMMY_ALPHA_GOLDEN_EXAMPLE.report,
     metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
     decisionId: "report-decision", predictionId: "prediction", metricId: "metric-uuid",
+    seriesId: "series", iterationNumber: 1, predecessorReportId: null,
+    iterationReason: null, isCurrent: true,
   };
 }
+
+test("explicit current pointer wins over report order and timestamps", () => {
+  const historical = { ...report(), id: "historical", isCurrent: false, updatedAt: "2099-01-01T00:00:00Z", decisionId: "old" };
+  const current = { ...report(), id: "current", updatedAt: "2020-01-01T00:00:00Z" };
+  const view = selectReportProjectView({
+    reports: [historical, current], actions: [action("report-action")],
+    decisions: [decision("report-decision", ["report-action"]), decision("old", [])],
+    metrics: [metric("completion")], metricUiIdByDbId: new Map([["metric-uuid", "completion"]]),
+    aggregatedImpact: [], impactByMetric: [],
+  });
+  assert.equal(view.activeReport?.id, "current");
+});
 
 test("an active report isolates every dashboard dataset to its project", () => {
   const view = selectReportProjectView({
@@ -47,6 +61,48 @@ test("an active report isolates every dashboard dataset to its project", () => {
   assert.deepEqual(view.metrics.map((item) => item.id), ["completion"]);
   assert.deepEqual(view.impactByMetric.map((item) => item.metricId), ["completion"]);
   assert.equal(view.aggregatedImpact[0].value, "—");
+});
+
+test("current report impact uses only its causal action cells", () => {
+  const current = action("report-action", [
+    {
+      metricId: "completion", direction: "up", value: 3,
+      label: "+3.0pp", good: true, evidence: "causal",
+    },
+  ]);
+  const descriptive = action("report-descriptive", [
+    {
+      metricId: "completion", direction: "down", value: -50,
+      label: "-50.0pp", good: false, evidence: "descriptive",
+    },
+  ]);
+  const unrelated = action("legacy-action", [
+    {
+      metricId: "completion", direction: "down", value: -100,
+      label: "-100.0pp", good: false, evidence: "causal",
+    },
+  ]);
+  const view = selectReportProjectView({
+    reports: [report()],
+    actions: [current, descriptive, unrelated],
+    decisions: [
+      decision("report-decision", [current.id, descriptive.id]),
+      decision("legacy", [unrelated.id]),
+    ],
+    metrics: [metric("completion")],
+    metricUiIdByDbId: new Map([["metric-uuid", "completion"]]),
+    aggregatedImpact: [{ label: "Improvement Rate", value: "0%", comparison: "workspace", tone: "negative" }],
+    impactByMetric: [{ metricId: "completion", value: -147, label: "-147.0pp", direction: "down", good: false }],
+  });
+
+  assert.deepEqual(view.actions.map((item) => item.id), [current.id, descriptive.id]);
+  assert.deepEqual(view.impactByMetric, [{
+    metricId: "completion", value: 3, label: "+3.0pp", direction: "up", good: true,
+  }]);
+  assert.deepEqual(view.aggregatedImpact, [{
+    label: "Improvement Rate", value: "100%",
+    comparison: "1 / 1 confident readouts for this report", tone: "positive",
+  }]);
 });
 
 test("legacy workspaces retain their complete dashboard payload", () => {

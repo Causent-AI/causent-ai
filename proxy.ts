@@ -21,6 +21,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { validateProductionAppRuntime } from "@/lib/runtime-config";
 
 /** Path prefixes that are public — never redirected to /login. NOTE: /api is
  *  deliberately NOT here. The unauthenticated api routes (webhooks + cron) are
@@ -39,11 +40,27 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // Start with a pass-through response we can attach refreshed cookies to.
   let response = NextResponse.next({ request });
 
+  const runtimeConfig = validateProductionAppRuntime(process.env);
+  if (!runtimeConfig.ok) {
+    // Names/codes are safe for operator logs; environment values are never logged.
+    console.error("[runtime-config] production app configuration rejected", {
+      event: "production_runtime_config_invalid",
+      issues: runtimeConfig.issues,
+    });
+    return NextResponse.json(
+      { error: "service unavailable" },
+      {
+        status: 503,
+        headers: { "cache-control": "no-store" },
+      },
+    );
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If Supabase env is absent (shouldn't happen in a configured deploy) skip the
-  // session dance rather than throw and 500 every request.
+  // Development keeps the existing permissive startup path when local env has
+  // not been configured. Production has already failed closed above.
   if (!url || !anonKey) return response;
 
   const supabase = createServerClient(url, anonKey, {

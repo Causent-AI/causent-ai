@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   saveDecisionReportAction,
@@ -47,6 +48,10 @@ export function DecisionReportEditor({
   initialPersistence,
   initialAsset,
   activationMetrics,
+  sourceReceiptId,
+  telemetrySessionKey,
+  telemetryStartedAtMs,
+  activationDateBounds,
   onStartOver,
 }: {
   initialReport: DecisionReportV1;
@@ -62,12 +67,17 @@ export function DecisionReportEditor({
   initialPersistence?: ReportPersistenceState;
   initialAsset?: ReportAssetView | null;
   activationMetrics: ReportActivationMetric[];
+  sourceReceiptId: string | null;
+  telemetrySessionKey: string;
+  telemetryStartedAtMs: number;
+  activationDateBounds: { today: string; minimum: string };
   onStartOver: () => void;
 }) {
   const router = useRouter();
   const [report, setReport] = useState(() => cloneDecisionReport(initialReport));
   const [editError, setEditError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveConflictReportId, setSaveConflictReportId] = useState<string | null>(null);
   const [assetError, setAssetError] = useState<string | null>(null);
   const [asset, setAsset] = useState<ReportAssetView | null>(initialAsset ?? null);
   const [persistence, setPersistence] = useState<ReportPersistenceState | null>(
@@ -78,12 +88,24 @@ export function DecisionReportEditor({
   );
   const [isSaving, startSaving] = useTransition();
   const [isChangingAsset, startChangingAsset] = useTransition();
+  const editedFields = useRef(new Set<string>());
+  const answeredFollowUps = useRef(new Set<string>());
   const gaps = scanDecisionReportGaps(report);
   const ready = gaps.length === 0;
   const hasUnsavedChanges = savedSnapshot !== JSON.stringify(report);
   const reportIsActive = persistence?.status === "active";
 
-  function dispatchEdit(command: ReportEditCommandV1): boolean {
+  function startOver() {
+    if (hasUnsavedChanges) {
+      const message = persistence
+        ? "Discard your unsaved changes and start a new report? Your latest saved revision will remain available in Reports."
+        : "Discard this unsaved report and start over? This generated draft has not been saved.";
+      if (!window.confirm(message)) return;
+    }
+    onStartOver();
+  }
+
+  function dispatchEdit(command: ReportEditCommandV1, editKey: string): boolean {
     if (reportIsActive) return false;
     const result = applyReportEditCommand(report, command);
     if (!result.ok) {
@@ -92,23 +114,24 @@ export function DecisionReportEditor({
     }
     setEditError(null);
     setReport(result.report);
+    editedFields.current.add(editKey);
     return true;
   }
 
   function updateClaim(claimId: string, text: string) {
-    dispatchEdit({ type: "replace_claim_text", claimId, text });
+    dispatchEdit({ type: "replace_claim_text", claimId, text }, `claim:${claimId}`);
   }
 
   function updateActionTitle(sourceItemId: string, title: string) {
-    dispatchEdit({ type: "edit_action_title", sourceItemId, title });
+    dispatchEdit({ type: "edit_action_title", sourceItemId, title }, `action-title:${sourceItemId}`);
   }
 
   function updateActionSummary(sourceItemId: string, text: string) {
-    dispatchEdit({ type: "edit_action_summary", sourceItemId, text });
+    dispatchEdit({ type: "edit_action_summary", sourceItemId, text }, `action-summary:${sourceItemId}`);
   }
 
   function updateActionOwner(sourceItemId: string, text: string) {
-    dispatchEdit({ type: "edit_action_owner", sourceItemId, text });
+    dispatchEdit({ type: "edit_action_owner", sourceItemId, text }, `action-owner:${sourceItemId}`);
   }
 
   function focusGap(gap: DecisionReportGap) {
@@ -128,7 +151,9 @@ export function DecisionReportEditor({
       setEditError(command.error);
       return false;
     }
-    return dispatchEdit(command.command);
+    const applied = dispatchEdit(command.command, `gap:${gap.targetId}`);
+    if (applied) answeredFollowUps.current.add(gap.targetId);
+    return applied;
   }
 
   function setDataClassification(
@@ -137,21 +162,33 @@ export function DecisionReportEditor({
     dispatchEdit({
       type: "set_data_classification",
       value,
-    });
+    }, "governance:data-classification");
   }
 
   function saveReport() {
     setSaveError(null);
+    setSaveConflictReportId(null);
     startSaving(async () => {
       try {
         const result: SaveDecisionReportActionResult = await saveDecisionReportAction({
           reportId: persistence?.reportId ?? null,
           baseRevisionId: persistence?.revisionId ?? null,
+          sourceReceiptId: persistence ? null : sourceReceiptId,
           report,
           metricProjection: projection,
+          telemetry: {
+            sessionKey: telemetrySessionKey,
+            msSinceStart: Math.max(0, Math.round(performance.now() - telemetryStartedAtMs)),
+            editCount: editedFields.current.size,
+            followUpCount: answeredFollowUps.current.size,
+            missingFieldCount: gaps.length,
+          },
         });
         if (!result.ok) {
           setSaveError(result.error);
+          if (result.code === "conflict" && persistence) {
+            setSaveConflictReportId(persistence.reportId);
+          }
           return;
         }
 
@@ -162,6 +199,7 @@ export function DecisionReportEditor({
           savedAt: result.saved.savedAt,
           activation: null,
         });
+        setSaveConflictReportId(null);
         setSavedSnapshot(JSON.stringify(report));
         router.replace(`/onboarding?report=${result.saved.reportId}`, { scroll: false });
       } catch {
@@ -190,6 +228,7 @@ export function DecisionReportEditor({
         const nextReport = cloneDecisionReport(report);
         nextReport.implementation.assetIds = result.asset ? [result.asset.assetId] : [];
         setReport(nextReport);
+        editedFields.current.add("implementation:asset");
         setAsset(result.asset);
         setPersistence({ ...persistence, revisionId: result.revisionId, status: result.status, savedAt: new Date().toISOString() });
         setSavedSnapshot(JSON.stringify(nextReport));
@@ -215,6 +254,7 @@ export function DecisionReportEditor({
         const nextReport = cloneDecisionReport(report);
         nextReport.implementation.assetIds = [];
         setReport(nextReport);
+        editedFields.current.add("implementation:asset");
         setAsset(null);
         setPersistence({ ...persistence, revisionId: result.revisionId, status: result.status, savedAt: new Date().toISOString() });
         setSavedSnapshot(JSON.stringify(nextReport));
@@ -275,7 +315,10 @@ export function DecisionReportEditor({
               aria-label="Report title"
               value={report.title}
               disabled={reportIsActive}
-              onChange={(event) => setReport((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) => {
+                editedFields.current.add("report:title");
+                setReport((current) => ({ ...current, title: event.target.value }));
+              }}
             />
             <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[var(--text-muted)]">
               {reportIsActive
@@ -286,9 +329,9 @@ export function DecisionReportEditor({
           <button
             type="button"
             className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
-            onClick={onStartOver}
+            onClick={startOver}
           >
-            {reportIsActive ? "New report" : "Edit"}
+            {reportIsActive ? "New report" : "Start over"}
           </button>
         </div>
         <div className="mt-3 border-t border-[var(--border)] pt-3">
@@ -337,6 +380,9 @@ export function DecisionReportEditor({
           persistence={persistence}
           hasUnsavedChanges={hasUnsavedChanges}
           metrics={activationMetrics}
+          telemetrySessionKey={telemetrySessionKey}
+          telemetryStartedAtMs={telemetryStartedAtMs}
+          activationDateBounds={activationDateBounds}
         />
       ) : null}
 
@@ -350,12 +396,25 @@ export function DecisionReportEditor({
       ) : null}
 
       {saveError ? (
-        <p
+        <div
           className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800"
           role="alert"
         >
-          {saveError}
-        </p>
+          <p>{saveError}</p>
+          {saveConflictReportId ? (
+            <p className="mt-2 leading-5">
+              Your edits remain in this tab. Open the latest saved report in a new tab to compare revisions, then decide what to keep.{" "}
+              <Link
+                className="font-semibold underline underline-offset-2"
+                href={`/onboarding?report=${saveConflictReportId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open latest saved report
+              </Link>
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {!reportIsActive ? <div

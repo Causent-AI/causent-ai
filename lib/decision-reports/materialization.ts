@@ -20,6 +20,7 @@ export type MaterializedReportActivation = {
   decisionId: string;
   predictionId: string;
   actionIds: string[];
+  primaryLeverActionId: string;
   reused: boolean;
   activatedAt: string;
 };
@@ -38,6 +39,7 @@ type ActivationRpcRow = {
   decision_id: string;
   prediction_id: string;
   action_ids: string[];
+  primary_lever_action_id: string;
   reused: boolean;
   activated_at: string;
 };
@@ -66,6 +68,8 @@ function firstActivationRow(value: unknown): ActivationRpcRow | null {
     row.action_ids.length > 3 ||
     row.action_ids.some((id) => !validUuid(id)) ||
     new Set(row.action_ids).size !== row.action_ids.length ||
+    !validUuid(row.primary_lever_action_id) ||
+    !row.action_ids.includes(row.primary_lever_action_id) ||
     typeof row.reused !== "boolean" ||
     typeof row.activated_at !== "string" ||
     Number.isNaN(Date.parse(row.activated_at))
@@ -129,7 +133,7 @@ export async function materializeReportActivation(
     return { ok: false, code: "validation", error: "Activation author is invalid." };
   }
 
-  const response = await sb.rpc("activate_decision_report_v1", {
+  const response = await sb.rpc("activate_decision_report_v2", {
     p_report_id: validation.data.reportId,
     p_revision_id: validation.data.revisionId,
     p_metric_id: validation.data.confirmedMetricId,
@@ -137,10 +141,14 @@ export async function materializeReportActivation(
     p_prediction_magnitude_pct_mean: validation.data.prediction.magnitudePctMean,
     p_prediction_resolution_date: validation.data.prediction.resolutionDate,
     p_selected_action_source_ids: validation.data.selectedActionSourceItemIds,
+    p_primary_lever_source_id: validation.data.primaryLeverActionSourceItemId,
     p_activated_by: activatedBy,
   });
 
   if (response.error) {
+    if (response.error.code === "PT409" && response.error.message.includes("STALE_ITERATION_PARENT")) {
+      return { ok: false, code: "conflict", error: "This iteration is stale because the series current report changed." };
+    }
     if (response.error.code === "PT409" && response.error.message.includes("REPORT_ALREADY_ACTIVE")) {
       return {
         ok: false,
@@ -178,6 +186,7 @@ export async function materializeReportActivation(
       decisionId: row.decision_id,
       predictionId: row.prediction_id,
       actionIds: row.action_ids,
+      primaryLeverActionId: row.primary_lever_action_id,
       reused: row.reused,
       activatedAt: row.activated_at,
     },

@@ -4,6 +4,7 @@ import { scanDecisionReportGaps } from "./editing.ts";
 import {
   validateDecisionReport,
   validateMetricProjection,
+  upgradeLegacyDecisionReportForEditing,
   type DecisionReportV1,
   type MetricProjection,
 } from "./schema.ts";
@@ -19,6 +20,7 @@ export type DecisionReportActivationPointer = {
   decisionId: string;
   predictionId: string;
   metricId: string;
+  primaryLeverActionId: string | null;
   activatedAt: string;
 };
 
@@ -32,11 +34,25 @@ export type PersistedDecisionReport = {
   report: DecisionReportV1;
   metricProjection: MetricProjection;
   activation: DecisionReportActivationPointer | null;
+  lineage: DecisionReportLineage | null;
 };
+
+export type DecisionReportLineage = {
+  seriesId: string;
+  iterationNumber: number;
+  predecessorReportId: string | null;
+  iterationReason: string | null;
+};
+
+export type StartDecisionReportIterationResult =
+  | { ok: true; reportId: string; revisionId: string; seriesId: string; iterationNumber: number; reused: boolean; createdAt: string }
+  | { ok: false; code: "validation" | "conflict" | "forbidden" | "database"; error: string; reportId?: string };
 
 export type SaveDecisionReportInput = {
   reportId: string | null;
   baseRevisionId: string | null;
+  /** Required for an untrusted initial v2 save; omitted only by trusted legacy fixtures. */
+  sourceReceiptId?: string | null;
   report: DecisionReportV1;
   metricProjection: MetricProjection;
   authoredBy: string | null;
@@ -90,6 +106,19 @@ type ReportRow = {
   active_prediction_id: string | null;
   active_metric_id: string | null;
   activated_at: string | null;
+  series_id: string;
+  iteration_number: number;
+  predecessor_report_id: string | null;
+  iteration_reason: string | null;
+};
+
+type RpcStartRow = {
+  report_id: string;
+  revision_id: string;
+  series_id: string;
+  iteration_number: number;
+  reused: boolean;
+  created_at: string;
 };
 
 type RevisionRow = {
@@ -109,6 +138,7 @@ type ActivationRow = {
   metric_id: string;
   decision_id: string;
   prediction_id: string;
+  primary_lever_action_id: string | null;
   activated_at: string;
 };
 
@@ -164,6 +194,91 @@ function firstDeleteRpcRow(value: unknown): RpcDeleteRow | null {
   return row as RpcDeleteRow;
 }
 
+function databaseFailure(
+  operation: string,
+  error: unknown,
+  userMessage: string,
+): { ok: false; code: "database"; error: string } {
+  // Persistence failures are only useful with their server-side diagnostics.
+  // Never serialize Postgres constraint names or other implementation details
+  // back through a Server Action to the browser.
+  console.error(`[decision-report persistence] ${operation} failed`, error);
+  return { ok: false, code: "database", error: userMessage };
+}
+
+export async function startDecisionReportIteration(
+  sb: SupabaseClient,
+  scopeId: string,
+  parentReportId: string,
+  reason: string,
+  authoredBy: string | null,
+): Promise<StartDecisionReportIterationResult> {
+  const trimmedReason = reason.trim();
+  if (!validUuid(scopeId) || !validUuid(parentReportId) || (authoredBy !== null && !validUuid(authoredBy)) || trimmedReason.length < 1 || trimmedReason.length > 500) {
+    return { ok: false, code: "validation", error: "Enter an iteration reason between 1 and 500 characters." };
+  }
+  const response = await sb.rpc("start_decision_report_iteration_v1", {
+    p_scope_id: scopeId,
+    p_parent_report_id: parentReportId,
+    p_reason: trimmedReason,
+    p_authored_by: authoredBy,
+  });
+  if (response.error) {
+    if (response.error.code === "PT409") {
+      return {
+        ok: false,
+        code: "conflict",
+        error: "A successor already exists with different iteration details.",
+        reportId: validUuid(response.error.details) ? response.error.details : undefined,
+      };
+    }
+    if (response.error.code === "42501") {
+      return {
+        ok: false,
+        code: "forbidden",
+        error: "This report is unavailable or is no longer current.",
+      };
+    }
+    if (response.error.code === "22023") {
+      return {
+        ok: false,
+        code: "validation",
+        error: "The iteration request was rejected. Check the reason and try again.",
+      };
+    }
+    return databaseFailure(
+      "start iteration",
+      response.error,
+      "Causent could not start the next iteration. Try again.",
+    );
+  }
+  if (!Array.isArray(response.data) || response.data.length !== 1) {
+    return databaseFailure(
+      "validate iteration receipt",
+      { rowCount: Array.isArray(response.data) ? response.data.length : null },
+      "Causent could not confirm the new iteration. Reload Reports before trying again.",
+    );
+  }
+  const row = response.data[0] as Partial<RpcStartRow>;
+  if (
+    !validUuid(row.report_id ?? null) ||
+    !validUuid(row.revision_id ?? null) ||
+    !validUuid(row.series_id ?? null) ||
+    !Number.isInteger(row.iteration_number) ||
+    (row.iteration_number ?? 0) < 2 ||
+    typeof row.reused !== "boolean" ||
+    typeof row.created_at !== "string"
+  ) {
+    return databaseFailure(
+      "validate iteration receipt",
+      { hasReceipt: true },
+      "Causent could not confirm the new iteration. Reload Reports before trying again.",
+    );
+  }
+  const validRow = row as RpcStartRow;
+  return { ok: true, reportId: validRow.report_id, revisionId: validRow.revision_id, seriesId: validRow.series_id, iterationNumber: validRow.iteration_number, reused: validRow.reused, createdAt: validRow.created_at };
+}
+
 export async function deleteDecisionReport(
   sb: SupabaseClient,
   scopeId: string,
@@ -190,11 +305,19 @@ export async function deleteDecisionReport(
         error: "This report is unavailable in the current workspace.",
       };
     }
-    return { ok: false, code: "database", error: response.error.message };
+    return databaseFailure(
+      "delete report",
+      response.error,
+      "Causent could not remove this report. Reload Reports and try again.",
+    );
   }
   const row = firstDeleteRpcRow(response.data);
   if (!row) {
-    return { ok: false, code: "database", error: "The database returned an invalid deletion receipt." };
+    return databaseFailure(
+      "validate deletion receipt",
+      { hasReceipt: Array.isArray(response.data) && response.data.length > 0 },
+      "Causent could not confirm that the report was removed. Reload Reports before trying again.",
+    );
   }
   return {
     ok: true,
@@ -219,6 +342,19 @@ export async function saveDecisionReport(
   if (input.reportId !== null && !validUuid(input.baseRevisionId)) {
     return validationFailure(["Saved reports require a valid base revision."]);
   }
+  if (input.reportId === null && input.sourceReceiptId === null) {
+    return validationFailure(["Generated report source receipt is required."]);
+  }
+  if (
+    input.sourceReceiptId !== undefined &&
+    input.sourceReceiptId !== null &&
+    !validUuid(input.sourceReceiptId)
+  ) {
+    return validationFailure(["Generated report source receipt is invalid."]);
+  }
+  if (input.reportId !== null && input.sourceReceiptId) {
+    return validationFailure(["A source receipt can only authorize the first report save."]);
+  }
   if (input.authoredBy !== null && !validUuid(input.authoredBy)) {
     return validationFailure(["Author ID is invalid."]);
   }
@@ -229,6 +365,11 @@ export async function saveDecisionReport(
     return validationFailure([
       ...(reportValidation.success ? [] : reportValidation.errors),
       ...(projectionValidation.success ? [] : projectionValidation.errors),
+    ]);
+  }
+  if (reportValidation.data.schemaVersion !== 2) {
+    return validationFailure([
+      "Legacy report provenance must be upgraded before this revision can be saved.",
     ]);
   }
 
@@ -242,10 +383,16 @@ export async function saveDecisionReport(
   };
 
   const response = input.reportId === null
-    ? await sb.rpc("create_decision_report_v1", {
-        p_scope_id: scopeId,
-        ...common,
-      })
+    ? input.sourceReceiptId
+      ? await sb.rpc("create_decision_report_v2", {
+          p_scope_id: scopeId,
+          p_source_receipt_id: input.sourceReceiptId,
+          ...common,
+        })
+      : await sb.rpc("create_decision_report_v1", {
+          p_scope_id: scopeId,
+          ...common,
+        })
     : await sb.rpc("append_decision_report_revision_v1", {
         p_report_id: input.reportId,
         p_base_revision_id: input.baseRevisionId,
@@ -271,23 +418,41 @@ export async function saveDecisionReport(
         error: "This report is already active and can no longer be edited.",
       };
     }
+    if (response.error.code === "PT409" && response.error.message.includes("SOURCE_RECEIPT_ALREADY_USED")) {
+      return {
+        ok: false,
+        code: "conflict",
+        error: "This generated draft changed after its source receipt was used. Start a new draft.",
+      };
+    }
     if (response.error.code === "42501") {
+      if (input.reportId === null && input.sourceReceiptId) {
+        return {
+          ok: false,
+          code: "forbidden",
+          error: "This generated draft can no longer be saved securely. Generate the draft again, then reapply any edits.",
+        };
+      }
       return {
         ok: false,
         code: "forbidden",
         error: "This report is unavailable in the current workspace.",
       };
     }
-    return { ok: false, code: "database", error: response.error.message };
+    return databaseFailure(
+      "save report",
+      response.error,
+      "Causent could not save this report. Reload the saved version and try again.",
+    );
   }
 
   const row = firstRpcRow(response.data);
   if (!row) {
-    return {
-      ok: false,
-      code: "database",
-      error: "The database returned an invalid report revision.",
-    };
+    return databaseFailure(
+      "validate saved revision receipt",
+      { hasReceipt: Array.isArray(response.data) && response.data.length > 0 },
+      "Causent could not confirm the saved revision. Reload the report before trying again.",
+    );
   }
 
   return {
@@ -303,6 +468,7 @@ export async function saveDecisionReport(
       report: reportValidation.data,
       metricProjection: projectionValidation.data,
       activation: null,
+      lineage: null,
     },
   };
 }
@@ -320,14 +486,19 @@ export async function loadDecisionReport(
     .from("decision_reports")
     .select(
       "report_id, status, current_revision_id, active_activation_id, active_decision_id, " +
-        "active_prediction_id, active_metric_id, activated_at",
+        "active_prediction_id, active_metric_id, activated_at, series_id, iteration_number, " +
+        "predecessor_report_id, iteration_reason",
     )
     .eq("scope_id", scopeId)
     .eq("report_id", reportId)
     .is("deleted_at", null)
     .maybeSingle();
   if (reportResponse.error) {
-    return { ok: false, code: "database", error: reportResponse.error.message };
+    return databaseFailure(
+      "load report",
+      reportResponse.error,
+      "Causent could not load this saved report. Try again from Reports.",
+    );
   }
   if (!reportResponse.data) {
     return { ok: false, code: "not_found", error: "Saved report not found." };
@@ -340,6 +511,9 @@ export async function loadDecisionReport(
   if (!validUuid(reportRow.current_revision_id)) {
     return { ok: false, code: "database", error: "Saved report has no current revision." };
   }
+  if (!validUuid(reportRow.series_id) || !Number.isInteger(reportRow.iteration_number) || reportRow.iteration_number < 1) {
+    return { ok: false, code: "database", error: "Saved report lineage is invalid." };
+  }
 
   const revisionResponse = await sb
     .from("decision_report_revisions")
@@ -351,7 +525,11 @@ export async function loadDecisionReport(
     .eq("revision_id", reportRow.current_revision_id)
     .maybeSingle();
   if (revisionResponse.error) {
-    return { ok: false, code: "database", error: revisionResponse.error.message };
+    return databaseFailure(
+      "load report revision",
+      revisionResponse.error,
+      "Causent could not load this saved report. Try again from Reports.",
+    );
   }
   if (!revisionResponse.data) {
     return { ok: false, code: "not_found", error: "Saved report revision not found." };
@@ -385,7 +563,7 @@ export async function loadDecisionReport(
       .from("decision_report_activations")
       .select(
         "activation_id, report_id, revision_id, scope_id, metric_id, decision_id, " +
-          "prediction_id, activated_at",
+          "prediction_id, primary_lever_action_id, activated_at",
       )
       .eq("scope_id", scopeId)
       .eq("report_id", reportId)
@@ -393,7 +571,11 @@ export async function loadDecisionReport(
       .eq("activation_id", reportRow.active_activation_id)
       .maybeSingle();
     if (activationResponse.error) {
-      return { ok: false, code: "database", error: activationResponse.error.message };
+      return databaseFailure(
+        "load report activation",
+        activationResponse.error,
+        "Causent could not load this saved report. Try again from Reports.",
+      );
     }
     const activationRow = activationResponse.data as ActivationRow | null;
     if (
@@ -404,6 +586,8 @@ export async function loadDecisionReport(
       activationRow.metric_id !== reportRow.active_metric_id ||
       activationRow.decision_id !== reportRow.active_decision_id ||
       activationRow.prediction_id !== reportRow.active_prediction_id ||
+      (activationRow.primary_lever_action_id !== null &&
+        !validUuid(activationRow.primary_lever_action_id)) ||
       Date.parse(activationRow.activated_at) !== Date.parse(reportRow.activated_at)
     ) {
       return {
@@ -417,6 +601,7 @@ export async function loadDecisionReport(
       decisionId: reportRow.active_decision_id,
       predictionId: reportRow.active_prediction_id,
       metricId: reportRow.active_metric_id,
+      primaryLeverActionId: activationRow.primary_lever_action_id,
       activatedAt: reportRow.activated_at,
     };
   }
@@ -430,9 +615,18 @@ export async function loadDecisionReport(
       status: reportRow.status,
       contentHash: revisionRow.content_hash,
       savedAt: revisionRow.created_at,
-      report: reportValidation.data,
+      report:
+        reportRow.status === "active"
+          ? reportValidation.data
+          : upgradeLegacyDecisionReportForEditing(reportValidation.data),
       metricProjection: projectionValidation.data,
       activation,
+      lineage: {
+        seriesId: reportRow.series_id,
+        iterationNumber: reportRow.iteration_number,
+        predecessorReportId: reportRow.predecessor_report_id,
+        iterationReason: reportRow.iteration_reason,
+      },
     },
   };
 }
