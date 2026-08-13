@@ -25,6 +25,16 @@ function action(index: number, title: string, summary: string): DraftAction {
     title,
     summary: [claim(`gummy-action-${index}-summary`, summary, "suggested")],
     owner: null,
+    priority: index === 2 ? 3 : index === 1 ? 2 : 1,
+    tags: index === 1 ? ["Measurement"] : index === 2 ? ["Product", "AI"] : ["Experiment"],
+    skills:
+      index === 1
+        ? ["Analytics engineering"]
+        : index === 2
+          ? ["Product engineering", "AI engineering"]
+          : ["Experiment design"],
+    estimatedTime: index === 1 ? "2–3 days" : index === 2 ? "2–3 weeks" : "4–6 weeks",
+    estimatedCost: index === 2 ? "$15K–$30K" : "Internal team",
   };
 }
 
@@ -140,7 +150,7 @@ export const GUMMY_ALPHA_GOLDEN_EXAMPLE: DecisionReportGoldenExample = {
     baselinePct: 40,
     predictedPct: 55,
     baselineLabel: "Illustrative baseline",
-    predictionLabel: "Founder prediction",
+    predictionLabel: "Prediction",
     evidenceState: "illustrative_assumption",
   },
 };

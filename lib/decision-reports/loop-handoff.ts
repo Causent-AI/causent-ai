@@ -74,6 +74,21 @@ export type DecisionLoopHandoffBuildResult =
   | { ok: true; handoff: DecisionLoopHandoff }
   | { ok: false; errors: string[] };
 
+export type DecisionLoopCopyTarget = "claude" | "codex";
+
+export type DecisionLoopCopyPreparation =
+  | {
+      ok: true;
+      target: DecisionLoopCopyTarget;
+      clipboardText: string;
+      contextFingerprint: string;
+    }
+  | {
+      ok: false;
+      target: DecisionLoopCopyTarget;
+      reason: string;
+    };
+
 export type DecisionLoopReview = {
   schemaVersion: typeof DECISION_LOOP_REVIEW_SCHEMA_VERSION;
   contextFingerprint: string;
@@ -87,6 +102,32 @@ export type DecisionLoopReview = {
 export type DecisionLoopReviewParseResult =
   | { ok: true; review: DecisionLoopReview }
   | { ok: false; errors: string[] };
+
+/**
+ * Prepare an explicit user-initiated clipboard handoff. The destination is UI
+ * state only: it never changes the bounded packet, fingerprint, or canonical
+ * context. Confirmation is enforced before browser clipboard access is tried.
+ */
+export function prepareDecisionLoopCopy(
+  handoff: DecisionLoopHandoff,
+  target: DecisionLoopCopyTarget,
+  egressConfirmed: boolean,
+): DecisionLoopCopyPreparation {
+  if (handoff.egress.requiresConfirmation && !egressConfirmed) {
+    return {
+      ok: false,
+      target,
+      reason: "Confirm that this report context may be copied to an external AI workspace.",
+    };
+  }
+
+  return {
+    ok: true,
+    target,
+    clipboardText: handoff.clipboardText,
+    contextFingerprint: handoff.contextFingerprint,
+  };
+}
 
 type ExportedClaim = {
   text: string;

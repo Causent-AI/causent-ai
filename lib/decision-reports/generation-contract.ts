@@ -7,7 +7,10 @@ import type {
   DraftAction,
   MetricProjection,
 } from "./schema.ts";
-import { validateDecisionReport } from "./schema.ts";
+import {
+  MAX_DECISION_REPORT_ACTIONS,
+  validateDecisionReport,
+} from "./schema.ts";
 import {
   INITIAL_PROMPT_SOURCE_ID,
   type ReportSourceChunk,
@@ -144,7 +147,7 @@ export const MODEL_DECISION_REPORT_JSON_SCHEMA: JSONSchema7 = {
         actions: {
           type: "array",
           minItems: 0,
-          maxItems: 3,
+          maxItems: MAX_DECISION_REPORT_ACTIONS,
           items: {
             type: "object",
             additionalProperties: false,
@@ -264,7 +267,7 @@ export function validateModelDecisionReportDraft(
     !isRecord(implementation) ||
     !isNullableModelClaim(implementation.actionPlanSummary) ||
     !Array.isArray(implementation.actions) ||
-    implementation.actions.length > 3 ||
+    implementation.actions.length > MAX_DECISION_REPORT_ACTIONS ||
     !implementation.actions.every(
       (action) =>
         isRecord(action) &&
@@ -482,6 +485,7 @@ function mapAction(
   draft: ModelActionDraft,
   corpus: ReportSourceCorpus,
   idFactory: IdFactory,
+  index: number,
 ): DraftAction {
   const actionId = `action-${idFactory()}`;
   const title = containsUnsupportedNumber(draft.title, corpus)
@@ -495,6 +499,11 @@ function mapAction(
     title: title || "Define the next implementation step",
     summary: [mapClaimOrMissing(draft.summary, corpus, `${actionId}-summary`)],
     owner: owner.status === "missing" ? null : owner,
+    priority: index === 0 ? 3 : index === 1 ? 2 : 1,
+    tags: [],
+    skills: [],
+    estimatedTime: "",
+    estimatedCost: "",
   };
 }
 
@@ -548,8 +557,8 @@ export function materializeModelDecisionReport(
         ),
       ],
       actions: draft.implementation.actions
-        .slice(0, 3)
-        .map((action) => mapAction(action, corpus, idFactory)),
+        .slice(0, MAX_DECISION_REPORT_ACTIONS)
+        .map((action, index) => mapAction(action, corpus, idFactory, index)),
       customers: mapClaimArray(draft.implementation.customers, corpus, "customer", idFactory, {
         sourceOnly: true,
       }),

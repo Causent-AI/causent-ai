@@ -120,6 +120,14 @@ METRICS = [
     (_metric_uuid(5), "Support Tickets", "csv", "count"),
 ]
 M_ARR, M_ACTIVATION, M_CHURN, M_GP, M_SUPPORT = (m[0] for m in METRICS)
+# Four populated context metrics plus a future report target fill the five-choice
+# demo drawer without silently marking that report target as a workspace core.
+DEMO_CORE_METRIC_NAMES = {
+    "ARR",
+    "Activation Rate",
+    "Churn Rate",
+    "Support Tickets",
+}
 
 # --- Landmark (confident-capable) ship dates ------------------------------------------
 ARR_STEP_DATE = date(2025, 2, 3)        # PR #8107 -> clean +step on ARR
@@ -345,9 +353,10 @@ def _seed(conn: psycopg.Connection, series: dict[uuid.UUID, list[float]]) -> Non
 
         for metric_id, name, source, unit in [*METRICS, DRIFT_METRIC]:
             cur.execute(
-                "insert into public.metrics (metric_id, scope_id, name, source, granularity, unit) "
-                "values (%s,%s,%s,%s,'daily',%s)",
-                (metric_id, SCOPE, name, source, unit),
+                "insert into public.metrics "
+                "(metric_id, scope_id, name, source, granularity, unit, is_core) "
+                "values (%s,%s,%s,%s,'daily',%s,%s)",
+                (metric_id, SCOPE, name, source, unit, name in DEMO_CORE_METRIC_NAMES),
             )
             cur.executemany(
                 "insert into public.metric_observations (metric_id, obs_date, value) values (%s,%s,%s)",

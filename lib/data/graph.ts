@@ -23,10 +23,16 @@ export type EdgeReadout = {
   beliefReason: string | null;
   /** Step estimate from the latest authoritative ITS evidence row (native units). */
   lift: number | null;
+  ciLow: number | null;
+  ciHigh: number | null;
+  nPre: number | null;
+  nPost: number | null;
   /** Non-authoritative 14-day before/after mean shift, when evaluable. */
   descriptiveLift: number | null;
   descriptiveCiLow: number | null;
   descriptiveCiHigh: number | null;
+  descriptiveNPre: number | null;
+  descriptiveNPost: number | null;
   /** True when another action's 14-day window overlaps this action. */
   descriptiveClustered: boolean;
 };
@@ -47,6 +53,8 @@ type EvidenceRow = {
   ci_low: number | null;
   ci_high: number | null;
   clustered: boolean;
+  n_pre: number | null;
+  n_post: number | null;
   created_at: string;
   evidence_id: string;
 };
@@ -77,7 +85,7 @@ export const loadEdgeReadouts = cache(async function loadEdgeReadouts(): Promise
       .eq("scope_id", DEMO_SCOPE_ID),
     sb
       .from("evidence_objects")
-      .select("edge_id, methodology, lift, ci_low, ci_high, clustered, created_at, evidence_id")
+      .select("edge_id, methodology, lift, ci_low, ci_high, clustered, n_pre, n_post, created_at, evidence_id")
       .eq("scope_id", DEMO_SCOPE_ID)
       .in("methodology", ["ITS", "BEFORE_AFTER_14D"]),
   ]);
@@ -124,12 +132,20 @@ export const loadEdgeReadouts = cache(async function loadEdgeReadouts(): Promise
       beliefScore: edge.belief_score === null ? null : Number(edge.belief_score),
       beliefReason: edge.belief_reason,
       lift: its?.lift == null ? null : Number(its.lift),
+      ciLow: its?.ci_low == null ? null : Number(its.ci_low),
+      ciHigh: its?.ci_high == null ? null : Number(its.ci_high),
+      nPre: its?.n_pre == null ? null : Number(its.n_pre),
+      nPost: its?.n_post == null ? null : Number(its.n_post),
       descriptiveLift:
         descriptive?.lift == null ? null : Number(descriptive.lift),
       descriptiveCiLow:
         descriptive?.ci_low == null ? null : Number(descriptive.ci_low),
       descriptiveCiHigh:
         descriptive?.ci_high == null ? null : Number(descriptive.ci_high),
+      descriptiveNPre:
+        descriptive?.n_pre == null ? null : Number(descriptive.n_pre),
+      descriptiveNPost:
+        descriptive?.n_post == null ? null : Number(descriptive.n_post),
       descriptiveClustered: descriptive?.clustered ?? false,
     });
   }

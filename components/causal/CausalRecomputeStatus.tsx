@@ -8,7 +8,7 @@ const COPY: Record<Status["state"], { label: string; detail: string; tone: strin
   },
   queued: {
     label: "Causal update queued",
-    detail: "Causent is updating this report in the background. Existing readouts remain visible until it completes.",
+    detail: "New metric data, activation, or action completion is waiting for the background causal analysis. Existing readouts stay visible until the update completes.",
     tone: "border-blue-200 bg-blue-50 text-blue-900",
   },
   retrying: {

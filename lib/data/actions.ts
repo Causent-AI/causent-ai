@@ -10,6 +10,7 @@ import { getMetricRecords } from "@/lib/data/metrics";
 import { edgeKey, loadEdgeReadouts } from "@/lib/data/graph";
 import { toImpactCell } from "@/lib/data/readout";
 import { toActionIdentity } from "@/lib/data/action-identifiers";
+import { metricUiIdForExpectedName } from "@/lib/data/action-metric";
 
 type ActionRow = {
   action_id: string;
@@ -82,10 +83,17 @@ export async function getActions(): Promise<Action[]> {
       toImpactCell(rec.metric, edges.get(edgeKey(row.action_id, rec.metricId))),
     );
 
-    // Primary metric = the action's hypothesized target (rationale meta), by slug.
+    // Primary metric = the action's hypothesized target (rationale meta). Join
+    // report-created names to their generated UI ids before the legacy slug
+    // fallback so every current-report action can find the displayed metric.
     const expectedName = doc?.meta?.expected_metric;
     const primaryMetricId = expectedName
-      ? (METRIC_CONFIG_BY_NAME[expectedName]?.id ?? expectedName)
+      ? (
+          metricUiIdForExpectedName(
+            records.map((record) => record.metric),
+            expectedName,
+          ) ?? METRIC_CONFIG_BY_NAME[expectedName]?.id ?? expectedName
+        )
       : firstMetricSlug;
 
     const action: Action = {

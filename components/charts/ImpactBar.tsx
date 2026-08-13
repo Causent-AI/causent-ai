@@ -1,5 +1,5 @@
 import type { Metric, MetricImpact } from "@/lib/types";
-import { formatCurrencyTick } from "@/lib/format";
+import { formatCount, formatCurrencyTick, formatPpDelta } from "@/lib/format";
 
 // Horizontal diverging bar chart: each metric's net impact, positive to the
 // right (teal) and negative to the left (red). Direction is reinforced by the
@@ -32,6 +32,9 @@ export function ImpactBar({
   metrics: Metric[];
 }) {
   const nameById = new Map(metrics.map((m) => [m.id, m.name]));
+  const formatById = new Map(metrics.map((m) => [m.id, m.format]));
+  const visibleFormats = new Set(rows.map((row) => formatById.get(row.metricId)).filter(Boolean));
+  const sharedFormat = visibleFormats.size === 1 ? [...visibleFormats][0] : null;
   const values = rows.map((r) => r.value);
   const rawMin = Math.min(0, ...values);
   const rawMax = Math.max(0, ...values);
@@ -41,6 +44,12 @@ export function ImpactBar({
   const frac = (v: number) => ((v - min) / (max - min)) * 100;
   const zero = frac(0);
   const ticks = niceTicks(min, max);
+  const formatTick = (value: number) => {
+    if (sharedFormat === "currency") return formatCurrencyTick(value);
+    if (sharedFormat === "percent") return formatPpDelta(value);
+    const label = formatCount(value);
+    return value > 0 ? `+${label}` : label;
+  };
 
   return (
     <div className="w-full">
@@ -100,7 +109,7 @@ export function ImpactBar({
               className="absolute -translate-x-1/2 text-[10px] text-[var(--text-subtle)] tabular-nums"
               style={{ left: `${frac(t)}%` }}
             >
-              {formatCurrencyTick(t)}
+              {formatTick(t)}
             </span>
           ))}
         </div>

@@ -612,12 +612,12 @@ READY_REPORT = {
     "sourceSummaries": [],
     "decision": {
         "decision": [{"id": "d", "text": "Deploy it", "status": "user_confirmed", "sourceChunkIds": []}],
-        "background": [],
+        "background": [{"id": "b", "text": "Teams need a clearer path", "status": "user_confirmed", "sourceChunkIds": []}],
         "problem": [{"id": "p", "text": "Users are blocked", "status": "user_confirmed", "sourceChunkIds": []}],
     },
     "supportingEvidence": {
-        "factors": [{"id": "f", "text": "Sessions abandon", "status": "user_confirmed", "sourceChunkIds": []}],
-        "metricMechanism": [{"id": "m", "text": "Completion should rise", "status": "user_confirmed", "sourceChunkIds": []}],
+        "factors": [],
+        "metricMechanism": [],
     },
     "implementation": {
         "actionPlanSummary": [{"id": "s", "text": "Instrument and ship", "status": "user_confirmed", "sourceChunkIds": []}],

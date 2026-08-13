@@ -8,7 +8,10 @@ import {
   type GenerateDecisionReportActionResult,
 } from "@/app/(onboarding)/onboarding/decision-report-actions";
 import { recordDecisionReportTelemetryAction } from "@/app/(onboarding)/onboarding/decision-report-telemetry-actions";
-import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "@/lib/decision-reports/fixtures/gummy-alpha";
+import {
+  DECISION_REPORT_REVIEW_EXAMPLES,
+  type DecisionReportReviewExampleId,
+} from "@/lib/decision-reports/fixtures/review-examples";
 import type { DecisionReportPersistenceStatus } from "@/lib/decision-reports/persistence";
 import type { DecisionReportActivationPointer } from "@/lib/decision-reports/persistence";
 import type { ReportActivationMetric } from "@/lib/decision-reports/materialization";
@@ -74,9 +77,10 @@ export function DecisionReportOnboarding({
 }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
+  const [selectedExampleId, setSelectedExampleId] =
+    useState<DecisionReportReviewExampleId | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [sourceEgressConfirmed, setSourceEgressConfirmed] = useState(false);
   const [draft, setDraft] = useState<ReportDraft | null>(() =>
     initialSavedReport ? { ...initialSavedReport } : null,
   );
@@ -98,10 +102,6 @@ export function DecisionReportOnboarding({
   }, [telemetryRun.sessionKey, trackLanding]);
 
   function generateReport() {
-    if (!sourceEgressConfirmed) {
-      setError("Confirm how Causent will process these sources before generating the report.");
-      return;
-    }
     if (pdfFile && (pdfFile.size === 0 || pdfFile.size > REPORT_SOURCE_MAX_PDF_BYTES)) {
       setError("Choose one non-empty PDF no larger than 5 MiB.");
       return;
@@ -117,6 +117,7 @@ export function DecisionReportOnboarding({
       );
       if (sourceUrl.trim()) formData.set("url", sourceUrl.trim());
       if (pdfFile) formData.set("pdf", pdfFile, pdfFile.name);
+      if (selectedExampleId) formData.set("reviewExampleId", selectedExampleId);
       let result: GenerateDecisionReportActionResult;
       try {
         result = await generateDecisionReportAction(formData);
@@ -189,9 +190,9 @@ export function DecisionReportOnboarding({
             setTelemetryRun(nextTelemetryRun);
             setTrackLanding(true);
             setPrompt("");
+            setSelectedExampleId(null);
             setSourceUrl("");
             setPdfFile(null);
-            setSourceEgressConfirmed(false);
             setDraft(null);
             setError(null);
             router.replace("/onboarding", { scroll: false });
@@ -207,51 +208,81 @@ export function DecisionReportOnboarding({
         <div className="mb-4 flex items-center gap-2 text-[11px] font-medium text-[var(--text-muted)]">
           <span className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1">Orbit</span>
           <span aria-hidden>→</span>
-          <span>New project</span>
+          <span>New Decision Report</span>
         </div>
         <h1 className="max-w-2xl text-[30px] font-semibold leading-[1.15] tracking-[-0.02em] text-[var(--text)] sm:text-[38px]">
-          What are you building?
+          What&apos;s the biggest business challenge on your mind today?
         </h1>
-        <p className="mt-3 max-w-2xl text-[14px] leading-6 text-[var(--text-muted)]">
-          Describe the decision, supporting evidence, and resources already in your plan. Causent will turn them into an editable Decision Report.
+        <p className="mt-3 max-w-2xl text-[15px] leading-6 text-[var(--text-muted)] sm:text-[16px]">
+          Causent helps you refine, measure, and track the business decisions behind it. Tell us what&apos;s going on, and we&apos;ll fill in what we can.
+        </p>
+        <p className="mt-2 max-w-2xl text-[12px] leading-5 text-[var(--text-muted)]">
+          Causent works best with supporting evidence and resources, but you can add those later.
         </p>
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg shadow-slate-200/50 sm:p-5">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <label className="text-[12px] font-semibold text-[var(--text)]" htmlFor="project-brief">
-            Project brief
+        <div className="mb-4">
+          <label className="text-[14px] font-semibold text-[var(--text)]" htmlFor="project-brief">
+            Tell us what&apos;s going on
           </label>
-          <button
-            type="button"
-            className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[11px] font-semibold text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
-            disabled={isPending}
-            onClick={() => {
-              setPrompt(GUMMY_ALPHA_GOLDEN_EXAMPLE.initialPrompt);
-              setSourceEgressConfirmed(false);
-              setError(null);
-            }}
-          >
-            Load Gummy Alpha example
-          </button>
+          <p id="project-brief-help" className="mt-1 text-[12px] leading-5 text-[var(--text-muted)]">
+            A few sentences is plenty. You don&apos;t need to have the decision figured out yet.
+          </p>
         </div>
         <textarea
           id="project-brief"
-          autoFocus
+          aria-describedby="project-brief-help"
           disabled={isPending}
-          className="min-h-56 w-full resize-y bg-transparent text-[14px] leading-7 text-[var(--text)] outline-none placeholder:text-[var(--text-subtle)]"
+          className="min-h-44 w-full resize-y rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-[14px] leading-6 text-[var(--text)] outline-none placeholder:text-[var(--text-subtle)] focus:border-slate-400"
           value={prompt}
           onChange={(event) => {
             setPrompt(event.target.value);
-            setSourceEgressConfirmed(false);
+            setSelectedExampleId(null);
             setError(null);
           }}
-          placeholder="What are you building? What supports the decision? What resources do you already have?"
+          placeholder="For example: Customers are dropping out of our setup flow, and we&apos;re not sure whether to simplify it or add in-product guidance."
         />
-        <div className="grid gap-3 border-t border-[var(--border)] py-4 sm:grid-cols-2">
+        <div className="mt-4 border-t border-[var(--border)] py-4">
+          <p className="text-[12px] font-semibold text-[var(--text)]">
+            Need a starting point?
+          </p>
+          <p className="mt-0.5 text-[11px] leading-5 text-[var(--text-muted)]">
+            Load an example brief, then change it to match your decision.
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {DECISION_REPORT_REVIEW_EXAMPLES.map((example) => (
+              <button
+                key={example.id}
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  setPrompt(example.prompt);
+                  setSelectedExampleId(example.id);
+                  setSourceUrl("");
+                  setPdfFile(null);
+                  setError(null);
+                }}
+                className="min-h-20 rounded-xl border border-[var(--border)] bg-slate-50/70 px-3 py-3 text-left transition-colors hover:border-[var(--brand-blue)] hover:bg-blue-50/40 disabled:opacity-50"
+              >
+                <span className="block text-[12px] font-semibold text-[var(--text)]">{example.project}</span>
+                <span className="mt-1 block text-[11px] leading-5 text-[var(--text-muted)]">{example.decision}</span>
+                <span className="mt-2 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-800">{example.badge}</span>
+                <span className="mt-2 block text-[11px] font-semibold text-[var(--brand-blue)]">Load example brief →</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="border-t border-[var(--border)] py-4">
+          <p className="text-[12px] font-semibold text-[var(--text)]">Optional supporting evidence</p>
+          <p className="mt-0.5 text-[11px] leading-5 text-[var(--text-muted)]">
+            Have something useful? Add one public page or text PDF now, or skip this and come back later.
+          </p>
+        </div>
+        <div className="grid gap-3 pb-4 sm:grid-cols-2">
           <div>
             <label className="text-[11px] font-semibold text-[var(--text)]" htmlFor="source-url">
-              Source URL <span className="font-normal text-[var(--text-muted)]">(optional)</span>
+              Public URL
             </label>
             <input
               id="source-url"
@@ -263,18 +294,15 @@ export function DecisionReportOnboarding({
               value={sourceUrl}
               onChange={(event) => {
                 setSourceUrl(event.target.value);
-                setSourceEgressConfirmed(false);
+                setSelectedExampleId(null);
                 setError(null);
               }}
               placeholder="https://example.com/research"
             />
-            <p className="mt-1.5 text-[10px] leading-4 text-[var(--text-muted)]">
-              One public HTTPS page. HTML or plain text only.
-            </p>
           </div>
           <div>
             <label className="text-[11px] font-semibold text-[var(--text)]" htmlFor="source-pdf">
-              PDF source <span className="font-normal text-[var(--text-muted)]">(optional)</span>
+              Text PDF
             </label>
             <input
               id="source-pdf"
@@ -284,49 +312,32 @@ export function DecisionReportOnboarding({
               className="mt-2 block w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[11px] text-[var(--text-muted)] file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-slate-700"
               onChange={(event) => {
                 setPdfFile(event.target.files?.[0] ?? null);
-                setSourceEgressConfirmed(false);
+                setSelectedExampleId(null);
                 setError(null);
               }}
             />
-            <p className="mt-1.5 text-[10px] leading-4 text-[var(--text-muted)]">
-              {pdfFile
-                ? `${pdfFile.name} · ${(pdfFile.size / 1_048_576).toFixed(1)} MiB selected`
-                : "One text-based PDF, up to 5 MiB and 40 pages. OCR is not included."}
-            </p>
+            {pdfFile ? (
+              <p className="mt-1.5 text-[10px] leading-4 text-[var(--text-muted)]">
+                {pdfFile.name} · {(pdfFile.size / 1_048_576).toFixed(1)} MiB selected
+              </p>
+            ) : null}
           </div>
         </div>
-        <div className="border-t border-[var(--border)] py-4">
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-3 text-[12px] leading-5 text-blue-950">
-            <input
-              type="checkbox"
-              checked={sourceEgressConfirmed}
-              disabled={isPending}
-              onChange={(event) => {
-                setSourceEgressConfirmed(event.target.checked);
-                setError(null);
-              }}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-blue-700"
-            />
-            <span>
-              I confirm that Causent may send this project brief and extracted text from any URL or PDF to the configured AI provider to generate this report. I am authorized to share these sources.
-            </span>
-          </label>
-          <p className="mt-2 text-[10px] leading-4 text-[var(--text-muted)]">
-            Changing the brief, URL, or PDF clears this confirmation so you can review it again.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
-          <p className="max-w-md text-[11px] leading-5 text-[var(--text-muted)]">
-            Causent labels supplied facts, AI inferences, suggestions, and missing information separately. It will not invent owners, costs, or metric values.
+        <div className="flex flex-col items-end gap-2 border-t border-[var(--border)] pt-4">
+          <p className="text-right text-[11px] font-medium leading-4 text-[var(--text)]">
+            We&apos;ll fill in what we can. You&apos;ll review the draft and complete any highlighted fields before activation.
           </p>
           <button
             type="button"
             className="rounded-lg bg-[var(--text)] px-5 py-2.5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={prompt.trim().length < 20 || !sourceEgressConfirmed || isPending}
+            disabled={prompt.trim().length < 20 || isPending}
             onClick={generateReport}
           >
-            {isPending ? "Generating report…" : "Generate Decision Report"}
+            {isPending ? "Building your draft…" : "Turn this into a Decision Report"}
           </button>
+          <p className="max-w-xl text-right text-[10px] leading-4 text-[var(--text-muted)]">
+            By clicking Turn this into a Decision Report, you authorize Causent to send your challenge description and extracted URL/PDF text to the configured AI provider.
+          </p>
         </div>
         {error ? (
           <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800" role="alert">
@@ -335,19 +346,6 @@ export function DecisionReportOnboarding({
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        {[
-          ["01", "Decision", "The change, context, and problem"],
-          ["02", "Evidence", "Signals, mechanism, and metric"],
-          ["03", "Implementation", "Actions, owners, and governance"],
-        ].map(([number, title, description]) => (
-          <div key={number} className="rounded-xl border border-[var(--border)] bg-white/60 p-4">
-            <p className="text-[10px] font-semibold text-[var(--brand-teal)]">{number}</p>
-            <p className="mt-2 text-[13px] font-semibold text-[var(--text)]">{title}</p>
-            <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">{description}</p>
-          </div>
-        ))}
-      </div>
     </section>
   );
 }

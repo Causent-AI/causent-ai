@@ -75,6 +75,8 @@ test("production Supabase and recompute URLs must be HTTPS", () => {
     ...validProductionApp,
     CAUSENT_RECOMPUTE_URL: "http://worker.example/api/recompute",
     CAUSENT_RECOMPUTE_SECRET: "worker-secret",
+    CAUSENT_RESOLVE_URL: "https://resolver.example/api/resolve",
+    CAUSENT_RESOLVE_SECRET: "resolver-secret",
     CRON_SECRET: "cron-secret",
   });
   assert.deepEqual(release.issues, [
@@ -82,17 +84,25 @@ test("production Supabase and recompute URLs must be HTTPS", () => {
   ]);
 });
 
-test("release checks cover the separately deployed app and worker", () => {
+test("release checks cover the app and both stateful workers", () => {
   const app = validateReleaseConfig("app", validProductionApp);
   assert.deepEqual(
     app.issues.map((issue) => issue.variable).sort(),
-    ["CAUSENT_RECOMPUTE_SECRET", "CAUSENT_RECOMPUTE_URL", "CRON_SECRET"],
+    [
+      "CAUSENT_RECOMPUTE_SECRET",
+      "CAUSENT_RECOMPUTE_URL",
+      "CAUSENT_RESOLVE_SECRET",
+      "CAUSENT_RESOLVE_URL",
+      "CRON_SECRET",
+    ],
   );
   assert.equal(
     validateReleaseConfig("app", {
       ...validProductionApp,
       CAUSENT_RECOMPUTE_URL: "https://causent-recompute.vercel.app/api/recompute",
       CAUSENT_RECOMPUTE_SECRET: "worker-secret",
+      CAUSENT_RESOLVE_URL: "https://causent-resolve.vercel.app/api/resolve",
+      CAUSENT_RESOLVE_SECRET: "resolver-secret",
       CRON_SECRET: "cron-secret",
     }).ok,
     true,
@@ -106,6 +116,18 @@ test("release checks cover the separately deployed app and worker", () => {
     validateReleaseConfig("worker", {
       DATABASE_URL: "postgresql://pooler.example/postgres",
       CAUSENT_RECOMPUTE_SECRET: "worker-secret",
+    }).ok,
+    true,
+  );
+
+  assert.deepEqual(validateReleaseConfig("resolver", {}).issues, [
+    { code: "missing_required", variable: "DATABASE_URL" },
+    { code: "missing_required", variable: "CAUSENT_RESOLVE_SECRET" },
+  ]);
+  assert.equal(
+    validateReleaseConfig("resolver", {
+      DATABASE_URL: "postgresql://pooler.example/postgres",
+      CAUSENT_RESOLVE_SECRET: "resolver-secret",
     }).ok,
     true,
   );

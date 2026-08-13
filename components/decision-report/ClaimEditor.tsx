@@ -1,3 +1,4 @@
+import { AutoGrowingTextarea } from "@/components/ui/AutoGrowingTextarea";
 import type { Claim, ClaimStatus } from "@/lib/decision-reports/schema";
 
 const STATUS_LABELS: Record<ClaimStatus, string> = {
@@ -33,6 +34,7 @@ export function ClaimEditor({
   rows = 2,
   optional = false,
   readOnly = false,
+  variant = "field",
   onChange,
 }: {
   claim: Claim;
@@ -41,6 +43,7 @@ export function ClaimEditor({
   rows?: number;
   optional?: boolean;
   readOnly?: boolean;
+  variant?: "field" | "document" | "decision";
   onChange: (text: string) => void;
 }) {
   const inputId = `claim-${claim.id}`;
@@ -48,35 +51,67 @@ export function ClaimEditor({
 
   return (
     <div
-      className={`rounded-lg border px-3 py-2 transition-colors ${
-        missing && !optional
-          ? "border-dashed border-amber-300 bg-amber-50/40"
-          : missing
-            ? "border-dashed border-slate-300 bg-slate-50/60"
-          : "border-[var(--border)] bg-[var(--surface)]"
-      }`}
+      className={
+        variant === "decision"
+          ? `rounded-xl border px-4 py-4 ${
+              missing && !optional
+                ? "border-amber-300 bg-amber-50/60"
+                : "border-blue-200 bg-blue-50/60"
+            }`
+          : variant === "document"
+            ? `group rounded-lg border-l-2 px-3 py-3 transition-colors ${
+                missing && !optional
+                  ? "border-l-amber-400 bg-amber-50/60"
+                  : "border-l-transparent hover:bg-slate-50/80 focus-within:border-l-[var(--brand-blue)] focus-within:bg-blue-50/35"
+              }`
+            : `rounded-lg border px-3 py-2 transition-colors ${
+                missing && !optional
+                  ? "border-dashed border-amber-300 bg-amber-50/40"
+                  : missing
+                    ? "border-dashed border-slate-300 bg-slate-50/60"
+                    : "border-[var(--border)] bg-[var(--surface)]"
+              }`
+      }
     >
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <label className="text-[12px] font-semibold text-[var(--text)]" htmlFor={inputId}>
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <label
+          className={
+            variant === "document"
+              ? "text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)] group-focus-within:text-[var(--brand-blue)]"
+              : "text-[12px] font-semibold text-[var(--text)]"
+          }
+          htmlFor={inputId}
+        >
           {label}
         </label>
-        {missing && optional ? (
-          <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600">
-            Optional
-          </span>
-        ) : (
-          <ClaimStatusBadge status={claim.status} />
-        )}
+        {missing && optional ? null : <ClaimStatusBadge status={claim.status} />}
       </div>
-      <textarea
-        id={inputId}
-        className="w-full resize-y bg-transparent text-[13px] leading-5 text-[var(--text)] outline-none placeholder:text-[var(--text-subtle)]"
-        value={claim.text}
-        rows={rows}
-        placeholder={placeholder ?? (missing ? "Add what you know…" : undefined)}
-        disabled={readOnly}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      {variant === "document" ? (
+        <AutoGrowingTextarea
+          id={inputId}
+          className="block min-h-7 w-full bg-transparent text-[15px] leading-7 text-[var(--text)] outline-none placeholder:text-[var(--text-subtle)]"
+          value={claim.text}
+          rows={1}
+          placeholder={placeholder ?? (missing ? "Add what you know…" : undefined)}
+          readOnly={readOnly}
+          aria-invalid={missing && !optional}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : (
+        <textarea
+          id={inputId}
+          className={`w-full resize-y bg-transparent text-[var(--text)] outline-none placeholder:text-[var(--text-subtle)] ${
+            variant === "decision"
+              ? "text-[15px] font-semibold leading-7"
+              : "text-[13px] leading-5"
+          }`}
+          value={claim.text}
+          rows={rows}
+          placeholder={placeholder ?? (missing ? "Add what you know…" : undefined)}
+          disabled={readOnly}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
     </div>
   );
 }
@@ -87,6 +122,7 @@ export function ClaimListEditor({
   placeholder,
   optional = false,
   readOnly = false,
+  variant = "field",
   onChange,
 }: {
   claims: Claim[];
@@ -94,35 +130,32 @@ export function ClaimListEditor({
   placeholder?: string;
   optional?: boolean;
   readOnly?: boolean;
+  variant?: "field" | "document";
   onChange: (claimId: string, text: string) => void;
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className={variant === "document" ? "flex flex-col" : "flex flex-col gap-2"}>
+      {variant === "document" ? null : (
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
           {label}
         </p>
-        {optional ? (
-          <span className="text-[10px] font-medium normal-case tracking-normal text-slate-500">
-            Optional
-          </span>
-        ) : null}
-      </div>
-      {claims.map((claim) => (
+      )}
+      {claims.map((claim, index) => (
         <ClaimEditor
           key={claim.id}
           claim={claim}
           label={
-            claim.status === "missing"
-              ? optional
-                ? "Add if useful"
-                : "Missing information"
-              : "Claim"
+            claim.status === "missing" && !optional
+              ? "Missing information"
+              : claims.length > 1
+                ? `${label} ${index + 1}`
+                : label
           }
           placeholder={placeholder}
           rows={2}
           optional={optional}
           readOnly={readOnly}
+          variant={variant}
           onChange={(text) => onChange(claim.id, text)}
         />
       ))}

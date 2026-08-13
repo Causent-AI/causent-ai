@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import type { ReportAssetView } from "@/lib/decision-reports/assets";
 
-export function SuppliedMockup({ asset, readOnly, disabled, pending, error, onUpload, onRemove }: {
+export function SuppliedMockup({ asset, readOnly, disabled, pending, error, onUpload, onRemove, title = "Chart or graph", emptyMessage = "Add a chart or graph if it helps explain the evidence.", imageAlt = "User-supplied supporting chart", uploadLabel = "Add PNG or JPEG" }: {
   asset: ReportAssetView | null;
   readOnly: boolean;
   disabled: boolean;
@@ -11,19 +11,23 @@ export function SuppliedMockup({ asset, readOnly, disabled, pending, error, onUp
   error: string | null;
   onUpload: (file: File) => void;
   onRemove: () => void;
+  title?: string;
+  emptyMessage?: string;
+  imageAlt?: string;
+  uploadLabel?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">Supplied mock-up · optional</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">{title}</p>
         {asset ? <span className="text-[10px] font-medium text-teal-700">Sanitized · private</span> : null}
       </div>
       {asset ? (
         <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
           {/* This URL is an authenticated route; the private Storage path never reaches the client. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={asset.previewUrl} alt="User-supplied product mock-up" className="max-h-72 w-full object-contain" />
+          <img src={asset.previewUrl} alt={imageAlt} className="max-h-72 w-full object-contain" />
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-3 py-2 text-[11px] text-[var(--text-muted)]">
             <span>{asset.width}×{asset.height} · {Math.ceil(asset.byteSize / 1024).toLocaleString()} KB</span>
             {!readOnly ? <div className="flex gap-2">
@@ -35,10 +39,10 @@ export function SuppliedMockup({ asset, readOnly, disabled, pending, error, onUp
       ) : (
         <div className="mt-3 flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/70 px-4 text-center">
           <p className="max-w-xs text-[12px] leading-5 text-[var(--text-muted)]">
-            No mock-up supplied. Causent never generates or implies one.
+            {emptyMessage}
           </p>
           {!readOnly ? <button type="button" disabled={disabled || pending} onClick={() => inputRef.current?.click()} className="mt-3 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[11px] font-semibold text-[var(--text)] disabled:opacity-45">
-            {disabled ? "Save report to upload" : pending ? "Processing…" : "Upload PNG or JPEG"}
+            {disabled ? "Waiting for autosave…" : pending ? "Processing…" : uploadLabel}
           </button> : null}
         </div>
       )}

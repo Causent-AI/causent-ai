@@ -65,7 +65,7 @@ export function MetricPredictionChart({ projection }: { projection: MetricProjec
         ) : null}
         <p className="text-[11px] leading-5 text-[var(--text-muted)]">
           {projection.evidenceState === "illustrative_assumption"
-            ? "Founder prediction for the prototype. Replace both values with instrumented data before using this report to approve the decision."
+            ? "Prediction for the prototype. Replace both values with instrumented data before using this report to approve the decision."
             : projection.evidenceState === "prompt_supplied"
               ? "These values came from the brief. Confirm the baseline against instrumented data before approving the decision."
               : "The AI can propose a metric definition, but it cannot invent observations or a prediction."}

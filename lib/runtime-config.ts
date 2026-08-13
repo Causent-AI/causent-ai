@@ -11,7 +11,7 @@ export type RuntimeConfigValidation = {
   issues: RuntimeConfigIssue[];
 };
 
-export type ReleaseConfigTarget = "app" | "worker";
+export type ReleaseConfigTarget = "app" | "worker" | "resolver";
 
 export const PRODUCTION_APP_REQUIRED_ENV = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -26,17 +26,27 @@ export const PRODUCTION_FORBIDDEN_LOCAL_FLAGS = [
   "CAUSENT_USE_SEED",
   "CAUSENT_DECISION_REPORT_FIXTURE",
   "CAUSENT_DECISION_REPORT_LOCAL_ROLLOUT",
+  // A historical demo clock would keep new real-world predictions from ever
+  // becoming due in the production resolution sweep.
+  "CAUSENT_DEMO_TODAY",
 ] as const;
 
 const APP_RELEASE_REQUIRED_ENV = [
   "CAUSENT_RECOMPUTE_URL",
   "CAUSENT_RECOMPUTE_SECRET",
+  "CAUSENT_RESOLVE_URL",
+  "CAUSENT_RESOLVE_SECRET",
   "CRON_SECRET",
 ] as const;
 
 const WORKER_RELEASE_REQUIRED_ENV = [
   "DATABASE_URL",
   "CAUSENT_RECOMPUTE_SECRET",
+] as const;
+
+const RESOLVER_RELEASE_REQUIRED_ENV = [
+  "DATABASE_URL",
+  "CAUSENT_RESOLVE_SECRET",
 ] as const;
 
 function value(env: RuntimeEnvironment, variable: string): string {
@@ -121,7 +131,7 @@ export function validateProductionAppRuntime(
   return { ok: issues.length === 0, production, issues };
 }
 
-/** Network-free validation for the two separately deployed production targets. */
+/** Network-free validation for the separately deployed production targets. */
 export function validateReleaseConfig(
   target: ReleaseConfigTarget,
   env: RuntimeEnvironment,
@@ -129,6 +139,12 @@ export function validateReleaseConfig(
   if (target === "worker") {
     const issues: RuntimeConfigIssue[] = [];
     pushMissing(issues, env, WORKER_RELEASE_REQUIRED_ENV);
+    pushInvalidPostgresUrl(issues, env, "DATABASE_URL");
+    return { ok: issues.length === 0, production: true, issues };
+  }
+  if (target === "resolver") {
+    const issues: RuntimeConfigIssue[] = [];
+    pushMissing(issues, env, RESOLVER_RELEASE_REQUIRED_ENV);
     pushInvalidPostgresUrl(issues, env, "DATABASE_URL");
     return { ok: issues.length === 0, production: true, issues };
   }
@@ -140,5 +156,6 @@ export function validateReleaseConfig(
   const issues = [...runtime.issues];
   pushMissing(issues, env, APP_RELEASE_REQUIRED_ENV);
   pushInvalidHttpsUrl(issues, env, "CAUSENT_RECOMPUTE_URL");
+  pushInvalidHttpsUrl(issues, env, "CAUSENT_RESOLVE_URL");
   return { ok: issues.length === 0, production: true, issues };
 }

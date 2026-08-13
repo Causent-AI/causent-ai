@@ -3,8 +3,8 @@
 import { validateReleaseConfig } from "../lib/runtime-config.ts";
 
 const target = process.argv[2] ?? "app";
-if (target !== "app" && target !== "worker") {
-  console.error("usage: node scripts/check-release-config.mjs [app|worker]");
+if (target !== "app" && target !== "worker" && target !== "resolver") {
+  console.error("usage: node scripts/check-release-config.mjs [app|worker|resolver]");
   process.exitCode = 2;
 } else {
   const result = validateReleaseConfig(target, process.env);

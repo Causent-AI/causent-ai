@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { FileCsvIcon } from "@/components/ui/icons";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import {
   importWorkspaceMetricCsvAction,
   type WorkspaceMetricCsvImportActionState,
@@ -12,10 +13,15 @@ const INITIAL_STATE: WorkspaceMetricCsvImportActionState = { status: "idle" };
 /** Import or update a named workspace metric for Decision Report selection. */
 export function WorkspaceMetricCsvDropzone({
   activeMetricName,
+  activeMetricUnit,
 }: {
   activeMetricName?: string | null;
+  activeMetricUnit?: string | null;
 }) {
   const [state, action, pending] = useActionState(importWorkspaceMetricCsvAction, INITIAL_STATE);
+  const defaultUnit = activeMetricUnit === "percent" || activeMetricUnit === "USD"
+    ? activeMetricUnit
+    : "count";
 
   return (
     <section aria-labelledby="workspace-metric-import-title">
@@ -23,17 +29,14 @@ export function WorkspaceMetricCsvDropzone({
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)]">
           <FileCsvIcon />
         </div>
-        <div>
-          <h2 id="workspace-metric-import-title" className="text-[15px] font-semibold text-[var(--text)]">
-            Add a core metric
-          </h2>
-          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[var(--text-muted)]">
-            Name the metric, choose its unit, and import one daily <span className="font-mono">date,value</span> CSV. Then add it to the shared Core Metrics surface from the list below.
-            {activeMetricName ? ` To update the current report metric, use its exact name: ${activeMetricName}.` : ""}
-          </p>
-          <p className="mt-2 max-w-2xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-950">
-            Reusing an existing metric name updates values on matching dates. Dates that are not present in this CSV remain unchanged.
-          </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1">
+            <h2 id="workspace-metric-import-title" className="text-[15px] font-semibold text-[var(--text)]">Add a core metric</h2>
+            <InfoTooltip label="How metric import works">
+              <p>Import one daily <span className="font-mono">date,value</span> CSV. Reusing a metric name updates matching dates while dates absent from the file remain unchanged. Add the result to Core Metrics below.</p>
+            </InfoTooltip>
+          </div>
+          {activeMetricName ? <p className="mt-1 text-[11px] text-[var(--text-muted)]">Current report metric: <span className="font-semibold text-[var(--text)]">{activeMetricName}</span></p> : null}
         </div>
       </div>
 
@@ -55,7 +58,7 @@ export function WorkspaceMetricCsvDropzone({
           <select
             id="workspace-metric-unit"
             name="unit"
-            defaultValue="count"
+            defaultValue={defaultUnit}
             className="mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-base text-[var(--text)] outline-none focus:border-[var(--brand-blue)] md:text-[12px]"
           >
             <option value="percent">Percent</option>

@@ -10,18 +10,22 @@ function directionOf(value: number): "up" | "down" | "neutral" {
 
 /**
  * Derive the report-level causal rollup from the already-isolated action list.
- * Descriptive cells remain visible on each action, but never enter the causal
- * aggregate. Workspace-wide aggregates are intentionally ignored here.
+ * Only the pre-registered primary lever can enter the causal aggregate.
+ * Descriptive and support-action cells remain outside the rollup, and
+ * workspace-wide aggregates are intentionally ignored here.
  */
 export function deriveCurrentReportImpact(
   actions: Action[],
   metrics: Metric[],
+  primaryActionId: string | null,
 ): Pick<ReportProjectView, "aggregatedImpact" | "impactByMetric"> {
-  const causalCells = actions.flatMap((action) =>
-    action.impact.filter(
-      (cell) => cell.evidence === "causal" && cell.value !== null,
-    ),
-  );
+  const causalCells = actions
+    .filter((action) => action.id === primaryActionId)
+    .flatMap((action) =>
+      action.impact.filter(
+        (cell) => cell.evidence === "causal" && cell.value !== null,
+      ),
+    );
   const confidentGood = causalCells.filter((cell) => cell.good).length;
   const confident = causalCells.length;
 
@@ -115,7 +119,11 @@ export function selectReportProjectView(input: {
   const metrics = metricUiId
     ? input.metrics.filter((metric) => metric.id === metricUiId)
     : [];
-  const reportImpact = deriveCurrentReportImpact(actions, metrics);
+  const reportImpact = deriveCurrentReportImpact(
+    actions,
+    metrics,
+    decisions[0]?.leverActionId ?? null,
+  );
 
   return {
     activeReport,

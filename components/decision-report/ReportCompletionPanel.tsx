@@ -41,11 +41,11 @@ export function ReportCompletionPanel({
               id="report-completion-title"
               className="text-[15px] font-semibold text-emerald-950"
             >
-              Required report sections complete
+              Core decision details complete
             </h2>
             <p className="mt-1 text-[12px] leading-5 text-emerald-900/80">
-              This draft is ready for review. Owners, customers, stakeholders,
-              governance, and a mock-up are optional and can be added now or later.
+              This draft is ready for review. Supporting evidence, owners, customers,
+              stakeholders, and charts can be added now or later.
             </p>
           </div>
         </div>
@@ -64,11 +64,11 @@ export function ReportCompletionPanel({
             id="report-completion-title"
             className="text-[15px] font-semibold text-[var(--text)]"
           >
-            Complete this report
+            A few details still need you
           </h2>
           <p className="mt-1 text-[12px] leading-5 text-[var(--text-muted)]">
-            Answer up to three focused questions here, or jump to the matching field.
-            No additional AI request is made.
+            Causent filled in what it could. Answer the highlighted questions here or
+            edit the matching fields in the report. Supporting evidence is optional.
           </p>
         </div>
         <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">

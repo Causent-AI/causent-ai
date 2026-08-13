@@ -13,7 +13,14 @@ import { buildDecisionLoopHandoff } from "@/lib/decision-reports/loop-handoff";
 export const dynamic = "force-dynamic";
 
 export default async function ActionsPage() {
-  const { actions, decisions, metrics, objective, activeDecisionReport } = await loadDashboardData();
+  const {
+    actions,
+    decisions,
+    metrics,
+    impactMetrics,
+    objective,
+    activeDecisionReport,
+  } = await loadDashboardData();
   const activeDecision = activeDecisionReport?.decisionId
     ? decisions.find((decision) => decision.id === activeDecisionReport.decisionId)
     : undefined;
@@ -57,8 +64,9 @@ export default async function ActionsPage() {
         decisions={decisions}
         metrics={metrics}
         objective={objective}
-        connectorMetricId={activeDecisionReport?.metricId ?? null}
+        connectorMetricId={activeDecisionReport ? impactMetrics[0]?.id ?? null : null}
         decisionReport={activeDecisionReport?.report ?? null}
+        decisionReportId={activeDecisionReport?.id ?? null}
         decisionLoopHandoffs={decisionLoopHandoffs}
       />
     </Suspense>

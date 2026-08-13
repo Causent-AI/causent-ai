@@ -56,7 +56,7 @@ export function ActionsTable({
                       {a.title}
                     </Link>
                     <span className="text-[var(--text-subtle)] tabular-nums">
-                      {actionReferenceLabel(a)}
+                      {a.source === "manual" && a.shippedAt ? "Complete" : actionReferenceLabel(a)}
                     </span>
                   </div>
                 </td>

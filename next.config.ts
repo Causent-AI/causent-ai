@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Keep development-only review chrome from covering the shared app header.
+  // Next.js still surfaces compile and runtime errors when this badge is hidden.
+  devIndicators: false,
   // The bounded PDF parser loads inside an eval worker, which intentionally
   // keeps its dependency outside the server bundle. Include that runtime tree
   // explicitly so standalone/Vercel output tracing ships the worker package.

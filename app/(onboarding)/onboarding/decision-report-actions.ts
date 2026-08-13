@@ -21,6 +21,7 @@ import {
   isLocalDemo,
 } from "@/lib/supabase-server";
 import { recordDecisionReportTelemetry } from "@/lib/decision-reports/telemetry";
+import { validateDecisionReportReviewExampleSelection } from "@/lib/decision-reports/fixtures/review-examples";
 
 export type MintedDecisionReportGeneration = DecisionReportGenerationResult & {
   sourceReceiptId: string;
@@ -95,6 +96,25 @@ export async function generateDecisionReportAction(
     };
   }
   const { brief: prompt, url: sourceUrl, pdf } = parsedInput;
+  const rawReviewExampleId = input instanceof FormData
+    ? input.get("reviewExampleId")
+    : null;
+  const reviewExampleSelection = validateDecisionReportReviewExampleSelection({
+    id: rawReviewExampleId,
+    prompt,
+    hasAdditionalSources: Boolean(sourceUrl) || Boolean(pdf),
+  });
+  if (!reviewExampleSelection.ok) {
+    await emit("REPORT_GENERATION_FAILED");
+    return {
+      ok: false,
+      error:
+        reviewExampleSelection.reason === "invalid_id"
+          ? "Choose one of the available report examples."
+          : "Reload the example after changing its brief or adding evidence.",
+    };
+  }
+  const reviewExample = reviewExampleSelection.example;
   if (prompt.length < DECISION_REPORT_PROMPT_MIN_CHARS) {
     await emit("REPORT_GENERATION_FAILED");
     return {
@@ -116,7 +136,10 @@ export async function generateDecisionReportAction(
       url: sourceUrl || undefined,
       pdf,
     });
-    const generation = await generateDecisionReportFromPrompt(prompt, { sources });
+    const generation = await generateDecisionReportFromPrompt(prompt, {
+      sources,
+      forceFixture: Boolean(reviewExample),
+    });
     const receipt = await mintDecisionReportSourceReceipt(
       getServiceRoleSupabase(),
       session.workspaceId,

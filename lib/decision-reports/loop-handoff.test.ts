@@ -7,6 +7,7 @@ import {
   DECISION_LOOP_REVIEW_MAX_BYTES,
   buildDecisionLoopHandoff,
   parseDecisionLoopReview,
+  prepareDecisionLoopCopy,
   type DecisionLoopHandoffInput,
 } from "./loop-handoff.ts";
 import type { Action, Decision, Prediction } from "../types.ts";
@@ -207,6 +208,41 @@ test("classification produces an explicit egress decision without pretending to 
     },
     { decision: "allowed", requiresConfirmation: false },
   );
+});
+
+test("Claude and Codex copy preparation preserves the same bounded packet", () => {
+  const handoff = built();
+
+  for (const target of ["claude", "codex"] as const) {
+    const blocked = prepareDecisionLoopCopy(handoff, target, false);
+    assert.equal(blocked.ok, false);
+
+    const prepared = prepareDecisionLoopCopy(handoff, target, true);
+    assert.equal(prepared.ok, true);
+    if (!prepared.ok) continue;
+    assert.equal(prepared.target, target);
+    assert.equal(prepared.clipboardText, handoff.clipboardText);
+    assert.equal(prepared.contextFingerprint, handoff.contextFingerprint);
+    assert.equal(prepared.clipboardText.includes(target), false);
+  }
+});
+
+test("copy preparation applies the same egress rule to both destinations", () => {
+  for (const classification of [null, "organization", "private"] as const) {
+    const input = validInput();
+    input.currentReport.report.implementation.governance.dataClassification = classification;
+    const handoff = built(input);
+    for (const target of ["claude", "codex"] as const) {
+      assert.equal(prepareDecisionLoopCopy(handoff, target, false).ok, false);
+      assert.equal(prepareDecisionLoopCopy(handoff, target, true).ok, true);
+    }
+  }
+
+  const publicInput = validInput();
+  publicInput.currentReport.report.implementation.governance.dataClassification = "public";
+  const publicHandoff = built(publicInput);
+  assert.equal(prepareDecisionLoopCopy(publicHandoff, "claude", false).ok, true);
+  assert.equal(prepareDecisionLoopCopy(publicHandoff, "codex", false).ok, true);
 });
 
 test("current selection and report/action identities fail closed", () => {

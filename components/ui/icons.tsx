@@ -38,6 +38,32 @@ export function ReportIcon({ size = 17, className, strokeWidth = 1.6 }: IconProp
   );
 }
 
+export function DataIcon({ size = 17, className, strokeWidth = 1.6 }: IconProps) {
+  return (
+    <svg {...base(size, className)} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="5" rx="8" ry="3" />
+      <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+    </svg>
+  );
+}
+
+export function DecisionIcon({ size = 17, className, strokeWidth = 1.6 }: IconProps) {
+  return (
+    <svg {...base(size, className)} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h10M4 12h16M4 18h10" />
+      <path d="m16 5 2 2 3-4" />
+    </svg>
+  );
+}
+
+export function ImpactIcon({ size = 17, className, strokeWidth = 1.6 }: IconProps) {
+  return (
+    <svg {...base(size, className)} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19V9M10 19V5M16 19v-7M22 19H2" />
+    </svg>
+  );
+}
+
 export function FolderIcon({ size = 16, className, strokeWidth = 1.6 }: IconProps) {
   return (
     <svg {...base(size, className)} stroke="currentColor" strokeWidth={strokeWidth} strokeLinejoin="round">

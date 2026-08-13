@@ -1,3 +1,35 @@
+# Production release preflight — 2026-08-12
+
+The founder requested publication of the current Decision Report review candidate, but this
+read-only preflight found blockers and performed no environment mutation, project creation,
+migration, merge, deployment, or canary:
+
+- Root app: Vercel project `causent-ai`, live baseline at **https://app.causent.ai**. Production
+  currently lacks `SUPABASE_SERVICE_ROLE_KEY`, `CAUSENT_RECOMPUTE_URL`, and
+  `CAUSENT_RECOMPUTE_SECRET`. The environment-name list confirms `CRON_SECRET`,
+  `CAUSENT_RESOLVE_URL`, and `CAUSENT_RESOLVE_SECRET`; Vercel does not expose their encrypted values
+  through the local pull/run context, so empty local values do not prove production absence. Verify
+  them during deployment and through authenticated canaries. Remove stale `CAUSENT_DEMO_TODAY`,
+  which the hardened production runtime rejects, and confirm every local-only flag is absent before
+  deployment.
+- Database: the Supabase CLI is neither authenticated nor linked. Authenticate, link the intended
+  production project, compare migration history, run `supabase db push --dry-run`, then apply only
+  the verified pending migrations. Never include local seed data or the synthetic 122-row Northstar
+  review fixture.
+- Recompute: Vercel project `causent-recompute` does not exist and no worker is deployed. Create it
+  only from the audited staging bundle, add the session-pooler `DATABASE_URL` plus shared secret,
+  deploy, and run fail-closed and queue-drain canaries.
+- Resolve: `causent-resolve` exists, but production `DATABASE_URL` is absent. Add it, redeploy, and
+  canary the app-to-resolver route after `npm run check:resolve-config` validates its
+  `DATABASE_URL` and `CAUSENT_RESOLVE_SECRET`.
+- App release: the deterministic, server-validated activation-ready sample fix and
+  **Full-plan example** label pass the complete local release gate. Obtain green hosted CI for the
+  exact revision; merge through review;
+  then verify the git-connected app deployment and complete authenticated clean-account canaries.
+
+Founder review and three initially unassisted partner sessions remain open. Production release does
+not convert the local synthetic completed-loop result into partner evidence.
+
 # Deploying the causal engine function (`api/engine.py`)
 
 A stateless Vercel Python Serverless Function that wraps the causal engine's
@@ -129,7 +161,12 @@ Guards: `401` (missing/wrong/unset secret), `413` (body cap), `400` (bad JSON /
 date / uuid), `500` (a genuine DB/driver fault — type name only, no message leaked),
 `405` (non-POST).
 
-## Deploy steps (project `causent-resolve`) — AS DEPLOYED 2026-07-18
+## Deploy steps (project `causent-resolve`) — DEPLOYED BUT NOT ARMED
+
+The 2026-08-12 preflight confirms that the project exists but lacks production `DATABASE_URL`.
+Treat it as unavailable until the credential is added, the project is redeployed, and the
+authenticated route is canaried. Before deployment, load the intended resolver environment and run
+`npm run check:resolve-config`; it requires both `DATABASE_URL` and `CAUSENT_RESOLVE_SECRET`.
 
 1. **Deploy** (stages `api/resolve.py` + `engine/**` + a minimal `vercel.json` +
    `pyproject.toml`, links project `causent-resolve`, deploys):
@@ -145,7 +182,8 @@ date / uuid), `500` (a genuine DB/driver fault — type name only, no message le
      sweep at a non-demo scope + acting owner.
 3. **Wire the app** (`causent-ai` project): set `CAUSENT_RESOLVE_URL` =
    `https://causent-resolve.vercel.app/api/resolve` and the SAME
-   `CAUSENT_RESOLVE_SECRET`. With both set, `/api/cron/resolve` POSTs the function;
+   `CAUSENT_RESOLVE_SECRET`. Both are now required by the production app release check. With both
+   set, `/api/cron/resolve` POSTs the function;
    without them it falls back to the local runner (dev only) and degrades loudly.
 4. **Smoke-test**:
    ```
@@ -212,7 +250,10 @@ and platform monitoring see a failure. Guards: `401` (missing/wrong/unset secret
 (missing `DATABASE_URL`), `500` (terminal job or non-sensitive exception class
 only), and `405` (non-POST).
 
-## Deploy steps (project `causent-recompute`) — NOT YET DEPLOYED
+## Deploy steps (project `causent-recompute`) — PROJECT ABSENT / NOT DEPLOYED
+
+The 2026-08-12 preflight confirms that no `causent-recompute` Vercel project exists. The following
+steps are the creation-and-deployment procedure, not evidence of a prior deployment.
 
 1. **Stage and deploy** the minimal standalone project:
    ```
