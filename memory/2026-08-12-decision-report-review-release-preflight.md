@@ -3,14 +3,18 @@
 ## Request and release posture
 
 The founder requested that the current Decision Report review changes be pushed to production and
-that progress be documented while review continues. The candidate remains a dirty working tree on
-`codex/decision-report-review-round-1`. This report records read-only preflight findings; it does not
-claim a commit, pull request, merge, migration, environment mutation, Vercel deployment, deployment
-ID, or authenticated canary.
+that progress be documented while review continues. The reviewed candidate is committed as
+`5a67a6f` and pushed on `codex/decision-report-review-round-1`. Vercel created Ready Preview
+deployment `dpl_GdYnCg7FoUpFevfTPPbeWVowuXRB` at
+**https://causent-oq0hqe1gm-adamdavidowens-1984s-projects.vercel.app**. The installed GitHub
+integration denied PR creation, so no PR or hosted PR CI result is claimed. This report does not
+claim a merge, production migration, environment mutation, production promotion, or authenticated
+canary.
 
 The production web app is Vercel project `causent-ai`, served at
 **https://app.causent.ai**. The existing production app remains the prior deployed baseline until
-the exact review candidate passes CI, is merged, deploys, and passes live verification.
+the exact review candidate passes hosted CI, is merged, deploys, and passes live verification. The
+branch Preview is reviewable but is not production.
 
 ## Release-candidate hardening completed locally
 
@@ -73,8 +77,10 @@ as a real customer outcome, or counted as a production canary or partner session
 
 ## Ordered release gates
 
-1. Commit and push only the reviewed release scope; obtain green hosted CI and Vercel checks for the
-   exact revision; merge through the reviewed path.
+1. Create the PR from pushed commit `5a67a6f`; obtain green hosted CI and Vercel checks for that
+   exact revision; merge through the reviewed path. Branch publication and its Ready Preview are
+   complete, but PR creation remains an operator step because the installed integration lacks
+   permission.
 2. Authenticate/link Supabase, verify history, dry-run, apply the exact pending migrations, and run
    authenticated schema/RLS/Storage/provenance/recompute-status probes.
 3. Complete `causent-ai` production configuration and remove stale/local-only values.

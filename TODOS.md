@@ -141,9 +141,11 @@ prop for testing whether that future loop is understandable and useful; it is no
   `CAUSENT_RESOLVE_SECRET`, pass `npm run check:resolve-config`, redeploy it, and canary the
   app-to-resolver route. The app-side release check now requires matching
   `CAUSENT_RESOLVE_URL`/`CAUSENT_RESOLVE_SECRET` configuration.
-- [ ] **CI and merge:** commit the exact release scope, push it for review, require the expanded hosted-CI and
-  Vercel checks to pass for that exact revision, then merge deliberately. PR #29's historical green
-  gate does not cover this dirty release candidate.
+- [x] **Exact release revision and Preview:** commit `5a67a6f`, push
+  `codex/decision-report-review-round-1`, and obtain a Ready Vercel Preview for that exact branch.
+- [ ] **PR CI and merge:** create the PR from the pushed branch, require the expanded hosted CI and
+  Vercel checks to pass for `5a67a6f`, then merge deliberately. The installed GitHub integration
+  denied PR creation, and PR #29's historical green gate does not cover this candidate.
 - [ ] **Authenticated canaries:** after database/configuration/deployment, run a clean-account live
   pass across one URL, one text PDF, save/activate, three successors, direct history links, private
   image reattachment, observation import, all three manual action completions, recompute/resolution,
@@ -151,9 +153,10 @@ prop for testing whether that future loop is understandable and useful; it is no
 - [ ] Complete one final deep review of the end-to-end UI experience and workflow, including the manual handoff preview, before declaring the MVP interaction complete.
 - [ ] Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, selected core metric plausible, next action usable.
 
-The 2026-08-12 read-only preflight made no production migration, environment, project, merge,
-deployment, or canary change. The operator release request does not satisfy founder acceptance or
-the unassisted partner-session gate.
+The 2026-08-12 release pass published the exact candidate branch and produced a Ready Vercel
+Preview. It made no production migration, environment, worker-project, merge, promotion, or canary
+change. The operator release request does not satisfy founder acceptance or the unassisted
+partner-session gate.
 
 ### Completed Slice 1 — interaction prototype
 

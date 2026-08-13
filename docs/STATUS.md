@@ -3,9 +3,12 @@
 ## 2026-08-12 — Production release requested; preflight blocked before deployment
 
 The founder requested that the current Decision Report review work be published to production and
-documented. The release candidate is still a dirty working tree on
-`codex/decision-report-review-round-1`; it has not produced an exact-revision hosted CI result, been
-merged, or been deployed. The production app remains Vercel project `causent-ai` at
+documented. The reviewed scope is committed as `5a67a6f` and pushed on
+`codex/decision-report-review-round-1`. Vercel built that exact branch as a ready Preview deployment
+(`dpl_GdYnCg7FoUpFevfTPPbeWVowuXRB`) at
+**https://causent-oq0hqe1gm-adamdavidowens-1984s-projects.vercel.app**. GitHub's installed
+integration denied pull-request creation with a permissions error, so no PR or hosted PR CI result
+exists yet. The branch has not been merged or promoted. Production remains the prior release at
 **https://app.causent.ai**.
 
 Read-only release preflight found material configuration gaps that must be closed before any
@@ -36,9 +39,10 @@ report without a provider-shaped draft, autosaves to a stable report URL, preser
 confirmed actions, the explicit primary lever and +37.5% prediction, and reports no console errors.
 Activation correctly remains disabled until the user confirms a real workspace metric. The completed
 122-row Northstar outcome remains local-only synthetic review data and must never be seeded into
-production. No production migration, environment change, worker creation, merge, deployment, or
-authenticated canary is claimed here. Founder review and the three initially unassisted partner
-sessions remain open after this operator-directed release.
+production. The ready branch Preview is not a production release: no production migration,
+environment change, worker creation, merge, promotion, or authenticated canary is claimed here.
+Founder review and the three initially unassisted partner sessions remain open after this
+operator-directed release request.
 
 ## 2026-08-10 — Northstar completed-loop review example ready locally
 
@@ -581,9 +585,11 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   separate Astro marketing site). A second Vercel project `causent` (created 7/10 via CLI link)
   is redundant — the repo is re-linked to `causent-ai`; check `.vercel/project.json` before
   `vercel env` commands.
-- **Current preflight (2026-08-12): no release mutation has been performed.** The working tree is
-  still dirty, no exact-revision hosted CI or merge exists, and the deployed app still represents
-  the prior baseline. The production environment currently lacks `SUPABASE_SERVICE_ROLE_KEY`,
+- **Current preflight (2026-08-12): branch publication and Preview are complete; production is
+  unchanged.** Commit `5a67a6f` is pushed on `codex/decision-report-review-round-1`, and Vercel
+  Preview `dpl_GdYnCg7FoUpFevfTPPbeWVowuXRB` is Ready. The installed GitHub integration lacks
+  permission to create the PR, so no hosted PR CI or merge exists. The deployed app still
+  represents the prior baseline. The production environment currently lacks `SUPABASE_SERVICE_ROLE_KEY`,
   `CAUSENT_RECOMPUTE_URL`, and `CAUSENT_RECOMPUTE_SECRET`. Vercel's environment list reports
   `CRON_SECRET`, `CAUSENT_RESOLVE_URL`, and `CAUSENT_RESOLVE_SECRET` exist by name, but Vercel does
   not expose their encrypted values to the local pull/run context. The empty local values are not
@@ -656,9 +662,11 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   shared dashboard layout.
 - The local recompute worker endpoint was intentionally absent, so server logs recorded only the
   sanitized `not_configured` deferred-kick outcome; source writes remained durable as designed.
-- Hosted CI for this working tree: **PENDING**. The expanded workflow is configured, but no cloud
-  result is claimed.
-- No production migrations, environment changes, deployment, or canary were performed.
+- Exact branch Preview: **READY** for commit `5a67a6f` at
+  `https://causent-oq0hqe1gm-adamdavidowens-1984s-projects.vercel.app`. Hosted PR CI remains
+  **PENDING** because the installed GitHub integration could not create the PR.
+- No production migrations, environment changes, merge, promotion, or authenticated canary were
+  performed.
 
 ## Next (priority order)
 
