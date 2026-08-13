@@ -22,12 +22,46 @@ export type DraftAction = {
   title: string;
   summary: Claim[];
   owner: Claim | null;
+  /** Optional execution metadata lives in the immutable report snapshot. */
+  priority?: 1 | 2 | 3;
+  tags?: string[];
+  skills?: string[];
+  estimatedTime?: string;
+  estimatedCost?: string;
 };
+
+export const MAX_DECISION_REPORT_ACTIONS = 25;
+
+export type DecisionReportActivationDraft = {
+  confirmedMetricId: string | null;
+  selectedActionSourceItemIds: string[];
+  primaryLeverActionSourceItemId: string | null;
+  prediction: {
+    direction: "POSITIVE" | "NEGATIVE";
+    magnitudePctMean: number | null;
+    resolutionDate: string | null;
+  };
+};
+
+export function emptyDecisionReportActivationDraft(): DecisionReportActivationDraft {
+  return {
+    confirmedMetricId: null,
+    selectedActionSourceItemIds: [],
+    primaryLeverActionSourceItemId: null,
+    prediction: {
+      direction: "POSITIVE",
+      magnitudePctMean: null,
+      resolutionDate: null,
+    },
+  };
+}
 
 export type DecisionReportV1 = {
   /** Version 1 is readable legacy data; every newly generated or edited report is version 2. */
   schemaVersion: 1 | 2;
   title: string;
+  /** Partial pre-activation intent. Canonical rows are created only by activation. */
+  activationDraft?: DecisionReportActivationDraft;
   /** Required for v2. Bounded provenance lives in the same RLS-protected snapshot. */
   sourceSummaries?: ReportSourceSummary[];
   decision: {
@@ -146,6 +180,126 @@ function validateAction(value: unknown, path: string, errors: string[]): value i
   }
   validateClaimArray(value.summary, `${path}.summary`, errors);
   if (value.owner !== null) validateClaim(value.owner, `${path}.owner`, errors);
+
+  if (
+    value.priority !== undefined &&
+    (!Number.isInteger(value.priority) || ![1, 2, 3].includes(value.priority as number))
+  ) {
+    errors.push(`${path}.priority must be 1, 2, or 3`);
+  }
+  for (const field of ["tags", "skills"] as const) {
+    const entries = value[field];
+    if (
+      entries !== undefined &&
+      (!Array.isArray(entries) ||
+        entries.length > 5 ||
+        entries.some(
+          (entry) =>
+            typeof entry !== "string" ||
+            entry.trim() === "" ||
+            entry.length > 40 ||
+            /[\u0000-\u001f\u007f]/.test(entry),
+        ))
+    ) {
+      errors.push(`${path}.${field} must contain at most five safe labels`);
+    }
+  }
+  for (const field of ["estimatedTime", "estimatedCost"] as const) {
+    const estimate = value[field];
+    if (
+      estimate !== undefined &&
+      (typeof estimate !== "string" ||
+        estimate.length > 80 ||
+        /[\u0000-\u001f\u007f]/.test(estimate))
+    ) {
+      errors.push(`${path}.${field} must be a safe string up to 80 characters`);
+    }
+  }
+  return true;
+}
+
+function validateActivationDraft(
+  value: unknown,
+  actionSourceItemIds: Set<string>,
+  errors: string[],
+): value is DecisionReportActivationDraft {
+  if (!isRecord(value)) {
+    errors.push("activationDraft must be an object");
+    return false;
+  }
+
+  if (
+    value.confirmedMetricId !== null &&
+    (typeof value.confirmedMetricId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        value.confirmedMetricId,
+      ))
+  ) {
+    errors.push("activationDraft.confirmedMetricId must be null or a UUID");
+  }
+
+  const selected = value.selectedActionSourceItemIds;
+  if (
+    !Array.isArray(selected) ||
+    selected.length > 3 ||
+    selected.some(
+      (sourceItemId) =>
+        typeof sourceItemId !== "string" ||
+        sourceItemId.trim() === "" ||
+        !actionSourceItemIds.has(sourceItemId),
+    ) ||
+    new Set(selected).size !== selected.length
+  ) {
+    errors.push(
+      "activationDraft.selectedActionSourceItemIds must contain up to three unique report action IDs",
+    );
+  }
+
+  if (
+    value.primaryLeverActionSourceItemId !== null &&
+    (typeof value.primaryLeverActionSourceItemId !== "string" ||
+      !Array.isArray(selected) ||
+      !selected.includes(value.primaryLeverActionSourceItemId))
+  ) {
+    errors.push(
+      "activationDraft.primaryLeverActionSourceItemId must be null or a selected action ID",
+    );
+  }
+
+  const prediction = value.prediction;
+  if (!isRecord(prediction)) {
+    errors.push("activationDraft.prediction must be an object");
+    return false;
+  }
+  if (!['POSITIVE', 'NEGATIVE'].includes(prediction.direction as string)) {
+    errors.push("activationDraft.prediction.direction is invalid");
+  }
+  if (
+    prediction.magnitudePctMean !== null &&
+    (typeof prediction.magnitudePctMean !== "number" ||
+      !Number.isFinite(prediction.magnitudePctMean) ||
+      prediction.magnitudePctMean <= 0)
+  ) {
+    errors.push(
+      "activationDraft.prediction.magnitudePctMean must be null or a positive finite number",
+    );
+  }
+  if (prediction.resolutionDate !== null) {
+    const date = typeof prediction.resolutionDate === "string"
+      ? new Date(`${prediction.resolutionDate}T00:00:00Z`)
+      : null;
+    if (
+      typeof prediction.resolutionDate !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(prediction.resolutionDate) ||
+      !date ||
+      Number.isNaN(date.getTime()) ||
+      date.toISOString().slice(0, 10) !== prediction.resolutionDate
+    ) {
+      errors.push(
+        "activationDraft.prediction.resolutionDate must be null or a valid YYYY-MM-DD date",
+      );
+    }
+  }
   return true;
 }
 
@@ -319,6 +473,7 @@ export function validateDecisionReport(value: unknown): ValidationResult {
   }
 
   const implementation = value.implementation;
+  const actionSourceItemIds = new Set<string>();
   if (!isRecord(implementation)) {
     errors.push("implementation must be an object");
   } else {
@@ -329,9 +484,18 @@ export function validateDecisionReport(value: unknown): ValidationResult {
     if (!Array.isArray(implementation.actions)) {
       errors.push("implementation.actions must be an array");
     } else {
-      if (implementation.actions.length > 3) errors.push("implementation.actions cannot exceed 3 items");
+      if (implementation.actions.length > MAX_DECISION_REPORT_ACTIONS) {
+        errors.push(
+          `implementation.actions cannot exceed ${MAX_DECISION_REPORT_ACTIONS} items`,
+        );
+      }
       implementation.actions.forEach((action, index) =>
-        validateAction(action, `implementation.actions[${index}]`, errors),
+        {
+          validateAction(action, `implementation.actions[${index}]`, errors);
+          if (isRecord(action) && typeof action.sourceItemId === "string") {
+            actionSourceItemIds.add(action.sourceItemId);
+          }
+        },
       );
     }
 
@@ -359,6 +523,10 @@ export function validateDecisionReport(value: unknown): ValidationResult {
         errors,
       );
     }
+  }
+
+  if (value.activationDraft !== undefined) {
+    validateActivationDraft(value.activationDraft, actionSourceItemIds, errors);
   }
 
   if (value.schemaVersion === 2 && persistedChunkIds) {

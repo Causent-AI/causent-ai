@@ -84,6 +84,23 @@ test("model draft validation rejects malformed structured output", () => {
   assert.equal(result.success, false);
 });
 
+test("model generation accepts 25 draft actions and rejects a 26th", () => {
+  const generated = draft();
+  generated.implementation.actions = Array.from({ length: 25 }, (_, index) => ({
+    title: `Action ${index + 1}`,
+    summary: claim(`Complete action ${index + 1}.`),
+    owner: null,
+  }));
+  assert.equal(validateModelDecisionReportDraft(generated).success, true);
+
+  generated.implementation.actions.push({
+    title: "Action 26",
+    summary: claim("This action exceeds the report limit."),
+    owner: null,
+  });
+  assert.equal(validateModelDecisionReportDraft(generated).success, false);
+});
+
 test("provider-stringified structured output is recovered only after full validation", () => {
   const expected = draft();
   const wrapped = JSON.stringify({ decision: JSON.stringify(expected) });
@@ -122,6 +139,19 @@ test("server materialization assigns IDs and verifies exact prompt evidence", ()
   assert.equal(result.metricProjection.predictedPct, 55);
   assert.deepEqual(result.sourceSummaries.map((source) => source.kind), ["brief"]);
   assert.deepEqual(result.report.sourceSummaries, result.sourceSummaries);
+});
+
+test("proposed rationale stays labeled as a suggestion without source attribution", () => {
+  const generated = draft();
+  generated.supportingEvidence.factors = [
+    claim("Shorter setup may reduce customer confusion.", "suggestion"),
+  ];
+
+  const result = materializeModelDecisionReport(generated, PROMPT, {
+    idFactory: () => "suggested-rationale",
+  });
+  assert.equal(result.report.supportingEvidence.factors[0].status, "suggested");
+  assert.deepEqual(result.report.supportingEvidence.factors[0].sourceChunkIds, []);
 });
 
 test("supported claims and metrics must quote the exact named source chunk", () => {

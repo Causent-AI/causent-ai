@@ -180,6 +180,17 @@ test("explicit saves are append-only, retry-safe, conflict-safe, and create no g
     status: "user_confirmed",
     sourceChunkIds: [],
   };
+  const selectedActionId = editedReport.implementation.actions[0].sourceItemId;
+  editedReport.activationDraft = {
+    confirmedMetricId: randomUUID(),
+    selectedActionSourceItemIds: [selectedActionId],
+    primaryLeverActionSourceItemId: selectedActionId,
+    prediction: {
+      direction: "NEGATIVE",
+      magnitudePctMean: 8.5,
+      resolutionDate: "2099-12-15",
+    },
+  };
   const edited = await saveDecisionReport(sb, WORKSPACE, {
     reportId: first.saved.reportId,
     baseRevisionId: first.saved.revisionId,
@@ -256,6 +267,124 @@ test("the database refuses report_ready for a sparse snapshot", async (t) => {
   });
   assert.equal(result.error?.code, "22023");
   assert.match(result.error?.message ?? "", /Required report fields are incomplete/);
+});
+
+test("the database requires decision context and a plan but not evidence or metric rationale for report_ready", async (t) => {
+  if (!gated(t) || !sb) return;
+  const optionalAnalysis = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  optionalAnalysis.title = "Ready without supplied evidence or metric rationale";
+  optionalAnalysis.supportingEvidence.factors = [{
+    ...optionalAnalysis.supportingEvidence.factors[0],
+    text: "",
+    status: "missing",
+    sourceChunkIds: [],
+  }];
+  optionalAnalysis.supportingEvidence.metricMechanism = [{
+    ...optionalAnalysis.supportingEvidence.metricMechanism[0],
+    text: "",
+    status: "missing",
+    sourceChunkIds: [],
+  }];
+  const mintedReady = await sb.rpc("mint_decision_report_source_receipt_v1", {
+    p_scope_id: WORKSPACE,
+    p_authored_by: null,
+    p_generated_snapshot: optionalAnalysis,
+  });
+  assert.equal(mintedReady.error, null, mintedReady.error?.message);
+  const sourceReceiptId = mintedReady.data?.[0]?.source_receipt_id;
+  assert.equal(typeof sourceReceiptId, "string");
+  const ready = await sb.rpc("create_decision_report_v2", {
+    p_scope_id: WORKSPACE,
+    p_title: optionalAnalysis.title,
+    p_status: "report_ready",
+    p_snapshot: optionalAnalysis,
+    p_metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    p_authored_by: null,
+    p_source_receipt_id: sourceReceiptId,
+  });
+  assert.equal(ready.error, null, ready.error?.message);
+  assert.equal(ready.data?.[0]?.status, "report_ready");
+
+  const requiredCases: Array<{
+    label: string;
+    clear: (report: typeof optionalAnalysis) => void;
+  }> = [
+    {
+      label: "background",
+      clear: (report) => {
+        report.decision.background[0] = {
+          ...report.decision.background[0],
+          text: "",
+          status: "missing",
+          sourceChunkIds: [],
+        };
+      },
+    },
+    {
+      label: "problem",
+      clear: (report) => {
+        report.decision.problem[0] = {
+          ...report.decision.problem[0],
+          text: "",
+          status: "missing",
+          sourceChunkIds: [],
+        };
+      },
+    },
+    {
+      label: "decision",
+      clear: (report) => {
+        report.decision.decision[0] = {
+          ...report.decision.decision[0],
+          text: "",
+          status: "missing",
+          sourceChunkIds: [],
+        };
+      },
+    },
+    {
+      label: "action plan summary",
+      clear: (report) => {
+        report.implementation.actionPlanSummary[0] = {
+          ...report.implementation.actionPlanSummary[0],
+          text: "",
+          status: "missing",
+          sourceChunkIds: [],
+        };
+      },
+    },
+    {
+      label: "titled action",
+      clear: (report) => {
+        report.implementation.actions = report.implementation.actions.map((action) => ({
+          ...action,
+          title: "",
+        }));
+      },
+    },
+  ];
+
+  for (const requiredCase of requiredCases) {
+    const incomplete = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+    incomplete.title = `Missing required ${requiredCase.label}`;
+    requiredCase.clear(incomplete);
+    const readinessError: { code?: string; message?: string } | null = (
+      await sb.rpc("create_decision_report_v1", {
+        p_scope_id: WORKSPACE,
+        p_title: incomplete.title,
+        p_status: "report_ready",
+        p_snapshot: incomplete,
+        p_metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+        p_authored_by: null,
+      })
+    ).error;
+    assert.equal(readinessError?.code, "22023", requiredCase.label);
+    assert.match(
+      readinessError?.message ?? "",
+      /Required report fields are incomplete/,
+      requiredCase.label,
+    );
+  }
 });
 
 test("the database rejects missing or tampered v2 source provenance", async (t) => {

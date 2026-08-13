@@ -17,10 +17,12 @@ export function AggregatedImpact({
   stats,
   impactByMetric,
   metrics,
+  scopeLabel = "in this workspace",
 }: {
   stats: ImpactStat[];
   impactByMetric: MetricImpact[];
   metrics: Metric[];
+  scopeLabel?: string;
 }) {
   const metricById = new Map(metrics.map((m) => [m.id, m]));
 
@@ -49,7 +51,7 @@ export function AggregatedImpact({
         <StatTile
           label="Metrics Tracked"
           value={String(metrics.length)}
-          sub="in this workspace"
+          sub={scopeLabel}
           valueClass={TONE.plain}
         />
         <StatTile

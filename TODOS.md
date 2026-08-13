@@ -1,15 +1,71 @@
 # Causent active backlog
 
-Last reconciled: 2026-08-03. Completed historical work is documented in `docs/STATUS.md` and the overnight reports. This file contains only active or deliberately deferred work.
+Last reconciled: 2026-08-12. Active and deliberately deferred work appears first; the dated
+completed-slice checklists below are retained as point-in-time implementation history.
 
-PR #28 merged the Slice 8/9 baseline into `main` on 2026-08-03. Slice 10 and the bounded MVP
-expansions are packaged separately on `codex/decision-report-slice-10` in draft PR #29; hosted CI,
-partner evidence, partner-environment migration/configuration, deployment, and canary work remain
-open below.
+PR #29 merged Slice 10 and the bounded MVP expansions into `main` as `690e196` on 2026-08-03 local
+time with the hosted app/engine/RLS/bridge gate green. Review rounds 1 and 2 plus the completed-loop
+Northstar review example are implemented locally on `codex/decision-report-review-round-1`. The
+founder has now requested production release, but the release candidate remains a dirty working
+tree and no deployment is claimed. Founder sign-off, partner evidence, production configuration,
+deployment, and canary work remain open below.
 
 ## P0 — AI-assisted Decision Report partner wedge
 
 Approved design: `docs/designs/ai-assisted-decision-report.md`.
+
+### Review round 1 — full-loop product presentation
+
+- [x] Simplify onboarding to one decision brief, optional URL/PDF evidence, two explicit sample reports, and authorization copy on the draft action.
+- [x] Present the editable Decision Report as Overview, Analysis, and Implementation Plan with document hierarchy, fewer status pills, a prediction visual, and a quiet AI Assisted footer.
+- [x] Add optional action priority, tags, skills, estimated time, and estimated cost to the validated revision snapshot; surface them in the report and Actions & Decisions without changing active history.
+- [x] Make project navigation responsive; add Project Summary and Edit Decision Report; keep the external-agent seam manual and avoid any MCP connection claim.
+- [x] Keep Core Metrics closed by default, show one selected metric, and pair raw level bars with a zero-centered WoW/MoM change view.
+- [x] Simplify Data Workshop around metric name, unit, connection, and one import explanation; place the activated prediction above Impact by Metric and Impact by Actions with methodology details at the bottom.
+- [x] Add a 122-row Gummy Alpha full-loop fixture plus a loopback-only recompute runner. Local browser acceptance produced a +14.7pp confident readout from the active report's June 15 action.
+- [x] Complete the founder's first-round interaction review; the outcome requires a second UI/workflow pass.
+
+### Review round 2 — interaction comprehension
+
+- [x] Reframe onboarding around the casual challenge-first prompt **What's the biggest business challenge on your mind today?** Causent fills the Decision Report from the user's own words and clearly highlights any core details that still need input.
+- [x] Present one concise decision document with **Decision**, **Supporting Evidence**, and **Implementation** sections. Preserve structured Background, Problem, and Decision claims behind one readable prose block; make evidence an editable paragraph with one optional private chart/graph; remove the report-level metric-rationale and governance prompts.
+- [x] Allow up to 25 draft actions while retaining the existing one-to-three-action activation boundary and one explicit primary lever. Move activation selection into each action row instead of repeating it in a bottom step.
+- [x] Replace explicit Save Report gating with debounced, serialized autosave. Flush the exact latest revision before asset mutation or activation; preserve local edits and stop on a stale conflict rather than silently rebasing.
+- [x] Add a forward database readiness predicate requiring Background, Problem, Decision, the Action Plan summary, and at least one titled action. Supporting evidence and metric rationale remain optional; focused integration coverage proves both the permissive and rejecting cases. Align the repository scanner and browser state in the interaction implementation.
+- [x] Replace the manually resizable narrative fields with one labeled, auto-growing Decision document canvas. Keep every paragraph bound to its existing claim ID, provenance, gap target, validated edit command, and serialized autosave path rather than flattening the report into an ambiguous freeform string.
+- [x] Use the same responsive global header and full-size logo in onboarding and the dashboard. Keep the funnel tab-free, collapse only the New Project label at narrow widths, and remove the development-only Next.js badge that covered the logo during local review.
+
+### Review round 2 follow-up — visual context and manual agent launchers
+
+- [x] Add an on-demand Actions History chart from existing current-report metric observations and action timing. It creates no observation, evidence, or new durable data.
+- [x] Add an Impact plan-versus-outcome chart from the existing current-report projection, prediction, and evidence, preserving honest planned, gathering, preliminary descriptive, and measured states without creating a new causal claim.
+- [x] Present Claude and Codex as distinct UI triggers for the same bounded manual clipboard handoff dialog. Neither trigger authenticates with a provider, sends context automatically, or grants an agent authority.
+- [x] Keep this follow-up presentation-only: no database migration, schema/table change, Storage path, server write, durable handback, or generated evidence was added.
+- [x] Complete focused responsive, keyboard-semantic, browser, and console validation for the History chart, plan-versus-outcome chart, and Claude/Codex dialog controls at desktop and 390px. Native controls, focus-visible states, dialog egress gating/cancel controls, and zero browser-console warnings were verified; final founder review remains open below.
+
+### Review round 2 completed-loop example — 2026-08-10
+
+- [x] Add a deterministic Northstar Support golden report behind its explicit sample card. The brief supplies the 40% baseline, 55% target, named owners, customer, stakeholders, and governance boundary; the generated report preselects three fully described actions, one primary lever, and a +37.5% human prediction.
+- [x] Add a dedicated 122-day **First-week Setup Completion** fixture and a loopback-only setup helper. The helper imports through `import_workspace_metric_csv_v1`, selects four populated context metrics through `set_workspace_core_metric_v1`, and asserts that the workspace current-series pointer is unchanged.
+- [x] Show every activated action's assigned report metric in Actions & Decisions. Keep the current one-report-metric contract explicit: support actions are connected but not independently credited; only the pre-registered primary lever can enter the causal rollup.
+- [x] Replace the report-mode generic impact aggregate with a mature Decision outcome: plan, measured estimate, variance, analysis sample, 3/3 completion, the existing plan/outcome chart, an observed baseline/target/action timeline, and an action-to-metric trace with confidence interval and pre/post counts.
+- [x] Expand Core Metrics into visible Report target and Context choices with correct `1 report + N core` accounting. Context charts never change the report prediction or causal target and never reuse the report's action markers.
+- [x] Run the local Northstar loop through the checked save, activation, three manual completions, recompute, and resolution paths. The dedicated metric resolves `CONFIRMED`: +37.0% measured versus +37.5% planned, +14.7pp native lift, 95% CI +14.5pp to +14.9pp, 75 pre and 47 post observations.
+
+- [x] Finish release hardening for explicit sample selection: use a deterministic,
+  server-validated activation-ready fixture and label the card **Full-plan example**. Verify that
+  selecting it cannot depend on a model-shaped shortcut or bypass normal report validation.
+
+This is an explicitly synthetic, local-only founder-review demonstration, not partner evidence or
+production seed data. The 122-row completed outcome must never be loaded into production. Distinct causal
+metrics and predictions per action would require a separate normalized multi-target activation and
+recompute contract; they were not faked into this review pass.
+
+Authenticated MCP/API delivery, provider OAuth, automatic context delivery, trusted writes, and
+durable attribution remain deferred until after partner review.
+
+- [ ] Continue the founder review after this operator-directed release and record any additional
+  workflow corrections before declaring the MVP interaction complete.
 
 ### Completed Slice 10 — explicit report iteration series and current-report boundary
 
@@ -53,8 +109,8 @@ prop for testing whether that future loop is understandable and useful; it is no
 
 ### Completed MVP finish — consent, observability, recovery, and release guardrails
 
-- [x] Start Decision Report onboarding blank. The Gummy Alpha fixture is now an explicit **Load example** action rather than an implicit user input.
-- [x] Require an explicit source-egress confirmation before generation and clear it whenever the brief, URL, or PDF changes. The confirmation names the project brief and extracted URL/PDF text that may be sent to the configured AI provider; a provider or network failure preserves the user's inputs and editable fallback.
+- [x] Start Decision Report onboarding blank. Gummy Alpha and Northstar Support are explicit sample cards rather than implicit user input.
+- [x] Put source-egress authorization on the explicit draft action. The copy names the decision brief and extracted URL/PDF text that may be sent to the configured AI provider; a provider or network failure preserves the user's inputs and editable fallback.
 - [x] Instrument the report lifecycle with content-free, best-effort events for landing, generation start/editable/failure, save/failure, and activation/failure. Payloads accept only a server-minted opaque session key, elapsed time, bounded edit/follow-up/missing-field counts, source/fallback/retry booleans, and no report, prompt, source, asset, or clipboard content. The aggregate reports distinct-session stages/drop-off, median time to editable/save/activation, median edit/follow-up counts, and failure events plus affected sessions.
 - [x] Enforce a future prediction resolution date in the browser, the shared runtime validator, and a database trigger using the UTC statement date.
 - [x] Expose only the explicit current report's sanitized causal-recompute state (`idle`, `queued`, `retrying`, `failed`, or `current`) and safe timestamps in Data Workshop and Impact. The private queue, errors, attempts, hashes, and identities remain ungranted.
@@ -66,15 +122,42 @@ prop for testing whether that future loop is understandable and useful; it is no
 
 ### Remaining MVP release gates — human/operator work
 
-- [ ] Require a green expanded hosted-CI run for the exact Slice 10 review revision. The workflow is configured, but no successful hosted run of that revision is claimed yet.
+- [ ] **Database:** authenticate/link the Supabase CLI, inspect the intended production project's
+  migration history, dry-run, and apply only the verified pending subset of `20260723053444`,
+  `20260723061012`, `20260723061925`, `20260723064500`, `20260723151939`, `20260810005135`, and
+  `20260810044832`; then run authenticated schema/RLS/Storage/recompute-status probes. The current
+  CLI is neither authenticated nor linked.
+- [ ] **App environment:** on `causent-ai`, add `SUPABASE_SERVICE_ROLE_KEY`,
+  `CAUSENT_RECOMPUTE_URL`, and `CAUSENT_RECOMPUTE_SECRET`; remove stale `CAUSENT_DEMO_TODAY`, which
+  the hardened production runtime now rejects; and verify local demo/seed/fixture/rollout flags are
+  absent. `CRON_SECRET`, `CAUSENT_RESOLVE_URL`, and `CAUSENT_RESOLVE_SECRET` are confirmed present by
+  name, but their encrypted values appear empty in the local pull/run context. Do not treat that as
+  production absence; pass `check:release-config` only in a secure context that supplies the actual
+  values and verify the paths with authenticated canaries.
+- [ ] **Recompute worker:** create and link `causent-recompute`, set its session-pooler
+  `DATABASE_URL` and matching `CAUSENT_RECOMPUTE_SECRET`, deploy the audited stage, then test
+  fail-closed authentication and bounded queue draining. The project does not currently exist.
+- [ ] **Resolver:** add the missing production `DATABASE_URL` to `causent-resolve`, retain its
+  `CAUSENT_RESOLVE_SECRET`, pass `npm run check:resolve-config`, redeploy it, and canary the
+  app-to-resolver route. The app-side release check now requires matching
+  `CAUSENT_RESOLVE_URL`/`CAUSENT_RESOLVE_SECRET` configuration.
+- [ ] **CI and merge:** commit the exact release scope, push it for review, require the expanded hosted-CI and
+  Vercel checks to pass for that exact revision, then merge deliberately. PR #29's historical green
+  gate does not cover this dirty release candidate.
+- [ ] **Authenticated canaries:** after database/configuration/deployment, run a clean-account live
+  pass across one URL, one text PDF, save/activate, three successors, direct history links, private
+  image reattachment, observation import, all three manual action completions, recompute/resolution,
+  deletion rollback, feature-flag rollback, and production log review.
 - [ ] Complete one final deep review of the end-to-end UI experience and workflow, including the manual handoff preview, before declaring the MVP interaction complete.
-- [ ] Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, metric mechanism plausible, next action usable.
-- [ ] After applying the migrations and runtime configuration to the partner environment, run one authenticated clean-account acceptance pass including one URL, one text-based PDF, three successor activations, direct historical links, private-image reattachment, deletion rollback, and rollout-flag rollback. Local engineering acceptance does not replace partner evidence.
-- [ ] Apply `20260723053444`, `20260723061012`, `20260723061925`, `20260723064500`, and `20260723151939` to the partner environment. Configure the app's Supabase URL, anon key, server-only service-role key, recompute URL/secret, and cron secret; configure the worker's session-pooler `DATABASE_URL` and matching recompute secret; ensure all four local-only flags are absent. Then deploy deliberately and run migration/RLS/Storage/recompute canaries. No production deployment is claimed by this run.
+- [ ] Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, selected core metric plausible, next action usable.
+
+The 2026-08-12 read-only preflight made no production migration, environment, project, merge,
+deployment, or canary change. The operator release request does not satisfy founder acceptance or
+the unassisted partner-session gate.
 
 ### Completed Slice 1 — interaction prototype
 
-- [x] Lock the versioned `DecisionReportV1` schema, five claim/provenance states, runtime validation, and the three-action ceiling.
+- [x] Lock the versioned `DecisionReportV1` schema, five claim/provenance states, runtime validation, and the original Slice 1 three-action ceiling. Review round 2 later raised only the editable draft cap to 25.
 - [x] Add the Gummy Alpha golden prompt, complete three-section report, metric hypothesis, 40% illustrative baseline, and 55% founder prediction.
 - [x] Replace `/onboarding` with the deterministic prompt-to-report flow while retaining the legacy funnel code for rollback.
 - [x] Build compact focused editors for Decision, Supporting Evidence, Implementation, actions, owners, governance, and visible missing fields.
@@ -95,7 +178,7 @@ prop for testing whether that future loop is understandable and useful; it is no
 
 ### MVP latency reduction
 
-- [x] Cap the report at three supporting proof claims and three actions.
+- [x] Cap the latency-reduction contract at three supporting proof claims and three actions. Review round 2 retains the three-proof cap but later raises the editable draft-action cap to 25.
 - [x] Remove Alternatives, Relevant Precedent, and Estimated Cost from the MVP report and model contract.
 - [x] Return `null`/`[]` for unknown model values, then materialize explicit editable `missing` states server-side.
 - [x] Reduce the output ceiling from 4,500 to 2,200 tokens while preserving the safe fallback.
@@ -108,12 +191,12 @@ prop for testing whether that future loop is understandable and useful; it is no
 
 Goal: help the user finish the partial report without adding chat infrastructure or another model call.
 
-- [x] Add a pure `scanDecisionReportGaps(report)` function with stable priority: Decision, Problem, at least one proof claim, Core Metric mechanism, Action Plan summary, then at least one action.
-- [x] Define the smallest `ReportEditCommandV1` reducer used by both direct field edits and focused answers. Commands may replace/confirm claim text, edit action title/summary/owner, add an action up to the three-action ceiling, and set data classification.
+- [x] Add a pure `scanDecisionReportGaps(report)` function. Review round 2 supersedes its readiness order with Background, Problem, Decision, Action Plan summary, then at least one action; supporting evidence and metric rationale do not block readiness.
+- [x] Define the original Slice 3 `ReportEditCommandV1` reducer used by both direct field edits and focused answers. At that checkpoint commands could replace/confirm claim text, edit action title/summary/owner, add an action up to the then-current three-action ceiling, and set data classification. Review round 2 extends this typed path and raises the draft cap to 25.
 - [x] Render a compact “Complete this report” panel with at most three open questions and focus the corresponding report field when selected.
 - [x] Mark user answers `user_confirmed`, preserve immutable claim/action IDs, and recompute gaps locally without another AI request.
-- [x] Replace the inert final-review behavior with an explicit ready/not-ready state. Optional customers, stakeholders, owner, governance, and mock-up fields do not block readiness.
-- [x] Add unit tests for gap ordering, optional missing fields, command validation, the three-action ceiling, ID preservation, direct-edit/question parity, and completing the safe fallback to ready.
+- [x] Replace the inert final-review behavior with an explicit ready/not-ready state. Supporting evidence, customers, stakeholders, owner, governance, and mock-up fields do not block readiness.
+- [x] Add the Slice 3 unit tests for gap ordering, optional missing fields, command validation, the then-current three-action ceiling, ID preservation, direct-edit/question parity, and completing the safe fallback to ready. Later reviews extend these cases for the 25-action contract.
 - [x] Browser-review the live Gummy Alpha report and the ready-state transition. The review caught and fixed a contradiction where optional owners, customers, and stakeholders appeared required beside a “Decision Report ready” message.
 - [x] Complete the sparse safe-fallback and keyboard-focus browser pass. Slice 9 verified exact-field focus, sequential Tab order, and report readiness without another model request.
 
@@ -127,8 +210,8 @@ Goal: make the reviewed Decision Report durable and retry-safe without premature
 
 - [x] Add `decision_reports` and `decision_report_revisions` with scope-bound RLS and explicit grants. Revisions are append-only full `DecisionReportV1` snapshots with author, timestamp, base revision, and a database-owned deterministic content hash.
 - [x] Add injected-client repository functions to create a report, append a revision, and load its current revision. Identical saves reuse the existing revision; a stale base revision returns an immediate HTTP 409 conflict with the current revision ID.
-- [x] Bind generation and persistence server actions to the authenticated session and scope, then validate all client payloads at runtime. Save only on explicit user action; no per-keystroke autosave was added.
-- [x] Add `Saved`/`Unsaved` UI state and explicit **Save draft**, **Save report**, and **Save changes** actions. The stable `?report=<id>` route reloads the exact report snapshot and metric projection.
+- [x] At the Slice 4 checkpoint, bind generation and persistence server actions to the authenticated session and scope, validate all client payloads at runtime, and save only on explicit user action. Review round 2 later replaces that UI gate with serialized autosave while retaining the checked persistence boundary.
+- [x] At the Slice 4 checkpoint, add `Saved`/`Unsaved` UI state and explicit **Save draft**, **Save report**, and **Save changes** actions. The stable `?report=<id>` route reloads the exact report snapshot and metric projection; Review round 2 removes the manual-save controls.
 - [x] Define and validate a pure, inert `ReportActivationInputV1` containing the report/revision IDs, confirmed metric ID, human prediction fields, and one to three selected action source-item IDs.
 - [x] Integration-test cross-workspace denial, read-only report tables, append-only revisions, identical-save idempotency, stale-revision conflicts, schema/readiness rejection, exact reload, and zero canonical graph writes.
 
@@ -136,7 +219,7 @@ Acceptance: a ready Gummy Alpha report persists once; an identical retry creates
 
 Verification: the live local Supabase repository test passes both cases in roughly 250 ms; the RLS isolation suite passes 19/19; TypeScript, targeted lint, all 368 library tests, the Supabase schema linter, and the webpack production build pass. Manual UI acceptance remains part of the partner pass.
 
-Non-goals: sources/assets/uploads, Data Workshop or CSV handoff, human-prediction UI, canonical materialization, connectors, and per-keystroke autosave.
+Historical Slice 4 non-goals: sources/assets/uploads, Data Workshop or CSV handoff, human-prediction UI, canonical materialization, connectors, and per-keystroke autosave. Later slices and Review round 2 deliberately supersede several of these boundaries.
 
 ### Completed Slice 5 — reviewed-report activation bridge
 
@@ -264,7 +347,7 @@ Goal: expose the completed Decision Report journey to controlled partner account
 - [x] Finish the sparse safe-fallback and keyboard-focus checks left from Slice 3. “Edit in report” focuses the exact missing textarea; Tab order continues through editable controls; focused answers reach ready without another model call.
 - [x] Add nine Decision Report-specific unsupported-claim scenarios. Fabricated decision, background, problem, proof, mechanism, action summary, owner, customer, and stakeholder evidence cannot become `sourced`.
 - [x] Retain the report/asset RLS, Storage, revision, activation, metric, manual-completion, and soft-delete gates. Slice 9 verification passed 24 focused TypeScript/Supabase integration cases and 41 combined primary/adversarial RLS cases.
-- [ ] Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, metric mechanism plausible, next action usable.
+- [ ] Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, selected core metric plausible, next action usable.
 
 Acceptance status: the controlled rollout, rollback, durable-report survival, and local clean-state journey are verified. The product release gate remains open until three real initially unassisted partner sessions are recorded; automated or facilitator-driven runs do not substitute for that evidence.
 

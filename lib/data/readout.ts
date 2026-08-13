@@ -39,6 +39,13 @@ function displayValue(value: number, metric: Metric): number {
   return value;
 }
 
+function displayOptionalValue(
+  value: number | null,
+  metric: Metric,
+): number | null {
+  return value === null ? null : displayValue(value, metric);
+}
+
 /**
  * Map one (metric, edge-readout) pair to an ImpactCell. A confident directional
  * ITS edge is authoritative. While ITS is gathering history, an evaluable 14-day
@@ -55,6 +62,14 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
       label: formatImpactMagnitude(value, metric.format),
       good: isGoodOutcome(direction, metric.higherIsBetter),
       evidence: "causal",
+      readout: {
+        methodology: "ITS",
+        ciLow: displayOptionalValue(edge.ciLow, metric),
+        ciHigh: displayOptionalValue(edge.ciHigh, metric),
+        nPre: edge.nPre,
+        nPost: edge.nPost,
+        beliefReason: edge.beliefReason,
+      },
     };
   }
 
@@ -78,8 +93,28 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
       good: isGoodOutcome(direction, metric.higherIsBetter),
       evidence: "descriptive",
       detail: `Preliminary 14-day before/after mean shift. Not a causal claim; gathering data for ITS.${overlap}`,
+      readout: {
+        methodology: "BEFORE_AFTER_14D",
+        ciLow: displayOptionalValue(edge.descriptiveCiLow, metric),
+        ciHigh: displayOptionalValue(edge.descriptiveCiHigh, metric),
+        nPre: edge.descriptiveNPre,
+        nPost: edge.descriptiveNPost,
+        beliefReason: edge.beliefReason,
+      },
     };
   }
 
-  return neutralCell(metric.id);
+  const neutral = neutralCell(metric.id);
+  if (!edge) return neutral;
+  return {
+    ...neutral,
+    readout: {
+      methodology: "ITS",
+      ciLow: displayOptionalValue(edge.ciLow, metric),
+      ciHigh: displayOptionalValue(edge.ciHigh, metric),
+      nPre: edge.nPre,
+      nPost: edge.nPost,
+      beliefReason: edge.beliefReason,
+    },
+  };
 }

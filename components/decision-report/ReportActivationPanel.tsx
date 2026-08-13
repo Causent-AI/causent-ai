@@ -5,13 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
 import { activateDecisionReportAction } from "@/app/(onboarding)/onboarding/decision-report-activation-actions";
-import { CoreMetricToggle } from "@/components/data-workshop/CoreMetricToggle";
-import type { ReportActivationMetric } from "@/lib/decision-reports/materialization";
 import type {
   DecisionReportActivationPointer,
   DecisionReportPersistenceStatus,
 } from "@/lib/decision-reports/persistence";
-import type { DecisionReportV1, MetricProjection } from "@/lib/decision-reports/schema";
 
 type ActivationPersistence = {
   reportId: string;
@@ -20,61 +17,40 @@ type ActivationPersistence = {
   activation: DecisionReportActivationPointer | null;
 };
 
-function DashboardCoreMetricSelector({ metrics }: { metrics: ReportActivationMetric[] }) {
-  if (metrics.length === 0) return null;
-  return (
-    <section className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]/50 p-3" aria-labelledby="onboarding-core-metrics">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h3 id="onboarding-core-metrics" className="text-[12px] font-semibold text-[var(--text)]">
-            Dashboard Core Metrics
-          </h3>
-          <p className="mt-0.5 text-[10px] leading-4 text-[var(--text-muted)]">
-            Add up to five. These appear across dashboard tabs and in the bottom drawer.
-          </p>
-        </div>
-        <span className="text-[10px] font-medium text-[var(--text-subtle)]">
-          {metrics.filter((metric) => metric.isCore).length}/5 selected
-        </span>
-      </div>
-      <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {metrics.map((metric) => (
-          <li key={metric.metricId} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-white px-3 py-2">
-            <span className="min-w-0 truncate text-[11px] font-medium text-[var(--text)]">{metric.name}</span>
-            <CoreMetricToggle metricId={metric.metricId} selected={metric.isCore} />
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 export function ReportActivationPanel({
-  report,
-  projection,
   persistence,
   hasUnsavedChanges,
-  metrics,
+  metricId,
+  metricAvailable,
+  selectedActionIds,
+  primaryActionId,
+  direction,
+  magnitudePctMean,
+  resolutionDate,
+  onDirectionChange,
+  onMagnitudeChange,
+  onResolutionDateChange,
   telemetrySessionKey,
   telemetryStartedAtMs,
   activationDateBounds,
 }: {
-  report: DecisionReportV1;
-  projection: MetricProjection;
   persistence: ActivationPersistence | null;
   hasUnsavedChanges: boolean;
-  metrics: ReportActivationMetric[];
+  metricId: string;
+  metricAvailable: boolean;
+  selectedActionIds: string[];
+  primaryActionId: string;
+  direction: "POSITIVE" | "NEGATIVE";
+  magnitudePctMean: number | null;
+  resolutionDate: string;
+  onDirectionChange: (direction: "POSITIVE" | "NEGATIVE") => void;
+  onMagnitudeChange: (magnitudePctMean: number | null) => void;
+  onResolutionDateChange: (resolutionDate: string | null) => void;
   telemetrySessionKey: string;
   telemetryStartedAtMs: number;
   activationDateBounds: { today: string; minimum: string };
 }) {
   const router = useRouter();
-  const [metricId, setMetricId] = useState("");
-  const [direction, setDirection] = useState<"POSITIVE" | "NEGATIVE">("POSITIVE");
-  const [magnitude, setMagnitude] = useState("");
-  const [resolutionDate, setResolutionDate] = useState("");
-  const [selectedActions, setSelectedActions] = useState<string[]>([]);
-  const [primaryLever, setPrimaryLever] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -90,10 +66,10 @@ export function ReportActivationPanel({
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="activation-title" className="text-[17px] font-semibold text-teal-950">
-              The reviewed report is now an action plan
+              This report is now tracked work
             </h2>
             <p className="mt-1 max-w-2xl text-[12px] leading-5 text-teal-900/80">
-              Its decision, human prediction, and selected actions are locked to this report revision.
+              The activated revision is locked.
             </p>
           </div>
           <Link
@@ -103,40 +79,30 @@ export function ReportActivationPanel({
             Open Actions &amp; Decisions
           </Link>
         </div>
-        <DashboardCoreMetricSelector metrics={metrics} />
       </section>
     );
   }
 
   const exactSavedRevision =
-    persistence?.status === "report_ready" &&
-    report.schemaVersion === 2 &&
-    !hasUnsavedChanges;
-  const magnitudeNumber = Number(magnitude);
+    persistence?.status === "report_ready" && !hasUnsavedChanges;
+  const magnitudeMissing =
+    magnitudePctMean === null ||
+    !Number.isFinite(magnitudePctMean) ||
+    magnitudePctMean <= 0;
+  const resolutionDateMissing =
+    !/^\d{4}-\d{2}-\d{2}$/.test(resolutionDate) ||
+    resolutionDate <= activationDateBounds.today;
+  const actionsMissing = selectedActionIds.length === 0;
+  const primaryMissing =
+    selectedActionIds.length > 0 && !selectedActionIds.includes(primaryActionId);
   const inputComplete =
     metricId !== "" &&
-    Number.isFinite(magnitudeNumber) &&
-    magnitudeNumber > 0 &&
-    /^\d{4}-\d{2}-\d{2}$/.test(resolutionDate) &&
-    resolutionDate > activationDateBounds.today &&
-    selectedActions.length >= 1 &&
-    selectedActions.length <= 3 &&
-    selectedActions.includes(primaryLever);
-
-  function toggleAction(sourceItemId: string) {
-    const removing = selectedActions.includes(sourceItemId);
-    if (removing && primaryLever === sourceItemId) setPrimaryLever("");
-    if (!removing && !primaryLever && selectedActions.length < 3) {
-      setPrimaryLever(sourceItemId);
-    }
-    setSelectedActions((current) =>
-      current.includes(sourceItemId)
-        ? current.filter((id) => id !== sourceItemId)
-        : current.length < 3
-          ? [...current, sourceItemId]
-          : current,
-    );
-  }
+    metricAvailable &&
+    !magnitudeMissing &&
+    !resolutionDateMissing &&
+    selectedActionIds.length >= 1 &&
+    selectedActionIds.length <= 3 &&
+    selectedActionIds.includes(primaryActionId);
 
   function activate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -151,11 +117,11 @@ export function ReportActivationPanel({
           confirmedMetricId: metricId,
           prediction: {
             direction,
-            magnitudePctMean: magnitudeNumber,
+            magnitudePctMean: magnitudePctMean!,
             resolutionDate,
           },
-          selectedActionSourceItemIds: selectedActions,
-          primaryLeverActionSourceItemId: primaryLever,
+          selectedActionSourceItemIds: selectedActionIds,
+          primaryLeverActionSourceItemId: primaryActionId,
         }, {
           sessionKey: telemetrySessionKey,
           msSinceStart: Math.max(0, Math.round(performance.now() - telemetryStartedAtMs)),
@@ -182,181 +148,90 @@ export function ReportActivationPanel({
             Activate the plan
           </p>
           <h2 id="activation-title" className="mt-1 text-[17px] font-semibold text-[var(--text)]">
-            Turn this report into tracked work
+            Set the prediction
           </h2>
-          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[var(--text-muted)]">
-            Confirm one real metric, make the team&apos;s prediction, and choose the actions to carry forward. Activation happens once and locks this reviewed revision.
-          </p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
           exactSavedRevision
             ? "bg-emerald-50 text-emerald-800"
             : "bg-amber-50 text-amber-800"
         }`}>
-          {exactSavedRevision ? "Reviewed revision saved" : "Save the completed report first"}
+          {exactSavedRevision ? "Autosaved" : "Waiting for autosave"}
         </span>
       </div>
 
-      <DashboardCoreMetricSelector metrics={metrics} />
-
-      <form className="mt-4 grid gap-3 xl:grid-cols-3" onSubmit={activate}>
-        <fieldset className="rounded-xl border border-[var(--border)] p-3" disabled={!exactSavedRevision || isPending}>
-          <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-subtle)]">
-            1 · Confirm the prediction metric
+      <form className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end" onSubmit={activate}>
+        <fieldset className="grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-3" disabled={isPending}>
+          <legend className="px-1 text-[11px] font-semibold text-[var(--text-subtle)]">
+            Prediction
           </legend>
-          <p className="mt-1 text-[12px] font-medium text-[var(--text)]">
-            Report hypothesis: {projection.metricName}
-          </p>
-          {metrics.length > 0 ? (
-            <>
-              <label className="mt-3 block text-[11px] font-medium text-[var(--text-muted)]" htmlFor="activation-metric">
-                Workspace metric
-              </label>
-              <select
-                id="activation-metric"
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px] text-[var(--text)]"
-                value={metricId}
-                onChange={(event) => setMetricId(event.target.value)}
-              >
-                <option value="">Choose a metric…</option>
-                {metrics.map((metric) => (
-                  <option key={metric.metricId} value={metric.metricId}>
-                    {metric.name} · {metric.hasObservations ? "data connected" : "no observations"}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-[10px] leading-4 text-[var(--text-subtle)]">
-                The report&apos;s illustrative 40% and 55% values are not imported as observations.
-              </p>
-              <p className="mt-2 text-[10px] leading-4 text-[var(--text-subtle)]">
-                This single metric owns the report prediction. Dashboard Core Metrics above are a separate multi-select.
-              </p>
-            </>
-          ) : (
-            <div className="mt-3 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 p-3">
-              <p className="text-[11px] leading-5 text-amber-900">
-                No workspace metric is available yet.
-              </p>
-            </div>
-          )}
-          <Link
-            href={`/data-workshop${persistence ? `?returnTo=${encodeURIComponent(`/onboarding?report=${persistence.reportId}`)}` : ""}`}
-            className="mt-3 inline-flex text-[11px] font-semibold text-[var(--brand-blue)] underline-offset-2 hover:underline"
-          >
-            {metrics.length === 0 ? "Import a metric in Data Workshop →" : "Manage metrics in Data Workshop →"}
-          </Link>
-        </fieldset>
-
-        <fieldset className="rounded-xl border border-[var(--border)] p-3" disabled={!exactSavedRevision || isPending}>
-          <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-subtle)]">
-            2 · Make a prediction
-          </legend>
-          <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">
-            These values must come from you. The AI&apos;s chart is context, not a commitment.
-          </p>
-          <label className="mt-3 block text-[11px] font-medium text-[var(--text-muted)]" htmlFor="activation-direction">
+          <label className="text-[11px] font-medium text-[var(--text-muted)]" htmlFor="activation-direction">
             Expected direction
+            <select
+              id="activation-direction"
+              className="mt-1 block w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px]"
+              value={direction}
+              onChange={(event) => onDirectionChange(event.target.value as "POSITIVE" | "NEGATIVE")}
+            >
+              <option value="POSITIVE">Increase</option>
+              <option value="NEGATIVE">Decrease</option>
+            </select>
           </label>
-          <select
-            id="activation-direction"
-            className="mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px]"
-            value={direction}
-            onChange={(event) => setDirection(event.target.value as "POSITIVE" | "NEGATIVE")}
-          >
-            <option value="POSITIVE">Increase</option>
-            <option value="NEGATIVE">Decrease</option>
-          </select>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <label className="text-[11px] font-medium text-[var(--text-muted)]" htmlFor="activation-magnitude">
-              Magnitude (% of mean)
-              <input
-                id="activation-magnitude"
-                className="mt-1 w-full rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] tabular-nums"
-                inputMode="decimal"
-                min="0"
-                step="0.1"
-                type="number"
-                value={magnitude}
-                onChange={(event) => setMagnitude(event.target.value)}
-                placeholder="e.g. 15"
-              />
-            </label>
-            <label className="text-[11px] font-medium text-[var(--text-muted)]" htmlFor="activation-date">
-              Resolution date
-              <input
-                id="activation-date"
-                className="mt-1 w-full rounded-lg border border-[var(--border)] px-3 py-2 text-[12px]"
-                type="date"
-                min={activationDateBounds.minimum}
-                value={resolutionDate}
-                onChange={(event) => setResolutionDate(event.target.value)}
-              />
-            </label>
-          </div>
+          <label className="text-[11px] font-medium text-[var(--text-muted)]" htmlFor="activation-magnitude">
+            Change (% of mean)
+            <input
+              id="activation-magnitude"
+              className={`mt-1 block w-full rounded-lg border px-3 py-2 text-[12px] tabular-nums ${magnitudeMissing ? "border-amber-400 bg-amber-50/70" : "border-[var(--border)]"}`}
+              aria-invalid={magnitudeMissing}
+              inputMode="decimal"
+              min="0"
+              step="0.1"
+              type="number"
+              value={magnitudePctMean ?? ""}
+              onChange={(event) =>
+                onMagnitudeChange(
+                  event.target.value === "" ? null : Number(event.target.value),
+                )
+              }
+              placeholder="15"
+            />
+            {magnitudeMissing ? (
+              <span className="mt-1 block text-[10px] font-medium text-amber-800">
+                Enter the expected percentage change.
+              </span>
+            ) : null}
+          </label>
+          <label className="text-[11px] font-medium text-[var(--text-muted)]" htmlFor="activation-date">
+            Resolution date
+            <input
+              id="activation-date"
+              className={`mt-1 block w-full rounded-lg border px-3 py-2 text-[12px] ${resolutionDateMissing ? "border-amber-400 bg-amber-50/70" : "border-[var(--border)]"}`}
+              aria-invalid={resolutionDateMissing}
+              type="date"
+              min={activationDateBounds.minimum}
+              value={resolutionDate}
+              onChange={(event) =>
+                onResolutionDateChange(event.target.value || null)
+              }
+            />
+            {resolutionDateMissing ? (
+              <span className="mt-1 block text-[10px] font-medium text-amber-800">
+                Choose a future resolution date.
+              </span>
+            ) : null}
+          </label>
         </fieldset>
-
-        <fieldset className="rounded-xl border border-[var(--border)] p-3" disabled={!exactSavedRevision || isPending}>
-          <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-subtle)]">
-            3 · Choose actions
-          </legend>
-          <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">
-            Select one to three generated actions, then explicitly choose the primary lever the prediction will resolve against.
+        <div className="flex flex-col items-stretch gap-2 lg:min-w-44">
+          <p className={`text-[10px] ${actionsMissing || primaryMissing ? "font-semibold text-amber-800" : "text-[var(--text-muted)]"}`}>
+            {actionsMissing
+              ? "Confirm at least one action above"
+              : primaryMissing
+                ? "Choose one primary lever above"
+                : `${selectedActionIds.length}/3 actions confirmed`}
           </p>
-          <div className="mt-2 flex flex-col gap-2">
-            {report.implementation.actions.map((action) => {
-              const checked = selectedActions.includes(action.sourceItemId);
-              return (
-                <div
-                  key={action.sourceItemId}
-                  className={`rounded-lg border px-2.5 py-2 text-[11px] leading-4 ${
-                    checked ? "border-teal-300 bg-teal-50/60" : "border-[var(--border)]"
-                  }`}
-                >
-                  <label className="flex cursor-pointer items-start gap-2">
-                    <input
-                      className="mt-0.5"
-                      type="checkbox"
-                      checked={checked}
-                      disabled={!checked && selectedActions.length >= 3}
-                      onChange={() => toggleAction(action.sourceItemId)}
-                    />
-                    <span>
-                      <span className="block font-semibold text-[var(--text)]">{action.title}</span>
-                      <span className="text-[var(--text-muted)]">{action.summary[0]?.text}</span>
-                    </span>
-                  </label>
-                  {checked ? (
-                    <label className="mt-2 flex cursor-pointer items-center gap-2 border-t border-teal-200 pt-2 font-semibold text-teal-900">
-                      <input
-                        type="radio"
-                        name="primary-lever"
-                        checked={primaryLever === action.sourceItemId}
-                        onChange={() => setPrimaryLever(action.sourceItemId)}
-                      />
-                      Primary causal lever
-                    </label>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-          <p className="mt-2 text-[10px] tabular-nums text-[var(--text-subtle)]">
-            {selectedActions.length} of {Math.min(3, report.implementation.actions.length)} selected
-          </p>
-        </fieldset>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 xl:col-span-3">
-          <div>
-            <p className="text-[11px] font-semibold text-[var(--text)]">
-              One explicit materialization
-            </p>
-            <p className="text-[10px] leading-4 text-[var(--text-muted)]">
-              Creates one decision, one prediction, {selectedActions.length || "your selected"} planned {selectedActions.length === 1 ? "action" : "actions"}, and one explicit primary lever. It does not claim impact or create tracker tickets.
-            </p>
-          </div>
           <button
             type="submit"
-            className="rounded-lg bg-[var(--text)] px-4 py-2 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-[var(--text)] px-4 py-2.5 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!exactSavedRevision || !inputComplete || isPending}
           >
             {isPending ? "Activating…" : "Activate decision"}

@@ -33,6 +33,7 @@ export function ActionsPageClient({
   objective,
   connectorMetricId,
   decisionReport,
+  decisionReportId,
   decisionLoopHandoffs,
 }: {
   actions: Action[];
@@ -41,6 +42,7 @@ export function ActionsPageClient({
   objective: ProjectObjective | null;
   connectorMetricId: string | null;
   decisionReport: DecisionReportV1 | null;
+  decisionReportId: string | null;
   decisionLoopHandoffs: Array<{
     actionId: string;
     handoff: DecisionLoopHandoff;
@@ -118,6 +120,7 @@ export function ActionsPageClient({
               onSelectAction={() => undefined}
               connectorMetricId={connectorMetricId}
               report={decisionReport}
+              reportId={decisionReportId}
               decisionLoopHandoffs={decisionLoopHandoffs}
               selectedActionId={visibleActions.some((action) => action.id === paramId) ? paramId : null}
             />

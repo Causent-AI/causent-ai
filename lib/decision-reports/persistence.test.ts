@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "./fixtures/gummy-alpha.ts";
 import { createSafeFallbackReport } from "./generation-contract.ts";
+import { cloneDecisionReport } from "./schema.ts";
 import {
   deleteDecisionReport,
   loadDecisionReport,
@@ -72,11 +73,23 @@ function unavailableSourceReceiptClient(): SupabaseClient {
 
 test("save derives report_ready and calls the create RPC for a new complete report", async () => {
   const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const actionId = report.implementation.actions[0].sourceItemId;
+  report.activationDraft = {
+    confirmedMetricId: "ca5e0000-0000-0000-0000-000000000073",
+    selectedActionSourceItemIds: [actionId],
+    primaryLeverActionSourceItemId: actionId,
+    prediction: {
+      direction: "POSITIVE",
+      magnitudePctMean: 14,
+      resolutionDate: "2099-12-15",
+    },
+  };
   const result = await saveDecisionReport(rpcClient(calls), SCOPE_ID, {
     reportId: null,
     baseRevisionId: null,
     sourceReceiptId: SOURCE_RECEIPT_ID,
-    report: GUMMY_ALPHA_GOLDEN_EXAMPLE.report,
+    report,
     metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
     authoredBy: null,
   });
@@ -86,6 +99,50 @@ test("save derives report_ready and calls the create RPC for a new complete repo
   assert.equal(calls[0].name, "create_decision_report_v2");
   assert.equal(calls[0].args.p_source_receipt_id, SOURCE_RECEIPT_ID);
   assert.equal(calls[0].args.p_status, "report_ready");
+  assert.deepEqual(
+    (calls[0].args.p_snapshot as typeof report).activationDraft,
+    report.activationDraft,
+  );
+});
+
+test("save derives report_ready without evidence and draft without background", async () => {
+  const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  const noEvidence = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  noEvidence.supportingEvidence.factors = [{
+    ...noEvidence.supportingEvidence.factors[0],
+    text: "",
+    status: "missing",
+    sourceChunkIds: [],
+  }];
+
+  const ready = await saveDecisionReport(rpcClient(calls), SCOPE_ID, {
+    reportId: null,
+    baseRevisionId: null,
+    sourceReceiptId: SOURCE_RECEIPT_ID,
+    report: noEvidence,
+    metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    authoredBy: null,
+  });
+  assert.equal(ready.ok, true);
+  assert.equal(calls[0].args.p_status, "report_ready");
+
+  const missingBackground = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  missingBackground.decision.background[0] = {
+    ...missingBackground.decision.background[0],
+    text: "",
+    status: "missing",
+    sourceChunkIds: [],
+  };
+  const draftResult = await saveDecisionReport(rpcClient(calls), SCOPE_ID, {
+    reportId: null,
+    baseRevisionId: null,
+    sourceReceiptId: SOURCE_RECEIPT_ID,
+    report: missingBackground,
+    metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    authoredBy: null,
+  });
+  assert.equal(draftResult.ok, true);
+  assert.equal(calls[1].args.p_status, "draft");
 });
 
 test("save derives draft for the sparse fallback", async () => {

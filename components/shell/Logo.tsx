@@ -88,7 +88,7 @@ export function Wordmark({ height = 20 }: { height?: number }) {
 
 export function Logo() {
   return (
-    <div className="flex items-center gap-2.5 select-none">
+    <div className="flex shrink-0 items-center gap-2.5 select-none">
       <LogoMark height={28} />
       <Wordmark height={19} />
     </div>

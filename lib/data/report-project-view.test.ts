@@ -8,10 +8,14 @@ import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "../decision-reports/fixtures/gummy-a
 const action = (id: string, impact: Action["impact"] = []): Action => ({
   id, pr: 0, title: id, shippedAt: null, primaryMetricId: "completion", impact,
 });
-const decision = (id: string, actionIds: string[]): Decision => ({
+const decision = (
+  id: string,
+  actionIds: string[],
+  leverActionId: string | null = null,
+): Decision => ({
   id, origin: id === "report-decision" ? "decision_report" : "legacy", title: id,
   createdAt: "2026-07-22", rationale: { body: [] }, actionIds,
-  leverActionId: null, predictions: [],
+  leverActionId, predictions: [],
 });
 const metric = (id: string): Metric => ({
   id, name: id, color: "#000", format: "percent", source: "CSV", cadence: "Daily",
@@ -63,7 +67,7 @@ test("an active report isolates every dashboard dataset to its project", () => {
   assert.equal(view.aggregatedImpact[0].value, "—");
 });
 
-test("current report impact uses only its causal action cells", () => {
+test("current report impact uses only the primary lever's causal cell", () => {
   const current = action("report-action", [
     {
       metricId: "completion", direction: "up", value: 3,
@@ -76,6 +80,12 @@ test("current report impact uses only its causal action cells", () => {
       label: "-50.0pp", good: false, evidence: "descriptive",
     },
   ]);
+  const supportWithCausalCell = action("report-support", [
+    {
+      metricId: "completion", direction: "up", value: 40,
+      label: "+40.0pp", good: true, evidence: "causal",
+    },
+  ]);
   const unrelated = action("legacy-action", [
     {
       metricId: "completion", direction: "down", value: -100,
@@ -84,9 +94,13 @@ test("current report impact uses only its causal action cells", () => {
   ]);
   const view = selectReportProjectView({
     reports: [report()],
-    actions: [current, descriptive, unrelated],
+    actions: [current, descriptive, supportWithCausalCell, unrelated],
     decisions: [
-      decision("report-decision", [current.id, descriptive.id]),
+      decision(
+        "report-decision",
+        [current.id, descriptive.id, supportWithCausalCell.id],
+        current.id,
+      ),
       decision("legacy", [unrelated.id]),
     ],
     metrics: [metric("completion")],
@@ -95,7 +109,10 @@ test("current report impact uses only its causal action cells", () => {
     impactByMetric: [{ metricId: "completion", value: -147, label: "-147.0pp", direction: "down", good: false }],
   });
 
-  assert.deepEqual(view.actions.map((item) => item.id), [current.id, descriptive.id]);
+  assert.deepEqual(
+    view.actions.map((item) => item.id),
+    [current.id, descriptive.id, supportWithCausalCell.id],
+  );
   assert.deepEqual(view.impactByMetric, [{
     metricId: "completion", value: 3, label: "+3.0pp", direction: "up", good: true,
   }]);

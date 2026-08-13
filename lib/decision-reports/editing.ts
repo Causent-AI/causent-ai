@@ -1,19 +1,21 @@
 import type {
   Claim,
+  DecisionReportActivationDraft,
   DecisionReportV1,
+  DraftAction,
 } from "./schema.ts";
 import {
   cloneDecisionReport,
+  MAX_DECISION_REPORT_ACTIONS,
   validateDecisionReport,
 } from "./schema.ts";
 
-export const REQUIRED_REPORT_FIELD_COUNT = 6;
+export const REQUIRED_REPORT_FIELD_COUNT = 5;
 
 export type DecisionReportGapKind =
-  | "decision"
+  | "background"
   | "problem"
-  | "proof"
-  | "metric_mechanism"
+  | "decision"
   | "action_plan_summary"
   | "action";
 
@@ -28,16 +30,38 @@ type DataClassification =
   DecisionReportV1["implementation"]["governance"]["dataClassification"];
 
 export type ReportEditCommandV1 =
+  | { type: "edit_report_title"; title: string }
+  | {
+      type: "edit_activation_draft";
+      activationDraft: DecisionReportActivationDraft;
+    }
   | { type: "replace_claim_text"; claimId: string; text: string }
+  | {
+      type: "add_supporting_evidence";
+      claimId: string;
+      text: string;
+    }
+  | { type: "add_customer"; claimId: string; text: string }
+  | { type: "add_stakeholder"; claimId: string; text: string }
   | { type: "edit_action_title"; sourceItemId: string; title: string }
   | { type: "edit_action_summary"; sourceItemId: string; text: string }
   | { type: "edit_action_owner"; sourceItemId: string; text: string }
+  | {
+      type: "edit_action_execution";
+      sourceItemId: string;
+      priority: 1 | 2 | 3;
+      tags: string[];
+      skills: string[];
+      estimatedTime: string;
+      estimatedCost: string;
+    }
   | {
       type: "add_action";
       sourceItemId: string;
       title: string;
       summary: string;
     }
+  | { type: "remove_action"; sourceItemId: string }
   | { type: "set_data_classification"; value: DataClassification };
 
 export type ReportEditResult =
@@ -73,16 +97,12 @@ function claimIsComplete(claim: Claim | undefined): boolean {
   );
 }
 
-function firstIncompleteClaim(claims: Claim[]): Claim | undefined {
-  return claims.find((claim) => !claimIsComplete(claim)) ?? claims[0];
-}
-
 function claimGap(
   kind: Exclude<DecisionReportGapKind, "action">,
   question: string,
   claims: Claim[],
 ): DecisionReportGap {
-  const claim = firstIncompleteClaim(claims);
+  const claim = claims.find((candidate) => !claimIsComplete(candidate)) ?? claims[0];
   return {
     kind,
     question,
@@ -96,12 +116,12 @@ export function scanDecisionReportGaps(
 ): DecisionReportGap[] {
   const gaps: DecisionReportGap[] = [];
 
-  if (!report.decision.decision.some(claimIsComplete)) {
+  if (!report.decision.background.some(claimIsComplete)) {
     gaps.push(
       claimGap(
-        "decision",
-        "What decision are you making?",
-        report.decision.decision,
+        "background",
+        "What context should someone know about this challenge?",
+        report.decision.background,
       ),
     );
   }
@@ -110,28 +130,18 @@ export function scanDecisionReportGaps(
     gaps.push(
       claimGap(
         "problem",
-        "What problem or pain point does this solve?",
+        "What is the specific problem to solve?",
         report.decision.problem,
       ),
     );
   }
 
-  if (!report.supportingEvidence.factors.some(claimIsComplete)) {
+  if (!report.decision.decision.some(claimIsComplete)) {
     gaps.push(
       claimGap(
-        "proof",
-        "What is the strongest evidence supporting this decision?",
-        report.supportingEvidence.factors,
-      ),
-    );
-  }
-
-  if (!report.supportingEvidence.metricMechanism.some(claimIsComplete)) {
-    gaps.push(
-      claimGap(
-        "metric_mechanism",
-        "How should this decision affect the core metric?",
-        report.supportingEvidence.metricMechanism,
+        "decision",
+        "What decision or change should move this forward?",
+        report.decision.decision,
       ),
     );
   }
@@ -140,7 +150,7 @@ export function scanDecisionReportGaps(
     gaps.push(
       claimGap(
         "action_plan_summary",
-        "What is the short plan to implement this decision?",
+        "How will you put this decision into action?",
         report.implementation.actionPlanSummary,
       ),
     );
@@ -180,6 +190,35 @@ function validDataClassification(value: unknown): value is DataClassification {
   );
 }
 
+function findAction(
+  report: DecisionReportV1,
+  sourceItemId: string,
+): DraftAction | undefined {
+  return report.implementation.actions.find(
+    (item) => item.sourceItemId === sourceItemId,
+  );
+}
+
+function appendAudienceClaim(
+  report: DecisionReportV1,
+  claims: Claim[],
+  claimId: string,
+  text: string,
+  label: "Customer" | "Stakeholder",
+): ReportEditResult | null {
+  if (claims.length >= 3) {
+    return editError(`${label} list cannot exceed 3 items.`);
+  }
+  if (claimId.trim() === "") {
+    return editError(`${label} claim ID cannot be empty.`);
+  }
+  if (reportClaims(report).some((claim) => claim.id === claimId)) {
+    return editError(`Claim already exists: ${claimId}`);
+  }
+  claims.push(userClaim(claimId, text));
+  return null;
+}
+
 export function applyReportEditCommand(
   report: DecisionReportV1,
   command: ReportEditCommandV1,
@@ -187,6 +226,17 @@ export function applyReportEditCommand(
   const next = cloneDecisionReport(report);
 
   switch (command.type) {
+    case "edit_report_title": {
+      if (command.title.trim() === "") {
+        return editError("Report title cannot be empty.");
+      }
+      next.title = command.title;
+      break;
+    }
+    case "edit_activation_draft": {
+      next.activationDraft = structuredClone(command.activationDraft);
+      break;
+    }
     case "replace_claim_text": {
       const target = reportClaims(next).find(
         (claim) => claim.id === command.claimId,
@@ -196,6 +246,43 @@ export function applyReportEditCommand(
       target.text = command.text;
       target.status = command.text.trim() === "" ? "missing" : "user_confirmed";
       target.sourceChunkIds = [];
+      break;
+    }
+    case "add_supporting_evidence": {
+      if (next.supportingEvidence.factors.length >= 3) {
+        return editError("Supporting evidence cannot exceed 3 items.");
+      }
+      if (command.claimId.trim() === "") {
+        return editError("Supporting evidence claim ID cannot be empty.");
+      }
+      if (reportClaims(next).some((claim) => claim.id === command.claimId)) {
+        return editError(`Claim already exists: ${command.claimId}`);
+      }
+      next.supportingEvidence.factors.push(
+        userClaim(command.claimId, command.text),
+      );
+      break;
+    }
+    case "add_customer": {
+      const error = appendAudienceClaim(
+        next,
+        next.implementation.customers,
+        command.claimId,
+        command.text,
+        "Customer",
+      );
+      if (error) return error;
+      break;
+    }
+    case "add_stakeholder": {
+      const error = appendAudienceClaim(
+        next,
+        next.implementation.stakeholders,
+        command.claimId,
+        command.text,
+        "Stakeholder",
+      );
+      if (error) return error;
       break;
     }
     case "edit_action_title": {
@@ -221,9 +308,7 @@ export function applyReportEditCommand(
       break;
     }
     case "edit_action_owner": {
-      const action = next.implementation.actions.find(
-        (item) => item.sourceItemId === command.sourceItemId,
-      );
+      const action = findAction(next, command.sourceItemId);
       if (!action) return editError(`Unknown action: ${command.sourceItemId}`);
       action.owner = command.text.trim()
         ? userClaim(
@@ -233,9 +318,21 @@ export function applyReportEditCommand(
         : null;
       break;
     }
+    case "edit_action_execution": {
+      const action = findAction(next, command.sourceItemId);
+      if (!action) return editError(`Unknown action: ${command.sourceItemId}`);
+      action.priority = command.priority;
+      action.tags = command.tags.map((tag) => tag.trim()).filter(Boolean);
+      action.skills = command.skills.map((skill) => skill.trim()).filter(Boolean);
+      action.estimatedTime = command.estimatedTime;
+      action.estimatedCost = command.estimatedCost;
+      break;
+    }
     case "add_action": {
-      if (next.implementation.actions.length >= 3) {
-        return editError("Action plan cannot exceed three actions.");
+      if (next.implementation.actions.length >= MAX_DECISION_REPORT_ACTIONS) {
+        return editError(
+          `Action plan cannot exceed ${MAX_DECISION_REPORT_ACTIONS} actions.`,
+        );
       }
       if (command.sourceItemId.trim() === "") {
         return editError("Action ID cannot be empty.");
@@ -265,7 +362,34 @@ export function applyReportEditCommand(
           userClaim(`${command.sourceItemId}-summary`, command.summary),
         ],
         owner: null,
+        priority: 2,
+        tags: [],
+        skills: [],
+        estimatedTime: "",
+        estimatedCost: "",
       });
+      break;
+    }
+    case "remove_action": {
+      const actionIndex = next.implementation.actions.findIndex(
+        (action) => action.sourceItemId === command.sourceItemId,
+      );
+      if (actionIndex < 0) {
+        return editError(`Unknown action: ${command.sourceItemId}`);
+      }
+      next.implementation.actions.splice(actionIndex, 1);
+      if (next.activationDraft) {
+        next.activationDraft.selectedActionSourceItemIds =
+          next.activationDraft.selectedActionSourceItemIds.filter(
+            (selectedId) => selectedId !== command.sourceItemId,
+          );
+        if (
+          next.activationDraft.primaryLeverActionSourceItemId ===
+          command.sourceItemId
+        ) {
+          next.activationDraft.primaryLeverActionSourceItemId = null;
+        }
+      }
       break;
     }
     case "set_data_classification": {

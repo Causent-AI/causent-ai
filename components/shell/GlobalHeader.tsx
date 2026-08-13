@@ -6,10 +6,10 @@ import { GearIcon, PlusIcon } from "@/components/ui/icons";
 
 export function GlobalHeader() {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-5">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 sm:px-5">
       <Logo />
 
-      <div className="flex items-center gap-2.5">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
         <button
           type="button"
           aria-label="Settings"
@@ -20,9 +20,10 @@ export function GlobalHeader() {
 
         <button
           type="button"
-          className="flex h-9 items-center gap-1.5 rounded-lg bg-[var(--brand-blue)] px-3.5 text-[13px] font-semibold text-white hover:brightness-105"
+          aria-label="New Project"
+          className="flex h-9 w-9 items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-blue)] px-0 text-[13px] font-semibold text-white hover:brightness-105 sm:w-auto sm:px-3.5"
         >
-          New Project
+          <span className="hidden sm:inline">New Project</span>
           <PlusIcon />
         </button>
 

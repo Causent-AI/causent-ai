@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import {
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
+import Link from "next/link";
 import type { Action, Decision, Metric, Prediction } from "@/lib/types";
 import { Delta } from "@/components/ui/Delta";
 import { VerdictBadge } from "@/components/actions/VerdictBadge";
@@ -18,9 +23,13 @@ import { actionReferenceLabel } from "@/components/actions/ActionReference";
 import { LeverCreate } from "@/components/onboarding/LeverCreate";
 import { ManualCompletionForm } from "@/components/actions/ManualCompletionForm";
 import { DecisionLoopHandoff } from "@/components/actions/DecisionLoopHandoff";
+import { MetricHistoryExplorer } from "@/components/charts/MetricHistoryExplorer";
 import { CheckIcon, ChevronIcon } from "@/components/ui/icons";
 import type { Claim, DecisionReportV1, DraftAction } from "@/lib/decision-reports/schema";
-import type { DecisionLoopHandoff as DecisionLoopHandoffContract } from "@/lib/decision-reports/loop-handoff";
+import type {
+  DecisionLoopCopyTarget,
+  DecisionLoopHandoff as DecisionLoopHandoffContract,
+} from "@/lib/decision-reports/loop-handoff";
 
 // The decision detail view (replaces the action-centric DecisionEditor):
 // intent (rationale) → the actions carrying it (lever marked) → the
@@ -216,34 +225,30 @@ function reportActionFor(action: Action, report: DecisionReportV1): DraftAction 
   );
 }
 
-function DecisionSummary({ report }: { report: DecisionReportV1 }) {
+function DecisionSummary({ report, reportId }: { report: DecisionReportV1; reportId: string | null }) {
   const decisions = presentClaims(report.decision.decision);
   const problems = presentClaims(report.decision.problem);
-  const evidence = presentClaims(report.supportingEvidence.factors);
   return (
     <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm shadow-slate-200/40">
-      <h2 className="text-[15px] font-semibold text-[var(--text)]">Decision Summary</h2>
-      <div className="mt-4 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Decision</h3>
-          {decisions.map((claim) => (
-            <p key={claim.id} className="mt-2 text-[15px] font-semibold leading-6 text-[var(--text)]">{claim.text}</p>
-          ))}
-          {problems.map((claim) => (
-            <p key={claim.id} className="mt-2 text-[12px] leading-5 text-[var(--text-muted)]">{claim.text}</p>
-          ))}
-        </div>
-        <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Supporting evidence</h3>
-          <ul className="mt-2 space-y-2">
-            {evidence.map((claim) => (
-              <li key={claim.id} className="flex gap-2 text-[12px] leading-5 text-[var(--text-muted)]">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand-teal)]" aria-hidden="true" />
-                <span>{claim.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[15px] font-semibold text-[var(--text)]">Project Summary</h2>
+        {reportId ? (
+          <Link
+            href={`/onboarding?report=${encodeURIComponent(reportId)}`}
+            className="text-[12px] font-semibold text-[var(--brand-blue)] hover:underline"
+          >
+            View Decision Report →
+          </Link>
+        ) : null}
+      </div>
+      <div className="mt-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Decision</h3>
+        {decisions.map((claim) => (
+          <p key={claim.id} className="mt-2 text-[15px] font-semibold leading-6 text-[var(--text)]">{claim.text}</p>
+        ))}
+        {problems.map((claim) => (
+          <p key={claim.id} className="mt-2 text-[12px] leading-5 text-[var(--text-muted)]">{claim.text}</p>
+        ))}
       </div>
     </section>
   );
@@ -251,20 +256,59 @@ function DecisionSummary({ report }: { report: DecisionReportV1 }) {
 
 function ReportActionRows({
   actions,
+  metrics,
   report,
+  primaryLeverActionId,
   decisionLoopHandoffs,
   selectedActionId,
 }: {
   actions: Action[];
+  metrics: Metric[];
   report: DecisionReportV1;
+  primaryLeverActionId: string | null;
   decisionLoopHandoffs: Array<{
     actionId: string;
     handoff: DecisionLoopHandoffContract;
   }>;
   selectedActionId: string | null;
 }) {
+  const metricById = new Map(metrics.map((metric) => [metric.id, metric]));
   const governanceSources = presentClaims(report.implementation.governance.allowedDataSources);
   const governanceNotes = presentClaims(report.implementation.governance.approvedModelNotes);
+  const [expansion, setExpansion] = useState<{
+    selectedActionId: string | null;
+    actionIds: Set<string>;
+  }>(() => ({
+    selectedActionId,
+    actionIds: new Set(selectedActionId ? [selectedActionId] : []),
+  }));
+  const [handoffSelection, setHandoffSelection] = useState<{
+    actionId: string;
+    target: DecisionLoopCopyTarget;
+  } | null>(null);
+
+  if (selectedActionId !== expansion.selectedActionId) {
+    const actionIds = new Set(expansion.actionIds);
+    if (selectedActionId) actionIds.add(selectedActionId);
+    setExpansion({
+      selectedActionId,
+      actionIds,
+    });
+  }
+
+  function toggleAction(actionId: string) {
+    setExpansion((current) => {
+      const next = new Set(current.actionIds);
+      if (next.has(actionId)) next.delete(actionId);
+      else next.add(actionId);
+      return { ...current, actionIds: next };
+    });
+  }
+
+  const selectedHandoff = handoffSelection
+    ? decisionLoopHandoffs.find((candidate) => candidate.actionId === handoffSelection.actionId)
+    : null;
+
   return (
     <section>
       <h2 className="text-[15px] font-semibold text-[var(--text)]">Actions</h2>
@@ -273,39 +317,98 @@ function ReportActionRows({
           const detail = reportActionFor(action, report);
           const summaries = detail ? presentClaims(detail.summary) : [];
           const reference = actionReferenceLabel(action);
+          const priority = detail?.priority ?? Math.max(1, 3 - actions.indexOf(action));
+          const tags = detail?.tags ?? [];
           const loopHandoff = decisionLoopHandoffs.find(
             (candidate) => candidate.actionId === action.id,
           )?.handoff;
+          const driftWatchArmed = action.id === primaryLeverActionId;
+          const assignedMetric = action.primaryMetricId
+            ? metricById.get(action.primaryMetricId)
+            : undefined;
+          const expanded = expansion.actionIds.has(action.id);
+          const contentId = `action-details-${action.id}`;
           return (
-            <details
+            <article
               key={action.id}
               id={action.id}
-              open={selectedActionId === action.id ? true : undefined}
-              className="group scroll-mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+              className="scroll-mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
             >
-              <summary className="grid cursor-pointer list-none grid-cols-[22px_minmax(0,1fr)_minmax(120px,0.35fr)_auto] items-center gap-3 px-4 py-3 marker:hidden">
-                <ChevronIcon className="text-[var(--text-subtle)] transition-transform group-open:rotate-180" />
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="shrink-0 rounded-md border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-teal-800">
-                    {action.displayCode ?? "Action"}
+              <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch">
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-controls={contentId}
+                  onClick={() => toggleAction(action.id)}
+                  className="grid min-h-16 w-full grid-cols-[22px_minmax(0,1fr)] items-center gap-3 px-4 py-3 text-left hover:bg-black/[0.015] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand-blue)]"
+                >
+                  <ChevronIcon className={`text-[var(--text-subtle)] transition-transform ${expanded ? "rotate-180" : ""}`} />
+                  <span className="min-w-0">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 rounded-md border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-teal-800">
+                        {action.displayCode ?? "Action"}
+                      </span>
+                      {driftWatchArmed ? (
+                        <span
+                          className="inline-flex shrink-0 items-center gap-1 text-[9px] font-semibold text-amber-800"
+                          aria-label="Drift watch active"
+                          title="Drift watch active"
+                        >
+                          <span className="h-2 w-2 rounded-full border border-amber-500 bg-amber-300" aria-hidden="true" />
+                          Drift watch
+                        </span>
+                      ) : null}
+                      <span className="truncate text-[13px] font-semibold text-[var(--text)]">{action.title}</span>
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] tracking-[0.08em] text-amber-500" aria-label={`${priority} of 3 priority`}>
+                        {"★".repeat(priority)}<span className="text-slate-300">{"★".repeat(3 - priority)}</span>
+                      </span>
+                      {tags.map((tag) => (
+                        <span key={tag} className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-semibold text-blue-800">{tag}</span>
+                      ))}
+                      <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[9px] font-semibold text-teal-800">
+                        Metric: {assignedMetric?.name ?? "Not assigned"}
+                      </span>
+                    </span>
                   </span>
-                  <span className="truncate text-[13px] font-semibold text-[var(--text)]">{action.title}</span>
-                </span>
-                <span className="truncate text-[11px] font-medium text-[var(--text-muted)]">
-                  {reference === "Planned" ? "No Jira/GitHub ticket" : reference}
-                </span>
-                <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-semibold ${
-                  action.shippedAt
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-[var(--border)] bg-white text-[var(--text-muted)]"
-                }`}>
-                  <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${action.shippedAt ? "border-emerald-600 bg-emerald-600 text-white" : "border-[var(--border-strong)]"}`}>
-                    {action.shippedAt ? <CheckIcon size={10} strokeWidth={2.5} /> : null}
+                </button>
+                <div className="flex min-h-16 flex-wrap items-center gap-2 border-t border-[var(--border)] px-4 py-2 sm:justify-end sm:border-l sm:border-t-0 sm:px-3">
+                  {loopHandoff ? (
+                    <>
+                      <span className="text-[10px] font-medium text-[var(--text-subtle)]">
+                        Copy Task Instructions to:
+                      </span>
+                      {(["claude", "codex"] as const).map((target) => (
+                        <button
+                          key={target}
+                          type="button"
+                          aria-label={`Copy ${action.displayCode ?? action.title} task instructions to ${target === "claude" ? "Claude" : "Codex"}`}
+                          onClick={() => setHandoffSelection({ actionId: action.id, target })}
+                          className="min-h-11 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-[10px] font-semibold text-indigo-800 hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                        >
+                          {target === "claude" ? "Claude" : "Codex"}
+                        </button>
+                      ))}
+                    </>
+                  ) : null}
+                  <span className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-[10px] font-semibold ${
+                    action.shippedAt
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-[var(--border)] bg-white text-[var(--text-muted)]"
+                  }`}>
+                    <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${action.shippedAt ? "border-emerald-600 bg-emerald-600 text-white" : "border-[var(--border-strong)]"}`}>
+                      {action.shippedAt ? <CheckIcon size={10} strokeWidth={2.5} /> : null}
+                    </span>
+                    {action.shippedAt ? "Complete" : "Open"}
                   </span>
-                  {action.shippedAt ? "Complete" : "Open"}
-                </span>
-              </summary>
-              <div className="border-t border-[var(--border)] px-4 py-4 pl-[58px]">
+                </div>
+              </div>
+              <div
+                id={contentId}
+                hidden={!expanded}
+                className="border-t border-[var(--border)] px-4 py-4 sm:pl-[58px]"
+              >
                 {summaries.length > 0 ? (
                   <div>
                     <h3 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Details</h3>
@@ -317,11 +420,27 @@ function ReportActionRows({
                     {action.rationale.body.map((paragraph, index) => <p key={index} className="mt-1 text-[12px] leading-5 text-[var(--text-muted)]">{paragraph}</p>)}
                   </div>
                 ) : null}
-                <dl className="mt-3 grid gap-3 text-[11px] sm:grid-cols-3">
+                <dl className="mt-3 grid gap-3 text-[11px] sm:grid-cols-3 lg:grid-cols-6">
                   <div><dt className="font-semibold text-[var(--text-subtle)]">Owner</dt><dd className="mt-1 text-[var(--text)]">{detail?.owner?.text || action.ownerLabel || "Not assigned"}</dd></div>
+                  <div>
+                    <dt className="font-semibold text-[var(--text-subtle)]">Assigned metric</dt>
+                    <dd className="mt-1 text-[var(--text)]">
+                      {assignedMetric?.name ?? "Not assigned"}
+                      {assignedMetric ? (
+                        <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
+                          {driftWatchArmed ? "Primary causal target" : "Report target · supporting action"}
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
                   <div><dt className="font-semibold text-[var(--text-subtle)]">Work item</dt><dd className="mt-1 text-[var(--text)]">{reference}</dd></div>
                   <div><dt className="font-semibold text-[var(--text-subtle)]">Completed</dt><dd className="mt-1 text-[var(--text)]">{action.shippedAt ?? "Not yet"}</dd></div>
+                  <div><dt className="font-semibold text-[var(--text-subtle)]">Time</dt><dd className="mt-1 text-[var(--text)]">{detail?.estimatedTime || "Not estimated"}</dd></div>
+                  <div><dt className="font-semibold text-[var(--text-subtle)]">Cost</dt><dd className="mt-1 text-[var(--text)]">{detail?.estimatedCost || "Not estimated"}</dd></div>
                 </dl>
+                {detail?.skills?.length ? (
+                  <p className="mt-3 text-[11px] text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Skills: </span>{detail.skills.join(", ")}</p>
+                ) : null}
                 <div className="mt-3 rounded-lg bg-[var(--bg)] px-3 py-2 text-[10px] leading-4 text-[var(--text-muted)]">
                   <span className="font-semibold text-[var(--text)]">Governance: </span>
                   {report.implementation.governance.dataClassification
@@ -329,11 +448,6 @@ function ReportActionRows({
                     : "Data classification not set. "}
                   {[...governanceSources, ...governanceNotes].map((claim) => claim.text).join(" ") || "No additional governance notes."}
                 </div>
-                {loopHandoff && !action.shippedAt ? (
-                  <div className="mt-3">
-                    <DecisionLoopHandoff handoff={loopHandoff} />
-                  </div>
-                ) : null}
                 {action.manualCompletion ? (
                   <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
                     Completed {action.manualCompletion.completedOn}: {action.manualCompletion.explanation}
@@ -342,24 +456,17 @@ function ReportActionRows({
                   <div className="mt-3"><ManualCompletionForm actionId={action.id} /></div>
                 ) : null}
               </div>
-            </details>
+            </article>
           );
         })}
       </div>
-    </section>
-  );
-}
-
-function ConnectorExplanation() {
-  return (
-    <section className="rounded-xl border border-[var(--border)] bg-[var(--bg)]/60 p-4">
-      <h2 className="text-[13px] font-semibold text-[var(--text)]">Connect work tracking</h2>
-      <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">
-        Account-level GitHub or Atlassian sign-in is not available yet. Today, choose a repository or Jira project below: Causent creates the ticket when workspace credentials are configured, or gives you a prefilled link and accepts the finished issue URL. Webhooks monitor connected work after attribution.
-      </p>
-      <p className="mt-2 text-[10px] leading-4 text-[var(--text-subtle)]">
-        Once connected, the action header shows the GitHub issue or Jira key and its completion state. Manual completion remains available for work shipped elsewhere.
-      </p>
+      {handoffSelection && selectedHandoff ? (
+        <DecisionLoopHandoff
+          handoff={selectedHandoff.handoff}
+          target={handoffSelection.target}
+          onClose={() => setHandoffSelection(null)}
+        />
+      ) : null}
     </section>
   );
 }
@@ -371,6 +478,7 @@ export function DecisionDetail({
   onSelectAction,
   connectorMetricId,
   report = null,
+  reportId = null,
   decisionLoopHandoffs = [],
   selectedActionId = null,
 }: {
@@ -380,6 +488,7 @@ export function DecisionDetail({
   onSelectAction: (id: string) => void;
   connectorMetricId: string | null;
   report?: DecisionReportV1 | null;
+  reportId?: string | null;
   decisionLoopHandoffs?: Array<{
     actionId: string;
     handoff: DecisionLoopHandoffContract;
@@ -388,13 +497,19 @@ export function DecisionDetail({
 }) {
   const metricById = new Map(metrics.map((m) => [m.id, m]));
   const actionById = new Map(actions.map((a) => [a.id, a]));
+  const reportActions = decision.actionIds.flatMap((id) => actionById.get(id) ?? []);
+  const reportMetric = connectorMetricId
+    ? metricById.get(connectorMetricId)
+    : decision.predictions[0]
+      ? metricById.get(decision.predictions[0].metricId)
+      : undefined;
   const [resolvePending, startResolve] = useTransition();
   const [resolveMsg, setResolveMsg] = useState<string | null>(null);
   const hasUnresolved = decision.predictions.some((p) => p.resolvedAt === null);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto">
-      {report ? <DecisionSummary report={report} /> : <div>
+      {report ? <DecisionSummary report={report} reportId={reportId} /> : <div>
         <h2 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">
           {decision.title}
         </h2>
@@ -405,6 +520,14 @@ export function DecisionDetail({
           )}
         </p>
       </div>}
+
+      {report && reportMetric ? (
+        <MetricHistoryExplorer
+          metric={reportMetric}
+          actions={reportActions}
+          primaryActionId={decision.leverActionId}
+        />
+      ) : null}
 
       {!report && decision.rationale.body.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -418,8 +541,10 @@ export function DecisionDetail({
 
       {report ? (
         <ReportActionRows
-          actions={decision.actionIds.flatMap((id) => actionById.get(id) ?? [])}
+          actions={reportActions}
+          metrics={metrics}
           report={report}
+          primaryLeverActionId={decision.leverActionId}
           decisionLoopHandoffs={decisionLoopHandoffs}
           selectedActionId={selectedActionId}
         />
@@ -461,23 +586,10 @@ export function DecisionDetail({
         </ul>
       </section>}
 
-      {report && decision.origin === "decision_report" && !decision.leverActionId && connectorMetricId ? (
-        <>
-          <ConnectorExplanation />
-          <LeverCreate
-            decisionId={decision.id}
-            metricId={connectorMetricId}
-            title={decision.title}
-            mechanismSummary={decision.rationale.body.join("\n\n") || decision.title}
-            mechanismCategory={decision.rationale.mechanismCategory}
-          />
-        </>
-      ) : null}
-
-      <section className="flex flex-col gap-2">
+      {!report ? <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
-            We predict
+            Prediction
           </h3>
           {hasUnresolved && process.env.NODE_ENV !== "production" && (
             <button
@@ -503,7 +615,7 @@ export function DecisionDetail({
         {decision.predictions.length === 0 && (
           <p className="text-[12px] text-[var(--text-subtle)]">No prediction committed.</p>
         )}
-      </section>
+      </section> : null}
 
       {!report && decision.origin === "decision_report" && !decision.leverActionId && connectorMetricId ? (
         <LeverCreate

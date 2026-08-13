@@ -7,9 +7,41 @@ migrations add `decision_reports`, append-only `decision_report_revisions`, and 
 `decision_report_activations` beginning at `20260722052759_decision_report_persistence.sql`.
 Authenticated reads are scope-bound through `has_scope_access`; direct application
 writes are revoked and checked security-definer RPCs require member access. The
-current isolation gate includes `report_assets`; the complete serialized Node suite now covers
-later report, rollout, iteration, provenance, RLS, and Storage surfaces as well. Its current local
-result is 499 total tests: 480 passed, 19 intentional live-model skips, and zero failures.
+current isolation gate includes `report_assets`; the complete serialized Node suite covers later
+report, rollout, iteration, provenance, RLS, and Storage surfaces as well. PR #29 merged those
+contracts after its hosted app/engine/RLS/bridge gate passed.
+
+Review round 1 introduces no migration, RLS policy, RPC, or Storage change. Optional action priority,
+tags, skills, estimated time, and estimated cost remain validated fields inside the existing
+append-only `report_snapshot` JSON. Active snapshots and canonical action rows remain immutable. The
+Gummy Alpha review CSV updates the already confirmed metric through the existing checked import RPC,
+and the loopback-only local recompute command uses the existing private queue/worker contract.
+
+Review round 2 adds ordered forward migrations
+`20260810005135_make_decision_report_evidence_optional.sql` and
+`20260810044832_remove_metric_mechanism_from_report_readiness.sql`. Together they replace only the
+private immutable readiness predicate: Background, Problem, Decision, Action Plan summary, and at
+least one titled action are required, while supporting evidence and metric rationale may remain
+missing. The later replacement intentionally preserves the function's owner and existing execute
+privileges. No table, RLS, grant, Storage, canonical-row, or active-report mutation contract changes.
+
+The 2026-08-10 Northstar completed-loop review adds no migration, table, policy, grant, RPC, trigger,
+or Storage path. Its loopback-only setup helper calls the existing checked
+`import_workspace_metric_csv_v1` and `set_workspace_core_metric_v1` functions as the local workspace
+owner, imports a dedicated synthetic daily metric, and selects four populated context metrics. It
+records the workspace current-series pointer before and after and aborts if that identity changes.
+The report itself still activates one confirmed metric, one prediction, one primary lever, and one to
+three actions through `activate_decision_report_v2`; recompute and resolution use the existing queue,
+worker, graph, and verdict contracts.
+
+The 2026-08-12 production-release preflight was read-only. The local Supabase CLI is neither
+authenticated nor linked to the production project, so it did not verify remote migration history,
+perform a dry-run, or apply any schema change. Treat migrations `20260723053444`, `20260723061012`,
+`20260723061925`, `20260723064500`, `20260723151939`, `20260810005135`, and `20260810044832` as
+pending until an authenticated history comparison proves the exact subset. Then dry-run and apply
+only that subset before authenticated RLS, Storage, provenance-receipt, recompute-status, and
+successor-isolation canaries. The 122-row Northstar fixture is local-only synthetic data and must
+never be production-seeded.
 
 Slice 8 adds a private `decision-report-assets` bucket and the `report_assets` lifecycle table.
 Application roles have scoped SELECT only; checked security-definer RPCs reserve, attach, detach,
@@ -131,14 +163,26 @@ or delete them directly.
 
 ## Current local verdict
 
-**Local schema verification passes; production release is not claimed.** A clean local reset applies
-every migration, error-level schema lint passes, and the serialized Node/Supabase/RLS/Storage suite
-reports 480 passed, 19 intentional live-model skips, and zero failures. Focused integration
-verification reports 9/9 passed. The complete engine/bridge/isolation/recompute suite reports
-1,204/1,204 passed. TypeScript, full application lint, the Next.js 16.2.11 webpack build, the
-post-build request-bound dashboard manifest guard, and browser acceptance through Iteration 4 pass.
-The expanded Slice 10 and MVP-finish migrations have not been applied to the partner Supabase
-environment, and the missing partner-session gate remains open.
+**The 2026-08-12 release candidate passes the complete local schema and application gate; production
+release is not claimed.** A clean reset applies all 31 migrations. The serialized
+Node/Supabase/RLS/Storage suite reports 556 total: 537 passed, 19 intentional live-model skips, and
+zero failures. The complete engine/bridge/isolation/recompute suite reports 1,217/1,217 passed, and
+error-level schema lint passes. TypeScript, full application lint, the audited 18-file recompute
+stage, the Node 22 Next.js 16.2.11 webpack build, and the post-build request-bound dashboard manifest
+guard pass. The Northstar follow-up adds no schema object and intentionally preserves the finished
+founder-review database. Earlier browser acceptance generated,
+autosaved, refreshed, and activated a Gummy Alpha report, then activated a successor against the
+isolated Adoption Rate fixture and rendered its confident +14.7pp current-report loop. Direct links
+and Actions/Core Metrics/Impact pass at desktop and 390px with zero console errors and zero failed
+requests.
+The dedicated Northstar review metric contains 122 synthetic observations. The checked loop resolves
+the current report `CONFIRMED` at +14.7pp (95% CI +14.5pp to +14.9pp; 75 pre / 47 post), while the
+workspace current-series pointer remains unchanged during data preparation. This is local synthetic
+engineering evidence and does not satisfy the partner-session or partner-environment gates.
+The remote production migration state was not freshly inspectable because the Supabase CLI is not
+authenticated or linked. All seven documented migrations therefore remain operator-pending until
+history verification, dry-run, deliberate apply, and authenticated database canaries complete. The
+missing partner-session gate remains open.
 
 The original v1 verdict remains historical evidence: all 11 base tables shipped with RLS enabled;
 the live tenant-isolation gate passed (`gate_pass=true`, `tables_with_rls=11`, `leaks=[]`), and the
@@ -246,11 +290,15 @@ blocked while legitimate within-rank grants still succeed.
   stored, but bounded source chunks remain inside append-only revisions so later claims are auditable.
   Soft deletion removes authenticated visibility; physical retention/garbage-collection policy still
   needs the same operator discipline as other retained audit history.
-- **Expanded Slice 10 and the MVP finish are local only.** Migrations `20260723053444`,
-  `20260723061012`, `20260723061925`, `20260723064500`, and `20260723151939` still need deliberate
-  partner-environment application plus authenticated RLS/Storage/recompute-status canaries. The app
+- **Expanded Slice 10, the MVP finish, and Review #2 are not yet production-verified.** Migrations `20260723053444`,
+  `20260723061012`, `20260723061925`, `20260723064500`, `20260723151939`, `20260810005135`, and
+  `20260810044832` still need deliberate partner-environment application plus authenticated
+  RLS/Storage/recompute-status canaries. The app
   also needs a server-only service-role key for receipt minting, and the recompute app/worker secrets
-  must pass their release checks. Passing local reset is not production evidence.
+  must pass their release checks. The production app currently lacks the service-role and recompute
+  settings, `causent-recompute` does not exist, and `causent-resolve` lacks `DATABASE_URL`. The app
+  release check now requires the resolve URL/secret, and the resolver must pass its dedicated
+  `DATABASE_URL`/secret config check. Passing local reset is not production evidence.
 - **The gate is a point-in-time result** against the seeded fixture. The expanded workflow is
   configured to rerun it on every PR/push, but this working tree has not yet produced a hosted CI
   result. The passing webpack/manifest checks and browser acceptance are useful product evidence,

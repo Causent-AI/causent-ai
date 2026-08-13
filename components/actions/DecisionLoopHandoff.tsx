@@ -1,15 +1,21 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   DECISION_LOOP_REVIEW_MAX_BYTES,
   parseDecisionLoopReview,
+  prepareDecisionLoopCopy,
   type DecisionLoopHandoff as DecisionLoopHandoffContract,
+  type DecisionLoopCopyTarget,
   type DecisionLoopReview,
 } from "@/lib/decision-reports/loop-handoff";
 
 type CopyState = "idle" | "success" | "failure";
+
+function targetLabel(target: DecisionLoopCopyTarget): "Claude" | "Codex" {
+  return target === "claude" ? "Claude" : "Codex";
+}
 
 function utf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength;
@@ -121,8 +127,12 @@ function ParsedReview({
 
 function DecisionLoopHandoffInner({
   handoff,
+  target,
+  onClose,
 }: {
   handoff: DecisionLoopHandoffContract;
+  target: DecisionLoopCopyTarget;
+  onClose: () => void;
 }) {
   const id = useId();
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
@@ -134,6 +144,7 @@ function DecisionLoopHandoffInner({
   const reviewBytes = utf8ByteLength(pastedReview);
   const confirmationRequired = handoff.egress.requiresConfirmation;
   const copyEnabled = !confirmationRequired || egressConfirmed;
+  const destination = targetLabel(target);
   const reportLabel = `${handoff.reportTitle}, iteration ${handoff.iterationNumber}`;
   const copyStatusId = `${id}-copy-status`;
   const reviewHelpId = `${id}-review-help`;
@@ -141,14 +152,15 @@ function DecisionLoopHandoffInner({
   const reviewErrorId = `${id}-review-error`;
 
   async function copyBrief() {
-    if (!copyEnabled) return;
+    const preparation = prepareDecisionLoopCopy(handoff, target, egressConfirmed);
+    if (!preparation.ok) return;
 
     setCopyState("idle");
     try {
       if (!navigator.clipboard?.writeText) {
         throw new Error("Clipboard API unavailable");
       }
-      await navigator.clipboard.writeText(handoff.clipboardText);
+      await navigator.clipboard.writeText(preparation.clipboardText);
       setCopyState("success");
     } catch {
       setCopyState("failure");
@@ -191,25 +203,34 @@ function DecisionLoopHandoffInner({
 
   return (
     <section
-      className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-3 sm:p-4"
+      className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-[var(--surface)] p-4 sm:p-5"
       aria-labelledby={`${id}-title`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-indigo-700">
-            AI handoff preview
+            Manual task handoff
           </p>
           <h4 id={`${id}-title`} className="mt-1 text-[13px] font-semibold text-[var(--text)]">
-            Take this action to Claude or ChatGPT
+            Copy task instructions to {destination}
           </h4>
           <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">
-            Causent prepares a governed implementation brief. Nothing is sent
-            automatically, and no AI workspace receives access to Causent.
+            Causent prepares bounded agent instructions. Nothing is sent
+            automatically, and {destination} receives no access to Causent.
           </p>
         </div>
-        <span className="rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-indigo-700">
-          Manual only
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-indigo-700">
+            Clipboard only
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-10 rounded-lg border border-[var(--border)] px-3 text-[11px] font-semibold text-[var(--text-muted)] hover:bg-[var(--bg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+          >
+            Close
+          </button>
+        </div>
       </div>
 
       <dl className="mt-3 grid gap-2 rounded-lg border border-indigo-100 bg-white/70 p-3 text-[10px] sm:grid-cols-2">
@@ -233,7 +254,7 @@ function DecisionLoopHandoffInner({
         <p className="mt-1">{handoff.egress.reason}</p>
         <p className="mt-1">
           Review your organization&apos;s AI policy before pasting private or
-          organization data into another service.
+          organization data into {destination}.
         </p>
       </div>
 
@@ -251,7 +272,7 @@ function DecisionLoopHandoffInner({
           <span>
             I reviewed this brief and confirm I am allowed to paste its{" "}
             {classificationLabel(handoff.dataClassification).toLowerCase()} report
-            context into the external AI workspace I choose.
+            context into {destination}.
           </span>
         </label>
       ) : null}
@@ -264,7 +285,7 @@ function DecisionLoopHandoffInner({
           onClick={copyBrief}
           className="rounded-lg bg-indigo-700 px-3 py-2 text-[11px] font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Copy implementation brief
+          Copy for {destination}
         </button>
         {!copyEnabled ? (
           <span className="text-[10px] text-amber-800">Confirm egress before copying.</span>
@@ -274,7 +295,7 @@ function DecisionLoopHandoffInner({
       <div id={copyStatusId} className="mt-2 min-h-4" aria-live="polite">
         {copyState === "success" ? (
           <p className="text-[10px] text-emerald-800" role="status">
-            Copied. Paste the brief into the AI workspace you choose.
+            Copied for {destination}. Open {destination} and paste manually; nothing was sent.
           </p>
         ) : null}
         {copyState === "failure" ? (
@@ -290,7 +311,7 @@ function DecisionLoopHandoffInner({
             htmlFor={`${id}-fallback`}
             className="text-[10px] font-semibold text-[var(--text-muted)]"
           >
-            Implementation brief — manual copy fallback
+            {destination} task instructions — manual copy fallback
           </label>
           <textarea
             ref={fallbackRef}
@@ -307,7 +328,7 @@ function DecisionLoopHandoffInner({
       {copyEnabled ? (
         <details className="mt-2 rounded-lg border border-indigo-100 bg-white/60 px-3 py-2">
           <summary className="cursor-pointer text-[10px] font-semibold text-[var(--text-muted)]">
-            Preview implementation brief
+            Preview agent instructions
           </summary>
           <p className="mt-2 text-[10px] leading-4 text-[var(--text-subtle)]">
             This is the exact text the copy button places on your clipboard.
@@ -321,7 +342,7 @@ function DecisionLoopHandoffInner({
         </details>
       ) : (
         <p className="mt-2 text-[10px] text-[var(--text-subtle)]">
-          The implementation brief preview unlocks after egress confirmation.
+            The agent instructions preview unlocks after egress confirmation.
         </p>
       )}
 
@@ -424,13 +445,43 @@ function DecisionLoopHandoffInner({
 
 export function DecisionLoopHandoff({
   handoff,
+  target,
+  onClose,
 }: {
   handoff: DecisionLoopHandoffContract;
+  target: DecisionLoopCopyTarget;
+  onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
+
   return (
-    <DecisionLoopHandoffInner
-      key={handoff.contextFingerprint}
-      handoff={handoff}
-    />
+    <dialog
+      ref={dialogRef}
+      aria-label={`Copy task instructions to ${targetLabel(target)}`}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      className="m-auto max-h-[calc(100dvh-1rem)] w-[min(720px,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-0 shadow-2xl backdrop:bg-slate-950/40"
+    >
+      <DecisionLoopHandoffInner
+        key={`${handoff.contextFingerprint}:${target}`}
+        handoff={handoff}
+        target={target}
+        onClose={onClose}
+      />
+    </dialog>
   );
 }

@@ -16,6 +16,7 @@
     "db:reset-demo": "bash scripts/reset-local-demo.sh",
     "check:release-config": "node scripts/check-release-config.mjs app",
     "check:recompute-config": "node scripts/check-release-config.mjs worker",
+    "check:resolve-config": "node scripts/check-release-config.mjs resolver",
     "check:dashboard-build": "node scripts/check-dashboard-build.mjs"
   },
   "dependencies": {

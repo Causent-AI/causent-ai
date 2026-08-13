@@ -5,6 +5,7 @@
 import type {
   Decision,
   DriftReadout,
+  Metric,
   Prediction,
   PredictionVerdict,
   ResolutionTuple,
@@ -13,6 +14,8 @@ import { getServerSupabase } from "@/lib/supabase-server";
 import { DEMO_SCOPE_ID, METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
 import { getDriftByPrediction } from "@/lib/data/drift";
 import { toActionIdentity } from "@/lib/data/action-identifiers";
+import { getMetricRecords } from "@/lib/data/metrics";
+import { metricUiIdForExpectedName } from "@/lib/data/action-metric";
 
 type RationaleDoc = {
   content?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
@@ -67,12 +70,16 @@ function paragraphs(doc: RationaleDoc | null): string[] {
 function mapPrediction(
   row: PredictionRow,
   driftByPrediction: Map<string, DriftReadout>,
+  metrics: Array<Pick<Metric, "id" | "name">>,
 ): Prediction {
   const metricName = row.metric?.name ?? "";
   const measured = row.resolution_tuple?.measured_pct;
   return {
     id: row.prediction_id,
-    metricId: METRIC_CONFIG_BY_NAME[metricName]?.id ?? metricName,
+    metricId:
+      metricUiIdForExpectedName(metrics, metricName) ??
+      METRIC_CONFIG_BY_NAME[metricName]?.id ??
+      metricName,
     direction: row.direction,
     magnitudePctMean: row.magnitude_pct_mean,
     resolutionDate: row.resolution_date,
@@ -98,7 +105,7 @@ function mapPrediction(
 export async function getDecisions(): Promise<Decision[]> {
   const sb = await getServerSupabase();
 
-  const [decisionsRes, actionsRes, driftByPrediction] = await Promise.all([
+  const [decisionsRes, actionsRes, driftByPrediction, metricRecords] = await Promise.all([
     sb
       .from("decisions")
       .select(
@@ -114,6 +121,9 @@ export async function getDecisions(): Promise<Decision[]> {
     sb.from("actions").select("action_id, source, external_ref").eq("scope_id", DEMO_SCOPE_ID),
     // Baseline drift, computed on read through the engine (empty on any failure).
     getDriftByPrediction(),
+    // Dynamic report metrics use generated UI ids. React cache shares this
+    // request-scoped load with the dashboard's own metric query.
+    getMetricRecords(),
   ]);
   if (decisionsRes.error) throw decisionsRes.error;
   if (actionsRes.error) throw actionsRes.error;
@@ -127,6 +137,7 @@ export async function getDecisions(): Promise<Decision[]> {
       (action) => [action.action_id, toActionIdentity(action).uiId] as const,
     ),
   );
+  const loadedMetrics = metricRecords.map((record) => record.metric);
 
   return (decisionsRes.data as unknown as DecisionRow[]).map((row) => {
     const lever = row.levers[0] ?? null;
@@ -145,7 +156,13 @@ export async function getDecisions(): Promise<Decision[]> {
         (da) => uiIdByUuid.get(da.action_id) ?? da.action_id,
       ),
       leverActionId: lever ? (uiIdByUuid.get(lever.action_id) ?? lever.action_id) : null,
-      predictions: row.predictions.map((p) => mapPrediction(p, driftByPrediction)),
+      predictions: row.predictions.map((p) =>
+        mapPrediction(
+          p,
+          driftByPrediction,
+          loadedMetrics,
+        ),
+      ),
     };
   });
 }

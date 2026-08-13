@@ -10,19 +10,17 @@ export function ReportSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm shadow-slate-200/40">
-      <header className="border-b border-[var(--border)] bg-slate-50/70 px-4 py-3 sm:px-5">
-        <div className="flex items-start gap-3">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--text)] text-[11px] font-semibold text-white">
-            {number}
-          </span>
-          <div>
-            <h2 className="text-[16px] font-semibold text-[var(--text)]">{title}</h2>
-            <p className="text-[12px] leading-5 text-[var(--text-muted)]">{description}</p>
-          </div>
+    <section className="border-t border-[var(--border)] px-5 py-8 first:border-t-0 sm:px-9 sm:py-10">
+      <header className="mb-6">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-blue)]">
+          {number.padStart(2, "0")}
+        </p>
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-[24px] font-semibold tracking-[-0.02em] text-[var(--text)]">{title}</h2>
+          <p className="max-w-xl text-[12px] leading-5 text-[var(--text-muted)]">{description}</p>
         </div>
       </header>
-      <div className="flex flex-col gap-3 p-4 sm:p-5">{children}</div>
+      <div className="flex flex-col gap-6">{children}</div>
     </section>
   );
 }

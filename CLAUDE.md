@@ -11,8 +11,8 @@ Causent connects evidence, decisions, predictions, implementation actions, and m
 - Next.js 16 App Router and React 19
 - TypeScript and Tailwind CSS 4
 - Supabase PostgreSQL/Auth/RLS/Storage
-- Anthropic API behind narrow typed seams
-- Python/NumPy causal engine deployed through Vercel functions
+- Vercel AI Gateway and the AI SDK behind narrow typed generation seams
+- Python/NumPy causal engine plus separately deployed stateful resolution/recompute workers
 
 ## Actual repository layout
 
@@ -21,6 +21,7 @@ Causent connects evidence, decisions, predictions, implementation actions, and m
 - `lib/` — typed domain logic, data access, connectors, auth, generation, and tests
 - `engine/` — pure-NumPy causal engine, persistence bridge, resolution, and pytest suite
 - `api/` — deployable Python Vercel functions
+- `scripts/` — local verification and separately staged worker deployment helpers
 - `supabase/migrations/` — schema, RLS, and grants
 - `docs/` — product designs, status, and verification evidence
 
@@ -33,6 +34,8 @@ There is no `/src` tree, LangGraph layer, Recharts/Tremor dependency, or TanStac
 - Keep page files thin; put domain behavior in typed `lib/` modules and UI behavior in focused components.
 - Preserve the existing injected-client pattern for database domain logic so it remains integration-testable.
 - All user data must stay scope-bound and RLS-protected. Never expose a service-role credential to the client.
+- Dashboard reads/writes use the caller's Supabase session. Restrict service-role clients to named server-only provisioning, receipt, webhook, cron, and backfill paths.
+- Keep the credential-free stateless engine separate from database-owning resolution/recompute workers; worker secrets and `DATABASE_URL` belong only in server deployment environments.
 - Preserve the honesty boundary: AI may structure or suggest, but cannot invent evidence, metric observations, owners, prediction magnitudes, or causal claims.
 - Human users enter prediction direction, magnitude, and resolution date.
 - Prefer deterministic validation and fallbacks around every model call.
@@ -40,18 +43,18 @@ There is no `/src` tree, LangGraph layer, Recharts/Tremor dependency, or TanStac
 
 ## Active Decision Report boundary
 
-- Slice 1 is implemented at `/onboarding`: `components/decision-report/` renders the compact editable report, while `lib/decision-reports/` owns the versioned schema, validation, tests, and Gummy Alpha fixture.
-- Slice 2 is implemented and live-validated behind the same report contract: the core AI SDK calls Vercel AI Gateway server-side, model output contains no trusted IDs, exact evidence excerpts are verified against the bounded prompt, and unsafe or failed output becomes an editable fallback. The sparse three-proof/three-action Gummy Alpha benchmark completed in one 13.9-second attempt with 1,598 output tokens.
-- Slice 3 is implemented: a pure deterministic gap scanner, a typed edit-command reducer shared by direct edits and focused questions, and a compact completion panel. Required report content produces “Ready for review”; optional owners, customers, stakeholders, governance, and mock-ups never block that state.
-- Slice 4 is implemented: scope-bound reports use append-only full revisions, explicit save/reload, identical-save reuse, immediate stale-revision conflicts, exact metric-projection recovery, and an inert validated activation packet. Report saves create no decisions, predictions, actions, decision-action edges, or levers.
-- Slice 5 is implemented: the user confirms an existing metric, enters a human prediction, selects one to three report actions, and explicitly activates the exact reviewed revision. A checked transaction creates one decision, one prediction, planned manual actions, decision-action links, and an append-only activation audit. Identical retries reuse canonical IDs; changed retries fail immediately. No lever or impact claim is created.
-- Active reports are immutable in the partner wedge. Further changes start a new report rather than silently mutating canonical intent.
-- The next boundary is partner acceptance plus the deferred metric-creation/CSV and supplied-image paths, not another canonical write redesign.
-- One typed report aggregate remains the draft during onboarding.
-- One final idempotent operation materializes the decision, prediction, metric relationship, and selected actions.
-- Partner inputs are limited to the initial prompt, pasted supporting text, an existing metric or one metric CSV, and one re-encoded PNG/JPEG mock-up.
-- Inline gap questions replace a general chatbot for the partner wedge.
-- URL crawling, PDF ingestion, general chat history, background jobs, model routing, and numeric completion probability are deferred until partner validation.
+- The pending review release starts at `/onboarding?flow=decision-report` with a casual business-challenge prompt. `components/decision-report/` renders one dynamic Decision / Supporting Evidence / Implementation editor; `lib/decision-reports/` owns the versioned schema, validation, provenance, persistence, activation, iteration, and tests.
+- Generation runs server-side through Vercel AI Gateway. Model output contains no trusted IDs, exact evidence excerpts must match bounded source chunks, and unsafe or failed output becomes an editable fallback. Supporting evidence is optional and must never be invented.
+- Source ingestion accepts at most one public HTTPS page and one text-based PDF. Preserve its SSRF, redirect, content-type, byte/page/time, active-content, and digest guards. It is not a crawler or OCR pipeline, and raw URL/PDF bytes are not retained.
+- The draft may hold 1–25 actions. Background, Problem, Decision, the Action Plan summary, and one titled action gate readiness; evidence, metric rationale, owners, customers, stakeholders, governance, and supplied visuals remain optional.
+- Draft changes, including metric selection, one-to-three activation selections, primary lever, prediction, and resolution date, autosave through the existing checked append-only revision contract. Preserve exact-retry reuse and stale-base conflicts.
+- Activation is the sole canonical materialization boundary. It creates the decision, human prediction, selected actions, links, one primary manual lever, and activation audit, then enqueues recomputation. Activated report revisions and prior canonical/audit rows are immutable.
+- Post-activation edits start one checked successor in the same linear series. There is one explicit current active report, no branching/merge behavior, and no timestamp/sort-order inference. The predecessor remains operational until successor activation moves the pointer atomically. Private asset IDs and paths never copy forward.
+- Actions & Decisions, Data Workshop, Core Metrics, and Impact must resolve the explicit current report. Current-report metric writes and primary-action completion may enqueue the private stateful recompute worker; historical/superseded graphs must not be rewritten.
+- The Claude/Codex controls are a bounded manual clipboard preview only. They perform no provider login, MCP call, automatic send, durable paste-back, or mutation.
+- Current preview auth is invite-only Google OAuth through Supabase with a Before User Created allowlist. Email/password, GitHub login, SSO, account-level connector OAuth, and member-management UI are not implemented.
+- The current branch is pending founder review and release. Do not claim partner evidence passed, production migrations/configuration are armed, the Northstar local fixture exists in production, or deployment completed unless verified in that release run.
+- Inline gap questions replace a general chatbot. Deferred scope includes URL crawling, OCR/scanned-PDF support, multiple documents, general chat history, authenticated MCP/API delivery, provider OAuth, hard deletion, revision diff/restore/export UI, and numeric completion probability.
 
 ## gstack skill routing
 
