@@ -143,9 +143,11 @@ prop for testing whether that future loop is understandable and useful; it is no
   `CAUSENT_RESOLVE_URL`/`CAUSENT_RESOLVE_SECRET` configuration.
 - [x] **Exact release revision and Preview:** commit `5a67a6f`, push
   `codex/decision-report-review-round-1`, and obtain a Ready Vercel Preview for that exact branch.
-- [ ] **PR CI and merge:** create the PR from the pushed branch, require the expanded hosted CI and
-  Vercel checks to pass for `5a67a6f`, then merge deliberately. The installed GitHub integration
-  denied PR creation, and PR #29's historical green gate does not cover this candidate.
+- [x] **PR merge:** founder-created PR #30 merged the two review commits into `main` as `b2bb98c`.
+- [ ] **Production re-release:** the automatic Vercel production build was Ready but returned HTTP
+  503 because `SUPABASE_SERVICE_ROLE_KEY` was absent and stale `CAUSENT_DEMO_TODAY` was present.
+  Production is healthy after rollback to `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`; configure and verify
+  every database/app/worker prerequisite above before redeploying `main`.
 - [ ] **Authenticated canaries:** after database/configuration/deployment, run a clean-account live
   pass across one URL, one text PDF, save/activate, three successors, direct history links, private
   image reattachment, observation import, all three manual action completions, recompute/resolution,
@@ -153,10 +155,10 @@ prop for testing whether that future loop is understandable and useful; it is no
 - [ ] Complete one final deep review of the end-to-end UI experience and workflow, including the manual handoff preview, before declaring the MVP interaction complete.
 - [ ] Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, selected core metric plausible, next action usable.
 
-The 2026-08-12 release pass published the exact candidate branch and produced a Ready Vercel
-Preview. It made no production migration, environment, worker-project, merge, promotion, or canary
-change. The operator release request does not satisfy founder acceptance or the unassisted
-partner-session gate.
+The 2026-08-12 release pass published and merged PR #30. Its automatic production deployment failed
+the public runtime canary and was rolled back to the newest verified pre-guard artifact. No database,
+environment-value, or worker-project change was made. The operator release request does not satisfy
+founder acceptance or the unassisted partner-session gate.
 
 ### Completed Slice 1 — interaction prototype
 

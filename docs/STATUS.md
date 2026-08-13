@@ -1,18 +1,21 @@
 # Causent — Build Status & Resume Guide
 
-## 2026-08-12 — Production release requested; preflight blocked before deployment
+## 2026-08-12 — PR #30 merged; production release rolled back
 
-The founder requested that the current Decision Report review work be published to production and
-documented. The reviewed scope is committed as `5a67a6f` and pushed on
-`codex/decision-report-review-round-1`. Vercel built that exact branch as a ready Preview deployment
-(`dpl_GdYnCg7FoUpFevfTPPbeWVowuXRB`) at
-**https://causent-oq0hqe1gm-adamdavidowens-1984s-projects.vercel.app**. GitHub's installed
-integration denied pull-request creation with a permissions error, so no PR or hosted PR CI result
-exists yet. The branch has not been merged or promoted. Production remains the prior release at
-**https://app.causent.ai**.
+The founder opened and merged [PR #30](https://github.com/Causent-AI/causent-ai/pull/30). Its two
+review commits landed on `main` as squash commit `b2bb98c`. Vercel automatically created Ready
+production deployment `dpl_58Ds3d71VdvKFTBcdUkgamd182ip`, but public canaries against `/` and
+`/onboarding?flow=decision-report` both returned no-store HTTP 503 responses. Runtime logs identified
+the exact fail-closed causes: missing `SUPABASE_SERVICE_ROLE_KEY` and forbidden stale
+`CAUSENT_DEMO_TODAY`.
 
-Read-only release preflight found material configuration gaps that must be closed before any
-production mutation:
+The first rollback target (`dpl_4RT4T3k46VhCog1xvtmHRVJsBhnj`) still contained the service-role
+guard and also returned 503. Production was then restored to the newest independently probed
+pre-guard deployment, `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`. Post-rollback public canaries pass:
+`/login` returns 200, while `/` and Decision Report onboarding return the expected unauthenticated
+307 redirect to `/login`. PR #30 remains merged in source, but its application artifact is not live.
+
+The following configuration gaps must be closed before attempting to release `main` again:
 
 - the `causent-ai` production environment lacks `SUPABASE_SERVICE_ROLE_KEY`,
   `CAUSENT_RECOMPUTE_URL`, and `CAUSENT_RECOMPUTE_SECRET`;
@@ -39,10 +42,9 @@ report without a provider-shaped draft, autosaves to a stable report URL, preser
 confirmed actions, the explicit primary lever and +37.5% prediction, and reports no console errors.
 Activation correctly remains disabled until the user confirms a real workspace metric. The completed
 122-row Northstar outcome remains local-only synthetic review data and must never be seeded into
-production. The ready branch Preview is not a production release: no production migration,
-environment change, worker creation, merge, promotion, or authenticated canary is claimed here.
-Founder review and the three initially unassisted partner sessions remain open after this
-operator-directed release request.
+production. No production migration, environment value, or worker project was changed during the
+failed release. The rollback changed only Vercel's production deployment pointer. Founder review
+and the three initially unassisted partner sessions remain open.
 
 ## 2026-08-10 — Northstar completed-loop review example ready locally
 
@@ -585,11 +587,12 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   separate Astro marketing site). A second Vercel project `causent` (created 7/10 via CLI link)
   is redundant — the repo is re-linked to `causent-ai`; check `.vercel/project.json` before
   `vercel env` commands.
-- **Current preflight (2026-08-12): branch publication and Preview are complete; production is
-  unchanged.** Commit `5a67a6f` is pushed on `codex/decision-report-review-round-1`, and Vercel
-  Preview `dpl_GdYnCg7FoUpFevfTPPbeWVowuXRB` is Ready. The installed GitHub integration lacks
-  permission to create the PR, so no hosted PR CI or merge exists. The deployed app still
-  represents the prior baseline. The production environment currently lacks `SUPABASE_SERVICE_ROLE_KEY`,
+- **Current release state (2026-08-12): PR #30 is merged, but its production artifact is rolled
+  back.** `main` is at squash commit `b2bb98c`. Production deployment
+  `dpl_58Ds3d71VdvKFTBcdUkgamd182ip` built successfully but returned 503 because runtime
+  configuration failed closed. Vercel now points production to verified pre-guard deployment
+  `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`; `/login` returns 200 and protected routes redirect to login.
+  The production environment currently lacks `SUPABASE_SERVICE_ROLE_KEY`,
   `CAUSENT_RECOMPUTE_URL`, and `CAUSENT_RECOMPUTE_SECRET`. Vercel's environment list reports
   `CRON_SECRET`, `CAUSENT_RESOLVE_URL`, and `CAUSENT_RESOLVE_SECRET` exist by name, but Vercel does
   not expose their encrypted values to the local pull/run context. The empty local values are not
@@ -662,11 +665,13 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   shared dashboard layout.
 - The local recompute worker endpoint was intentionally absent, so server logs recorded only the
   sanitized `not_configured` deferred-kick outcome; source writes remained durable as designed.
-- Exact branch Preview: **READY** for commit `5a67a6f` at
-  `https://causent-oq0hqe1gm-adamdavidowens-1984s-projects.vercel.app`. Hosted PR CI remains
-  **PENDING** because the installed GitHub integration could not create the PR.
-- No production migrations, environment changes, merge, promotion, or authenticated canary were
-  performed.
+- PR #30: **MERGED** as `b2bb98c`. Its `causent-ai` Vercel build passed, but the public runtime
+  canary failed with HTTP 503. No GitHub Actions workflow result surfaced for the merge commit; the
+  available commit statuses were Vercel checks only.
+- Production: **ROLLED BACK AND PUBLICLY HEALTHY** on
+  `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`. This is not acceptance of the new Decision Report release.
+  No production migrations, environment-value changes, worker deployment, or authenticated product
+  canary were performed.
 
 ## Next (priority order)
 
