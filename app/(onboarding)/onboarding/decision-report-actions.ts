@@ -22,9 +22,15 @@ import {
 } from "@/lib/supabase-server";
 import { recordDecisionReportTelemetry } from "@/lib/decision-reports/telemetry";
 import { validateDecisionReportReviewExampleSelection } from "@/lib/decision-reports/fixtures/review-examples";
+import {
+  listAccessibleDemoWorkspaces,
+  writeActiveWorkspaceCookie,
+} from "@/lib/auth/workspace-context";
+import { getScope } from "@/lib/data/scope";
 
 export type MintedDecisionReportGeneration = DecisionReportGenerationResult & {
   sourceReceiptId: string;
+  workspaceId: string;
 };
 
 export type GenerateDecisionReportActionResult =
@@ -54,6 +60,7 @@ export async function generateDecisionReportAction(
     return { ok: false, error: "Sign in before generating a Decision Report." };
   }
   const requestStartedAt = Date.now();
+  let targetWorkspaceId = session.workspaceId;
   const telemetry = generationTelemetry(input);
   const telemetryClient = telemetry
     ? await getServerSupabase().catch(() => null)
@@ -71,7 +78,7 @@ export async function generateDecisionReportAction(
       : telemetry.msSinceStart + (Date.now() - requestStartedAt);
     await recordDecisionReportTelemetry({
       client: telemetryClient,
-      scopeId: session.workspaceId,
+      scopeId: targetWorkspaceId,
       userId: session.userId,
     }, {
       sessionKey: telemetry.sessionKey,
@@ -80,8 +87,6 @@ export async function generateDecisionReportAction(
       meta,
     });
   };
-  await emit("REPORT_GENERATION_STARTED");
-
   let parsedInput: Awaited<ReturnType<typeof parseReportSourceActionInput>>;
   try {
     parsedInput = await parseReportSourceActionInput(input);
@@ -115,6 +120,15 @@ export async function generateDecisionReportAction(
     };
   }
   const reviewExample = reviewExampleSelection.example;
+  if (reviewExample) {
+    const selectionClient = telemetryClient ?? await getServerSupabase();
+    const accessible = await listAccessibleDemoWorkspaces(selectionClient).catch(() => []);
+    if (!accessible.some((workspace) => workspace.id === reviewExample.workspaceId)) {
+      return { ok: false, error: "That example workspace is unavailable." };
+    }
+    targetWorkspaceId = reviewExample.workspaceId;
+  }
+  await emit("REPORT_GENERATION_STARTED");
   if (prompt.length < DECISION_REPORT_PROMPT_MIN_CHARS) {
     await emit("REPORT_GENERATION_FAILED");
     return {
@@ -140,15 +154,19 @@ export async function generateDecisionReportAction(
       sources,
       forceFixture: Boolean(reviewExample),
     });
+    const scope = await getScope(targetWorkspaceId);
     const receipt = await mintDecisionReportSourceReceipt(
       getServiceRoleSupabase(),
-      session.workspaceId,
+      targetWorkspaceId,
       session.userId,
       generation.report,
     );
     if (!receipt.ok) {
       await emit("REPORT_GENERATION_FAILED");
       return receipt;
+    }
+    if (reviewExample) {
+      await writeActiveWorkspaceCookie(targetWorkspaceId);
     }
     await emit("REPORT_EDITABLE", {
       usedUrl: Boolean(sourceUrl),
@@ -159,6 +177,9 @@ export async function generateDecisionReportAction(
       ok: true,
       generation: {
         ...generation,
+        workspaceId: targetWorkspaceId,
+        workspaceName: scope.project,
+        projectName: scope.workspace,
         sourceReceiptId: receipt.sourceReceiptId,
       },
     };

@@ -90,7 +90,7 @@ export function CoreMetricsDrawer({
     view: prepareSeriesView(metric.series, range, cadence),
     flagWindow: filterSeriesRange(metric.series, range),
   })) : [];
-  const summaryMetrics = drawerView.choices.map(({ metric, role }) => ({
+  const summaryMetrics = drawerView.summaryChoices.map(({ metric, role }) => ({
     metric,
     role,
     view: prepareSeriesView(metric.series, range, cadence),
@@ -134,7 +134,7 @@ export function CoreMetricsDrawer({
           aria-controls="core-metrics-content"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2 text-[13px] font-semibold text-[var(--text)]"
+          className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-[var(--text)]"
         >
           <ChevronIcon
             size={16}
@@ -189,10 +189,7 @@ export function CoreMetricsDrawer({
 
       {open && (
         <div id="core-metrics-content" className="px-5 pb-4">
-          <div className="flex flex-wrap items-start justify-between gap-2 border-t border-[var(--border)] pt-3">
-            <p id="core-metric-view-help" className="max-w-2xl text-[11px] leading-5 text-[var(--text-muted)]">
-              View one metric at a time. The Report target stays canonical; Context metrics do not change the report&apos;s prediction or causal readout.
-            </p>
+          <div className="flex justify-end border-t border-[var(--border)] pt-3">
             <Link
               href="/data-workshop"
               className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50"
@@ -209,7 +206,6 @@ export function CoreMetricsDrawer({
                   <button
                     key={metric.id}
                     type="button"
-                    aria-describedby="core-metric-view-help"
                     aria-pressed={selected}
                     onClick={() => setSelectedMetricId(metric.id)}
                     className={`min-h-11 min-w-[150px] shrink-0 rounded-lg border px-3 py-2 text-left transition-colors ${
@@ -231,7 +227,7 @@ export function CoreMetricsDrawer({
             </div>
           ) : null}
 
-          <div className="mt-3 flex gap-4">
+          <div className="mt-3 flex flex-col gap-4 lg:flex-row">
             {selectedMetricNeedsData ? (
               <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
                 <div>
@@ -255,48 +251,20 @@ export function CoreMetricsDrawer({
                 {/* one selected metric at a time */}
                 <div className="flex-1 space-y-1">
                   {chartMetrics.map(({ metric: m, view, flagWindow }) => {
-                    const current = view.levels.at(-1)?.value;
-                    const wow = latestRate(view.wow);
-                    const mom = latestRate(view.mom);
                     return (
-                      <div key={m.id} className="grid items-stretch gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                        <div className="py-2">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span
-                              className="h-2 w-2 rounded-full"
-                              style={{ background: m.color }}
-                              aria-hidden="true"
-                            />
-                            <span className="text-[13px] font-medium text-[var(--text)]">
-                              {m.name}
-                            </span>
-                            <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-subtle)]">
-                              {selectedChoice?.role === "report" ? "Report target" : "Context"}
-                            </span>
-                          </div>
-                          <div className="mt-1 text-[18px] font-semibold tabular-nums text-[var(--text)]">
-                            {current === undefined ? "—" : formatMetricValue(current, m.format)}
-                          </div>
-                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-semibold tabular-nums">
-                            <span className={rateTone(wow, m.higherIsBetter)}>WoW {formatRate(wow)}</span>
-                            <span className={rateTone(mom, m.higherIsBetter)}>MoM {formatRate(mom)}</span>
-                          </div>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <VolumeChangeChart
-                            view={view}
-                            color={m.color}
-                            format={m.format}
-                            flags={selectedChoice?.role === "report" ? flagsForMetric(m.color, flagWindow) : []}
-                          />
-                        </div>
+                      <div key={m.id} className="min-w-0 flex-1">
+                        <VolumeChangeChart
+                          view={view}
+                          color={m.color}
+                          format={m.format}
+                          flags={selectedChoice?.role === "report" ? flagsForMetric(m.color, flagWindow) : []}
+                        />
                       </div>
                     );
                   })}
                 </div>
 
-                {/* summary panel — hidden below lg (would overlap the hero charts) */}
-                <div className="hidden w-[360px] shrink-0 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4 lg:block">
+                <div className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4 lg:w-[360px] lg:shrink-0">
                   <div className="mb-3">
                     <h3 className="text-[13px] font-semibold text-[var(--text)]">
                       Core Metrics Summary
@@ -311,14 +279,17 @@ export function CoreMetricsDrawer({
                   </div>
 
                   <div className="mt-1.5 space-y-1.5">
-                    {summaryMetrics.map(({ metric: m, role, view }) => {
+                    {summaryMetrics.map(({ metric: m, role, view }, index) => {
                       const current = view.levels.at(-1)?.value;
                       const wow = latestRate(view.wow);
                       const mom = latestRate(view.mom);
+                      const selected = selectedMetric?.id === m.id;
                       return (
                         <div
                           key={m.id}
-                          className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-2"
+                          className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-2 ${
+                            selected ? "pb-3" : "py-1.5"
+                          } ${index === 1 ? "border-t border-[var(--border)] pt-3" : ""}`}
                         >
                           <div className="flex min-w-0 items-center gap-2" title={role === "report" ? "Report target" : "Context metric"}>
                             <span
@@ -326,7 +297,7 @@ export function CoreMetricsDrawer({
                               style={{ background: m.color }}
                               aria-hidden="true"
                             />
-                            <span className="truncate text-[12px] text-[var(--text)]">
+                            <span className={`truncate text-[var(--text)] ${selected ? "text-[15px] font-semibold" : "text-[12px]"}`}>
                               {m.name}
                             </span>
                             {view.levels.length > 0 ? (
@@ -335,13 +306,13 @@ export function CoreMetricsDrawer({
                               </span>
                             ) : null}
                           </div>
-                          <span className="text-right text-[12px] font-semibold tabular-nums text-[var(--text)]">
+                          <span className={`text-right font-semibold tabular-nums text-[var(--text)] ${selected ? "text-[15px]" : "text-[12px]"}`}>
                             {current === undefined ? "—" : formatMetricValue(current, m.format)}
                           </span>
-                          <span className={`text-right text-[11px] font-semibold tabular-nums ${rateTone(wow, m.higherIsBetter)}`}>
+                          <span className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(wow, m.higherIsBetter)}`}>
                             {formatRate(wow)}
                           </span>
-                          <span className={`text-right text-[11px] font-semibold tabular-nums ${rateTone(mom, m.higherIsBetter)}`}>
+                          <span className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(mom, m.higherIsBetter)}`}>
                             {formatRate(mom)}
                           </span>
                         </div>

@@ -1,5 +1,10 @@
-import { AutoGrowingTextarea } from "@/components/ui/AutoGrowingTextarea";
-import type { Claim, ClaimStatus } from "@/lib/decision-reports/schema";
+import { RichTextClaimEditor } from "@/components/decision-report/rich-text/RichTextClaimEditor";
+import {
+  portableRichTextFromPlainText,
+  type Claim,
+  type ClaimStatus,
+  type PortableRichTextDocument,
+} from "@/lib/decision-reports/schema";
 
 const STATUS_LABELS: Record<ClaimStatus, string> = {
   sourced: "From supplied source",
@@ -35,6 +40,8 @@ export function ClaimEditor({
   optional = false,
   readOnly = false,
   variant = "field",
+  richTextDocument,
+  onDocumentChange,
   onChange,
 }: {
   claim: Claim;
@@ -44,6 +51,8 @@ export function ClaimEditor({
   optional?: boolean;
   readOnly?: boolean;
   variant?: "field" | "document" | "decision";
+  richTextDocument?: PortableRichTextDocument;
+  onDocumentChange?: (document: PortableRichTextDocument) => void;
   onChange: (text: string) => void;
 }) {
   const inputId = `claim-${claim.id}`;
@@ -87,15 +96,16 @@ export function ClaimEditor({
         {missing && optional ? null : <ClaimStatusBadge status={claim.status} />}
       </div>
       {variant === "document" ? (
-        <AutoGrowingTextarea
-          id={inputId}
-          className="block min-h-7 w-full bg-transparent text-[15px] leading-7 text-[var(--text)] outline-none placeholder:text-[var(--text-subtle)]"
-          value={claim.text}
-          rows={1}
+        <RichTextClaimEditor
+          claimId={claim.id}
+          label={label}
+          document={
+            richTextDocument ?? portableRichTextFromPlainText(claim.text)
+          }
           placeholder={placeholder ?? (missing ? "Add what you know…" : undefined)}
           readOnly={readOnly}
-          aria-invalid={missing && !optional}
-          onChange={(event) => onChange(event.target.value)}
+          invalid={missing && !optional}
+          onChange={(document) => onDocumentChange?.(document)}
         />
       ) : (
         <textarea
@@ -123,6 +133,8 @@ export function ClaimListEditor({
   optional = false,
   readOnly = false,
   variant = "field",
+  claimDocuments,
+  onDocumentChange,
   onChange,
 }: {
   claims: Claim[];
@@ -131,6 +143,11 @@ export function ClaimListEditor({
   optional?: boolean;
   readOnly?: boolean;
   variant?: "field" | "document";
+  claimDocuments?: Record<string, PortableRichTextDocument>;
+  onDocumentChange?: (
+    claimId: string,
+    document: PortableRichTextDocument,
+  ) => void;
   onChange: (claimId: string, text: string) => void;
 }) {
   return (
@@ -156,6 +173,10 @@ export function ClaimListEditor({
           optional={optional}
           readOnly={readOnly}
           variant={variant}
+          richTextDocument={claimDocuments?.[claim.id]}
+          onDocumentChange={(document) =>
+            onDocumentChange?.(claim.id, document)
+          }
           onChange={(text) => onChange(claim.id, text)}
         />
       ))}

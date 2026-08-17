@@ -86,6 +86,8 @@ ACTIVATION_A = uuid.UUID("aaaa0000-0000-0000-0000-0000000000e7")
 ACTIVATION_B = uuid.UUID("bbbb0000-0000-0000-0000-0000000000f7")
 REPORT_ASSET_A = uuid.UUID("aaaa0000-0000-0000-0000-0000000000e8")
 REPORT_ASSET_B = uuid.UUID("bbbb0000-0000-0000-0000-0000000000f8")
+CSV_IMPORT_A = uuid.UUID("aaaa0000-0000-0000-0000-0000000000eb")
+CSV_IMPORT_B = uuid.UUID("bbbb0000-0000-0000-0000-0000000000fb")
 
 ALL_USERS = (USER_A, USER_B, USER_A_VIEWER)
 
@@ -115,9 +117,28 @@ DOMAIN_TABLES = [
     ("public.decision_report_series", "scope_id", WS_A, WS_B),
     ("public.decision_report_revisions", "scope_id", WS_A, WS_B),
     ("public.decision_report_activations", "scope_id", WS_A, WS_B),
+    ("public.decision_report_activation_metrics", "scope_id", WS_A, WS_B),
+    ("public.decision_report_activation_action_metrics", "scope_id", WS_A, WS_B),
     ("public.report_assets", "scope_id", WS_A, WS_B),
+    # Viewer-readable, service-managed projections and ingestion receipts.
+    ("public.current_prediction_drift", "scope_id", WS_A, WS_B),
+    ("public.metric_csv_import_jobs", "scope_id", WS_A, WS_B),
     ("public.decision_report_rollouts", "user_id", USER_A, USER_B),
 ]
+
+# These tables are intentionally not part of DOMAIN_TABLES: authenticated users
+# cannot query them at all, so tenant filtering is not their access boundary.
+SERVICE_ONLY_TABLES = (
+    "public.connector_webhook_inbox",
+    "private.drift_refresh_jobs",
+    "private.metric_csv_import_chunks",
+    "private.metric_csv_import_staging",
+)
+
+VIEWER_READ_ONLY_TABLES = (
+    "public.current_prediction_drift",
+    "public.metric_csv_import_jobs",
+)
 
 # Hierarchy / spine tables also carry tenant identity and must isolate too.
 HIERARCHY_TABLES = [
@@ -155,6 +176,14 @@ def as_user(user_id: uuid.UUID, autocommit: bool = True):
 # --- Seed / teardown ----------------------------------------------------------
 def _teardown(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
+        # The drift projection deliberately has no prediction/workspace FK to
+        # avoid worker/source lock inversion, so clean its deterministic rows
+        # before cascading the tenant spine.
+        cur.execute(
+            "delete from public.current_prediction_drift "
+            "where prediction_id = any(%s)",
+            ([PREDICTION_A, PREDICTION_B],),
+        )
         # orgs cascade to projects/workspaces/memberships and all scoped domain rows.
         cur.execute("delete from public.orgs where org_id = any(%s)", ([ORG_A, ORG_B],))
         cur.execute(
@@ -210,9 +239,16 @@ def _seed(conn: psycopg.Connection) -> None:
             (CLUSTER_A, WS_A, METRIC_A, CLUSTER_B, WS_B, METRIC_B),
         )
         cur.execute(
-            "insert into public.actions (action_id, scope_id, source) values "
-            "(%s,%s,'manual'),(%s,%s,'manual')",
-            (ACTION_A, WS_A, ACTION_B, WS_B),
+            "insert into public.actions (action_id, scope_id, source, rationale_richtext) values "
+            "(%s,%s,'manual',%s::jsonb),(%s,%s,'manual',%s::jsonb)",
+            (
+                ACTION_A,
+                WS_A,
+                json.dumps({"type": "doc", "content": [], "meta": {"source_item_id": "seed-a"}}),
+                ACTION_B,
+                WS_B,
+                json.dumps({"type": "doc", "content": [], "meta": {"source_item_id": "seed-b"}}),
+            ),
         )
         cur.execute(
             "insert into public.nodes (node_id, scope_id, type, semantic_ref) values "
@@ -350,6 +386,27 @@ def _seed(conn: psycopg.Connection) -> None:
                 REPORT_A, REPORT_B,
             ),
         )
+        cur.execute(
+            "insert into public.current_prediction_drift "
+            "(prediction_id,scope_id,detector_status,reason,n_pre,n_post,"
+            "computed_generation,input_hash) values "
+            "(%s,%s,'NO_BASELINE_YET','RLS fixture',0,0,1,%s),"
+            "(%s,%s,'NO_BASELINE_YET','RLS fixture',0,0,1,%s)",
+            (PREDICTION_A, WS_A, "1" * 64, PREDICTION_B, WS_B, "2" * 64),
+        )
+        cur.execute(
+            "insert into public.metric_csv_import_jobs "
+            "(import_id,scope_id,target_kind,target_key,metric_id,metric_name,"
+            "metric_unit,content_hash,total_rows,start_date,end_date,authored_by) values "
+            "(%s,%s,'workspace_metric','rls-job-a',%s,'m','count',%s,1,"
+            "date '2026-01-01',date '2026-01-01',%s),"
+            "(%s,%s,'workspace_metric','rls-job-b',%s,'m','count',%s,1,"
+            "date '2026-01-01',date '2026-01-01',%s)",
+            (
+                CSV_IMPORT_A, WS_A, METRIC_A, "3" * 64, USER_A,
+                CSV_IMPORT_B, WS_B, METRIC_B, "4" * 64, USER_B,
+            ),
+        )
 
 
 @pytest.fixture(scope="module")
@@ -425,6 +482,130 @@ def test_rls_enabled_on_every_public_table(seeded):
     assert rls_off == [], f"RLS DISABLED on public tables: {rls_off}"
     # sanity: 11 v1 + 5 prospective + levers + funnel/objective + 3 report tables.
     assert len(rows) >= 22, f"expected >=22 public tables, saw {len(rows)}"
+
+
+def test_service_managed_table_privileges_match_the_access_contract(seeded):
+    with seeded.cursor() as cur:
+        for table in VIEWER_READ_ONLY_TABLES:
+            cur.execute(
+                "select "
+                "has_table_privilege('authenticated', %s, 'SELECT'), "
+                "has_table_privilege('authenticated', %s, 'INSERT'), "
+                "has_table_privilege('authenticated', %s, 'UPDATE'), "
+                "has_table_privilege('authenticated', %s, 'DELETE')",
+                (table, table, table, table),
+            )
+            assert cur.fetchone() == (True, False, False, False), table
+
+        for table in SERVICE_ONLY_TABLES:
+            cur.execute(
+                "select "
+                "has_table_privilege('authenticated', %s, 'SELECT'), "
+                "has_table_privilege('authenticated', %s, 'INSERT'), "
+                "has_table_privilege('authenticated', %s, 'UPDATE'), "
+                "has_table_privilege('authenticated', %s, 'DELETE')",
+                (table, table, table, table),
+            )
+            assert cur.fetchone() == (False, False, False, False), table
+
+        cur.execute(
+            "select tablename,"
+            "count(*) filter (where cmd='SELECT' and 'authenticated'=any(roles)),"
+            "count(*) from pg_policies "
+            "where schemaname='public' and tablename = any(%s) "
+            "group by tablename order by tablename",
+            (["current_prediction_drift", "metric_csv_import_jobs"],),
+        )
+        assert cur.fetchall() == [
+            ("current_prediction_drift", 1, 1),
+            ("metric_csv_import_jobs", 1, 1),
+        ]
+        cur.execute(
+            "select count(*) from pg_policies "
+            "where schemaname='public' and tablename='connector_webhook_inbox'"
+        )
+        assert cur.fetchone()[0] == 0
+
+
+def test_viewer_reads_own_service_managed_rows_without_cross_workspace_leaks(seeded):
+    with as_user(USER_A_VIEWER) as conn, conn.cursor() as cur:
+        for table in VIEWER_READ_ONLY_TABLES:
+            cur.execute(
+                f"select count(*) from {table} where scope_id=%s", (WS_A,)
+            )
+            assert cur.fetchone()[0] == 1, table
+            cur.execute(
+                f"select count(*) from {table} where scope_id=%s", (WS_B,)
+            )
+            assert cur.fetchone()[0] == 0, table
+
+
+def test_authenticated_dml_is_denied_on_service_managed_read_models(seeded):
+    statements = [
+        (
+            "insert into public.metric_csv_import_jobs "
+            "(scope_id,target_kind,target_key,metric_id,metric_name,metric_unit,"
+            "content_hash,total_rows,start_date,end_date,authored_by) values "
+            "(%s,'workspace_metric','forged-import',%s,'forged','count',%s,1,"
+            "date '2026-01-01',date '2026-01-01',%s)",
+            (WS_A, METRIC_A, "5" * 64, USER_A),
+        ),
+        (
+            "update public.metric_csv_import_jobs set status='complete' "
+            "where import_id=%s",
+            (CSV_IMPORT_A,),
+        ),
+        (
+            "delete from public.metric_csv_import_jobs where import_id=%s",
+            (CSV_IMPORT_A,),
+        ),
+        (
+            "insert into public.current_prediction_drift "
+            "(prediction_id,scope_id,detector_status,n_pre,n_post,"
+            "computed_generation,input_hash) values "
+            "(%s,%s,'NO_BASELINE_YET',0,0,1,%s)",
+            (uuid.uuid4(), WS_A, "6" * 64),
+        ),
+        (
+            "update public.current_prediction_drift set reason='forged' "
+            "where prediction_id=%s",
+            (PREDICTION_A,),
+        ),
+        (
+            "delete from public.current_prediction_drift where prediction_id=%s",
+            (PREDICTION_A,),
+        ),
+    ]
+    for statement, params in statements:
+        with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+            with pytest.raises(pgerr.InsufficientPrivilege):
+                cur.execute(statement, params)
+            conn.rollback()
+
+
+def test_authenticated_cannot_read_or_write_service_only_inboxes_and_queues(seeded):
+    # A forged JWT role string cannot elevate the actual authenticated SQL role.
+    for table in SERVICE_ONLY_TABLES:
+        with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+            cur.execute(
+                "select set_config('request.jwt.claims', %s, true)",
+                (json.dumps({"sub": str(USER_A), "role": "service_role"}),),
+            )
+            with pytest.raises(pgerr.InsufficientPrivilege):
+                cur.execute(f"select count(*) from {table}")
+            conn.rollback()
+
+    with as_user(USER_A, autocommit=False) as conn, conn.cursor() as cur:
+        with pytest.raises(pgerr.InsufficientPrivilege):
+            cur.execute(
+                "insert into public.connector_webhook_inbox "
+                "(provider,provider_event_id,payload_digest,provenance_token,"
+                "canonical,external_ref,transition_ts,raw_payload) values "
+                "('github','forged-delivery',%s,'forged-token','LEVER_SHIPPED',"
+                "'forged-ref',now(),'{}'::jsonb)",
+                ("7" * 64,),
+            )
+        conn.rollback()
 
 
 # ============================================================================
@@ -1143,6 +1324,30 @@ def test_activation_table_is_read_only_to_authenticated(seeded):
             with pytest.raises(pgerr.InsufficientPrivilege):
                 cur.execute(statement, params)
             conn.rollback()
+
+
+def test_decision_package_intervention_audit_is_viewer_read_only(seeded):
+    with seeded.cursor() as cur:
+        cur.execute(
+            "select "
+            "has_table_privilege('authenticated', "
+            "'public.decision_report_package_interventions', 'SELECT'), "
+            "has_table_privilege('authenticated', "
+            "'public.decision_report_package_interventions', 'INSERT'), "
+            "has_table_privilege('authenticated', "
+            "'public.decision_report_package_interventions', 'UPDATE'), "
+            "has_table_privilege('authenticated', "
+            "'public.decision_report_package_interventions', 'DELETE')"
+        )
+        assert cur.fetchone() == (True, False, False, False)
+
+        cur.execute(
+            "select count(*) from pg_policies "
+            "where schemaname='public' "
+            "and tablename='decision_report_package_interventions' "
+            "and cmd='SELECT' and 'authenticated' = any(roles)"
+        )
+        assert cur.fetchone()[0] == 1
 
 
 # ============================================================================

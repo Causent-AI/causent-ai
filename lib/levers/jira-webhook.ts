@@ -3,11 +3,10 @@
 // with SYNTHETIC payloads and zero live Jira. The thin route
 // (app/api/webhooks/jira/route.ts) only reads the raw body + secret header.
 //
-// Same invariants as the GitHub path: the (source, provider_event_id) dedup
-// insert is the FIRST write, so a redelivered event returns early WITHOUT
-// re-detecting — the unique index is the idempotency authority. Jira has no
+// Same durable-inbox invariants as the GitHub path. Jira has no
 // per-delivery id header, so provider_event_id is composed deterministically from
-// (issue id, webhookEvent, timestamp): the same event redelivered dedups.
+// (issue id, webhookEvent, timestamp), while a SHA-256 payload digest rejects a
+// changed body reusing that identity.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -16,9 +15,12 @@ import {
   type JiraWebhookPayload,
   type ParsedJiraEvent,
 } from "../connectors/jira.ts";
-import { detectLever } from "./detect.ts";
-
-const UNIQUE_VIOLATION = "23505";
+import {
+  connectorHttpsOrigin,
+  connectorPayloadDigest,
+  connectorWebhookBodyIsBounded,
+  processVerifiedConnectorEvent,
+} from "./webhook-inbox.ts";
 
 export type JiraWebhookParams = {
   rawBody: string;
@@ -36,6 +38,10 @@ export type JiraWebhookOutcome = {
     | "ignored_no_provenance"
     | "ignored_no_lever"
     | "ignored_untracked_action"
+    | "queued_retry"
+    | "quarantined"
+    | "dead_letter"
+    | "payload_conflict"
     | "invalid_secret"
     | "bad_request";
   leverId?: string;
@@ -43,10 +49,15 @@ export type JiraWebhookOutcome = {
 
 /** Deterministic dedup key: (issue id, event, timestamp). A redelivery of the
  *  exact same Jira event produces the same id and conflicts on the unique index. */
-function jiraEventId(payload: JiraWebhookPayload, event: ParsedJiraEvent): string {
+function jiraEventId(payload: JiraWebhookPayload, event: ParsedJiraEvent, targetOrigin: string): string {
   const id = payload.issue?.id ?? event.issueKey ?? "unknown";
   const ts = payload.timestamp ?? "";
-  return `jira:${id}:${payload.webhookEvent ?? "?"}:${ts}`;
+  return `jira:${connectorPayloadDigest(targetOrigin)}:${id}:${payload.webhookEvent ?? "?"}:${ts}`;
+}
+
+function jiraProjectKey(issueKey: string | null): string | null {
+  const match = /^([A-Z][A-Z0-9_]*)-\d+$/i.exec(issueKey ?? "");
+  return match?.[1]?.toUpperCase() ?? null;
 }
 
 export async function processJiraWebhook(
@@ -55,6 +66,9 @@ export async function processJiraWebhook(
 ): Promise<JiraWebhookOutcome> {
   if (!verifyJiraSecret(params.secret, params.providedSecret)) {
     return { status: 401, result: "invalid_secret" };
+  }
+  if (!connectorWebhookBodyIsBounded(params.rawBody)) {
+    return { status: 413, result: "bad_request" };
   }
 
   let payload: JiraWebhookPayload;
@@ -68,45 +82,23 @@ export async function processJiraWebhook(
   if (!event.token || !event.canonical || !event.externalRef) {
     return { status: 200, result: "ignored_no_provenance" };
   }
-
-  const leverRes = await sb
-    .from("levers")
-    .select("lever_id, action_id")
-    .eq("provenance_token", event.token)
-    .maybeSingle();
-  if (leverRes.error) return { status: 500, result: "bad_request" };
-  if (!leverRes.data) return { status: 200, result: "ignored_no_lever" };
-  const lever = leverRes.data as { lever_id: string; action_id: string };
+  const targetRef = jiraProjectKey(event.issueKey);
+  const targetOrigin = connectorHttpsOrigin(event.self);
+  if (!targetRef || !targetOrigin) return { status: 400, result: "bad_request" };
 
   const nowIso = params.nowIso ?? new Date().toISOString();
-
-  // Dedup FIRST (unique (source, provider_event_id)).
-  const txn = await sb.from("transition_events").insert({
-    action_id: lever.action_id,
+  return processVerifiedConnectorEvent(sb, {
+    provider: "jira",
+    providerEventId: jiraEventId(payload, event, targetOrigin),
+    rawBody: params.rawBody,
+    rawPayload: payload as unknown as Record<string, unknown>,
+    provenanceToken: event.token,
+    targetRef,
+    targetOrigin,
     canonical: event.canonical,
-    source: "jira",
-    provider_event_id: jiraEventId(payload, event),
-    transition_ts: nowIso,
-    to_status: payload.webhookEvent ?? null,
-    raw_payload: payload as unknown as Record<string, unknown>,
+    externalRef: event.externalRef,
+    externalUrl: event.self,
+    providerStatus: payload.webhookEvent ?? null,
+    transitionTs: nowIso,
   });
-  if (txn.error) {
-    if (txn.error.code === UNIQUE_VIOLATION) return { status: 200, result: "duplicate" };
-    return { status: 500, result: "bad_request" };
-  }
-
-  // Attribute on the issue coming to life. SHIPPED/DROPPED are recorded above;
-  // their lifecycle handling is C5, not #19.
-  if (event.canonical === "LEVER_ACTIVE") {
-    const det = await detectLever(sb, {
-      token: event.token,
-      externalRef: event.externalRef,
-      htmlUrl: event.self,
-      detectedAt: nowIso,
-    });
-    if (!det.ok) return { status: 200, result: "ignored_no_lever" };
-    return { status: 200, result: "detected", leverId: det.leverId };
-  }
-
-  return { status: 200, result: "ignored_untracked_action", leverId: lever.lever_id };
 }

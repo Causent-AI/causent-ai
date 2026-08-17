@@ -33,9 +33,9 @@ export type DraftInput = {
   targetSource?: TargetSource;
   /** GitHub watch target "owner/name" (required when targetSource is github). */
   repo?: string;
-  /** Jira target: project key (target_ref) + optional deep-link params. Omit the
-   *  link params for the write-scope auto-create path (no deep-link needed). */
-  jira?: { projectKey: string; baseUrl?: string; projectId?: string; issueTypeId?: string };
+  /** Jira target: project key + site are the durable webhook boundary. The
+   *  numeric ids are optional and only power the read-only deep-link. */
+  jira?: { projectKey: string; baseUrl: string; projectId?: string; issueTypeId?: string };
 };
 
 export type DraftResult =
@@ -59,7 +59,13 @@ function splitRepo(repo: string): { owner: string; name: string } | null {
 /** Resolve (targetSource, target_ref, actions.source, deepLink) for the tracker. */
 function resolveTarget(
   input: DraftInput,
-): { source: TargetSource; targetRef: string; actionSource: string; deepLink: string | null } | { error: string } {
+): {
+  source: TargetSource;
+  targetRef: string;
+  targetOrigin: string;
+  actionSource: string;
+  deepLink: string | null;
+} | { error: string } {
   const targetSource = input.targetSource ?? "github";
   if (targetSource === "github") {
     const repo = input.repo ? splitRepo(input.repo) : null;
@@ -67,6 +73,7 @@ function resolveTarget(
     return {
       source: "github",
       targetRef: input.repo!.trim(),
+      targetOrigin: "https://github.com",
       actionSource: "github_issue",
       deepLink: buildIssueDeepLink({
         owner: repo.owner,
@@ -80,10 +87,21 @@ function resolveTarget(
   // Jira.
   const j = input.jira;
   if (!j?.projectKey?.trim()) return { error: "Jira target needs a project key." };
+  if (!j.baseUrl?.trim()) return { error: "Jira target needs a site URL." };
+  let targetOrigin: string;
+  try {
+    const parsed = new URL(j.baseUrl);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
+      return { error: "Jira target needs an HTTPS site URL." };
+    }
+    targetOrigin = parsed.origin;
+  } catch {
+    return { error: "Jira target needs a valid site URL." };
+  }
   const deepLink =
-    j.baseUrl && j.projectId && j.issueTypeId
+    j.projectId && j.issueTypeId
       ? buildJiraDeepLink({
-          baseUrl: j.baseUrl,
+          baseUrl: targetOrigin,
           projectId: j.projectId,
           issueTypeId: j.issueTypeId,
           summary: input.title,
@@ -91,7 +109,7 @@ function resolveTarget(
           decisionId: input.decisionId,
         })
       : null;
-  return { source: "jira", targetRef: j.projectKey.trim(), actionSource: "jira", deepLink };
+  return { source: "jira", targetRef: j.projectKey.trim(), targetOrigin, actionSource: "jira", deepLink };
 }
 
 /**
@@ -112,12 +130,62 @@ export async function draftLeverFromDecision(
   // Idempotent: a lever with this provenance token already exists → return it.
   const existing = await sb
     .from("levers")
-    .select("lever_id, action_id")
+    .select("lever_id, action_id, scope_id, target_source, target_ref, target_origin")
     .eq("provenance_token", token)
     .maybeSingle();
   if (existing.error) return { ok: false, error: existing.error.message };
   if (existing.data) {
-    const row = existing.data as { lever_id: string; action_id: string };
+    const row = existing.data as {
+      lever_id: string;
+      action_id: string;
+      scope_id: string;
+      target_source: string;
+      target_ref: string | null;
+      target_origin: string | null;
+    };
+    if (
+      row.scope_id !== scopeId
+      || row.target_source !== target.source
+      || row.target_ref?.toLowerCase() !== target.targetRef.toLowerCase()
+    ) {
+      return { ok: false, error: "This decision is already registered to another tracker target." };
+    }
+
+    if (row.target_origin !== target.targetOrigin) {
+      if (row.target_origin !== null) {
+        return { ok: false, error: "This decision is already registered to another tracker target." };
+      }
+
+      // Compatibility path for a pre-target-origin lever. The user has
+      // deliberately re-drafted the same scoped provider + project/repo and
+      // supplied the site, so bind that exact row once. A concurrent different
+      // binding loses the NULL compare-and-set and is rejected below.
+      const rebound = await sb
+        .from("levers")
+        .update({ target_origin: target.targetOrigin })
+        .eq("lever_id", row.lever_id)
+        .eq("action_id", row.action_id)
+        .eq("scope_id", scopeId)
+        .eq("provenance_token", token)
+        .eq("target_source", target.source)
+        .eq("target_ref", row.target_ref!)
+        .is("target_origin", null)
+        .select("lever_id")
+        .maybeSingle();
+      if (rebound.error) return { ok: false, error: rebound.error.message };
+      if (!rebound.data) {
+        const current = await sb
+          .from("levers")
+          .select("target_origin")
+          .eq("lever_id", row.lever_id)
+          .eq("scope_id", scopeId)
+          .maybeSingle();
+        if (current.error) return { ok: false, error: current.error.message };
+        if ((current.data as { target_origin?: string } | null)?.target_origin !== target.targetOrigin) {
+          return { ok: false, error: "This decision is already registered to another tracker target." };
+        }
+      }
+    }
     return {
       ok: true,
       leverId: row.lever_id,
@@ -133,7 +201,12 @@ export async function draftLeverFromDecision(
     type: "doc",
     title: input.title,
     content: [{ type: "paragraph", content: [{ type: "text", text: input.body }] }],
-    meta: { provenance_token: token, target_ref: target.targetRef, target_source: target.source },
+    meta: {
+      provenance_token: token,
+      target_ref: target.targetRef,
+      target_origin: target.targetOrigin,
+      target_source: target.source,
+    },
   };
   const actionRes = await sb
     .from("actions")
@@ -166,6 +239,7 @@ export async function draftLeverFromDecision(
       provenance_token: token,
       target_source: target.source,
       target_ref: target.targetRef,
+      target_origin: target.targetOrigin,
       status: "DRAFTED",
       drafted_payload: {
         title: input.title,
@@ -173,6 +247,7 @@ export async function draftLeverFromDecision(
         label: token,
         deep_link: target.deepLink,
         target_source: target.source,
+        target_origin: target.targetOrigin,
       },
     })
     .select("lever_id")

@@ -178,7 +178,7 @@ export function PredictionCapture({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className={label} htmlFor="capture-why">Mechanism — what changes, and why would that move the metric?</label>
+        <label className={label} htmlFor="capture-why">Why will this change the metric?</label>
         <textarea id="capture-why" className={field} rows={2} value={why} onChange={(e) => setWhy(e.target.value)} />
       </div>
 
@@ -222,20 +222,20 @@ export function PredictionCapture({
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label className={label} htmlFor="capture-date">Resolution date — when Causent measures it</label>
+          <label className={label} htmlFor="capture-date">Resolution date</label>
           <input id="capture-date" type="date" className={field} value={resolutionDate} onChange={(e) => setResolutionDate(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1">
           <label className={label} htmlFor="capture-lever">
-            Lever — the action that carries the mechanism
+            Primary action
             {suggestedLever && leverActionId === null && (
               <span className="ml-1 font-normal text-[var(--text-subtle)]">
-                (suggested: {unassignedActions.find((a) => a.id === suggestedLever)?.title ?? suggestedLever} — confirm by selecting)
+                · Suggested: {unassignedActions.find((a) => a.id === suggestedLever)?.title ?? suggestedLever}
               </span>
             )}
           </label>
           <select id="capture-lever" className={field} value={leverActionId ?? ""} onChange={(e) => setLeverActionId(e.target.value || null)}>
-            <option value="">No lever yet</option>
+            <option value="">No primary action yet</option>
             {unassignedActions.map((a) => (
               <option key={a.id} value={a.id}>#{a.pr} {a.title}</option>
             ))}
@@ -245,7 +245,7 @@ export function PredictionCapture({
 
       <div className="rounded border border-dashed border-[var(--border)] p-3">
         <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
-          Precedent (informs — never authors — your number)
+          Past results
         </p>
         <PrecedentPanel priors={priors} />
       </div>
@@ -264,7 +264,7 @@ export function PredictionCapture({
           onClick={commit}
           className="rounded bg-[var(--text)] px-3 py-1.5 text-[13px] font-medium text-[var(--surface)] disabled:opacity-50"
         >
-          {pending ? "Committing…" : "We predict — commit it"}
+          {pending ? "Committing…" : "Commit prediction"}
         </button>
       </div>
     </div>

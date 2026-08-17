@@ -79,6 +79,7 @@ export async function autoCreateLever(
 
   // 4. Attribute it through the SAME detector the webhook + paste path use.
   const det = await detectLever(sb, {
+    scopeId,
     token: draft.token,
     externalRef: created.externalRef,
     htmlUrl: created.url,

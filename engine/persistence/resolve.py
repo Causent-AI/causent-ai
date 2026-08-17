@@ -1,10 +1,14 @@
 """Resolution verdict machine + scorer (epic #6, child #8).
 
-At a prediction's `resolution_date` the live ITS engine measures the lever
-action -> metric edge; this module maps the ITS belief-table state onto one of
-the 8 verdicts (docs/designs/prospective-prediction-loop.md) and persists the
-memory tuple. It REUSES the bridge (persist_metric_readouts) to materialize the
-edge through the real engine — it never re-implements ITS.
+At a prediction's `resolution_date` the live ITS engine measures the registered
+causal object against its primary metric. For Decision Report v2, that object is
+the complete decision package: no model runs until every included action is
+complete, and the latest effective included action supplies timing without
+receiving individual causal credit. Legacy predictions retain their lever
+semantics. This module maps the ITS belief-table state onto one of the 8
+verdicts (docs/designs/prospective-prediction-loop.md) and persists the memory
+tuple. It REUSES the bridge (persist_metric_readouts) to materialize the
+statistical readout through the real engine — it never re-implements ITS.
 
 Verdict machine (belief table -> verdict):
 
@@ -117,6 +121,15 @@ class Lever:
     ref: str                      # display: external_ref, else source
     effective_date: date | None   # None = never shipped
     status: str = "SHIPPED"       # levers lifecycle (DRAFTED..SHIPPED/DROPPED/TIMED_OUT)
+
+
+@dataclass(frozen=True)
+class DecisionPackageContract:
+    registered_primary_action_id: UUID
+    included_action_ids: list[UUID]
+    intervention_action: Lever | None = None
+    package_hash: str | None = None
+    completed_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -264,6 +277,73 @@ def _levers_for(conn: Connection, decision_id: Id, metric_id: Id) -> list[Lever]
     return [Lever(action_id, ref, eff, status) for action_id, ref, eff, status in rows]
 
 
+def _decision_package_for_prediction(
+    conn: Connection,
+    prediction_id: Id,
+) -> DecisionPackageContract | None:
+    """Return package semantics for v2 report predictions.
+
+    ``None`` is a legacy/non-report prediction. A v2 package always retains its
+    registered primary action and exact included action set; its intervention
+    fields remain null until the package is complete.
+    """
+    row = conn.execute(
+        "select activation.contract_version, activation.primary_lever_action_id, "
+        "activation.action_ids, package.registered_primary_action_id, "
+        "package.intervention_action_id, package.intervention_date, "
+        "package.included_action_ids, package.package_hash, package.completed_at, "
+        "coalesce(action.external_ref, action.source) "
+        "from public.decision_report_activations activation "
+        "left join public.decision_report_package_interventions package "
+        "on package.activation_id = activation.activation_id "
+        "and package.scope_id = activation.scope_id "
+        "left join public.actions action "
+        "on action.action_id = package.intervention_action_id "
+        "and action.scope_id = package.scope_id "
+        "where activation.prediction_id = %s",
+        (prediction_id,),
+    ).fetchone()
+    if row is None or row[0] != 2:
+        return None
+    (
+        _, activation_primary_action_id, activation_action_ids,
+        package_primary_action_id, intervention_action_id,
+        intervention_date, included_action_ids, package_hash, completed_at,
+        intervention_ref,
+    ) = row
+    if (
+        activation_primary_action_id is None
+        or activation_primary_action_id not in activation_action_ids
+    ):
+        raise RuntimeError("DECISION_PACKAGE_CONTRACT_MISMATCH")
+    if package_primary_action_id is None:
+        return DecisionPackageContract(
+            registered_primary_action_id=activation_primary_action_id,
+            included_action_ids=list(activation_action_ids),
+        )
+    if (
+        intervention_action_id not in included_action_ids
+        or package_primary_action_id != activation_primary_action_id
+        or list(included_action_ids) != list(activation_action_ids)
+        or intervention_date is None
+        or not package_hash
+        or completed_at is None
+    ):
+        raise RuntimeError("DECISION_PACKAGE_CONTRACT_MISMATCH")
+    return DecisionPackageContract(
+        registered_primary_action_id=activation_primary_action_id,
+        included_action_ids=list(activation_action_ids),
+        intervention_action=Lever(
+            intervention_action_id,
+            intervention_ref or "Decision package completion",
+            intervention_date,
+            "SHIPPED",
+        ),
+        package_hash=package_hash,
+        completed_at=completed_at,
+    )
+
+
 def _load_edge_state(
     conn: Connection, scope_id: Id, source_type: str, source_ref: Id, metric_id: Id
 ) -> EdgeState | None:
@@ -379,7 +459,13 @@ def resolve_prediction(
             f"due {resolution_date.isoformat()}",
         )
 
-    levers = _levers_for(conn, decision_id, metric_id)
+    decision_package = _decision_package_for_prediction(conn, pid)
+    is_decision_package = decision_package is not None
+    levers = (
+        [decision_package.intervention_action]
+        if decision_package is not None and decision_package.intervention_action is not None
+        else [] if is_decision_package else _levers_for(conn, decision_id, metric_id)
+    )
     features = _reference_class_features(conn, decision_id, metric_id)
 
     tuple_base = {
@@ -389,6 +475,52 @@ def resolve_prediction(
         "decision_id": str(decision_id),
         "metric_id": str(metric_id),
     }
+    if is_decision_package:
+        tuple_base.update({
+            "causal_object": "decision_package",
+            "intervention_rule": "latest_effective_included_action",
+            "individual_attribution": False,
+            "registered_primary_action_id": str(
+                decision_package.registered_primary_action_id
+            ),
+            "intervention_action_id": (
+                None if decision_package.intervention_action is None
+                else str(decision_package.intervention_action.action_id)
+            ),
+            "intervention_date": (
+                None if decision_package.intervention_action is None
+                else decision_package.intervention_action.effective_date.isoformat()
+            ),
+            "included_action_ids": [
+                str(action_id) for action_id in decision_package.included_action_ids
+            ],
+            "package_hash": decision_package.package_hash,
+            "package_completed_at": (
+                None if decision_package.completed_at is None
+                else decision_package.completed_at.isoformat()
+            ),
+        })
+
+    if is_decision_package and decision_package.intervention_action is None:
+        verdict = "GATHERING"
+        extended = today + timedelta(days=GATHERING_EXTENSION_DAYS)
+        conn.execute(
+            "update public.predictions set resolved_verdict = 'GATHERING', "
+            "resolution_date = %s, resolved_edge_id = null, resolution_tuple = %s "
+            "where prediction_id = %s",
+            (
+                extended,
+                json.dumps({**tuple_base, "verdict": verdict}),
+                pid,
+            ),
+        )
+        conn.commit()
+        return ResolutionResult(
+            pid,
+            "GATHERING",
+            verdict,
+            "decision package is incomplete — no intervention event exists yet",
+        )
 
     # A declared metric that never received observations cannot be measured —
     # say so BEFORE any ITS runs (C1/#14 added the verdict; C4 routes it).
@@ -438,7 +570,19 @@ def resolve_prediction(
         commit=False,
     )
 
-    if len(shipped) == 1:
+    if decision_package is not None and decision_package.intervention_action is not None:
+        # The complete plan is one causal object. Its latest effective included
+        # action supplies timing only; no action receives individual credit.
+        intervention = decision_package.intervention_action
+        edge = _load_edge_state(
+            conn,
+            scope_id,
+            "ACTION",
+            intervention.action_id,
+            metric_id,
+        )
+        intervention_date = intervention.effective_date
+    elif len(shipped) == 1:
         # Single lever — the unchanged single-intervention path.
         lever = shipped[0]
         tuple_base["lever_action_id"] = str(lever.action_id)

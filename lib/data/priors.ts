@@ -10,7 +10,6 @@ import {
   type ResolutionTuple,
 } from "@/lib/priors";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { DEMO_SCOPE_ID } from "@/lib/data/config";
 
 /**
  * Priors for a reference class. The class is (metric) narrowed by mechanism
@@ -18,6 +17,7 @@ import { DEMO_SCOPE_ID } from "@/lib/data/config";
  * (GATHERING is a not-yet, not an outcome — resolved_at stays NULL).
  */
 export async function getPriorsForReferenceClass(params: {
+  scopeId: string;
   metricId: string;
   mechanismCategory?: string | null;
 }): Promise<ReferenceClassPriors> {
@@ -25,7 +25,7 @@ export async function getPriorsForReferenceClass(params: {
   const res = await sb
     .from("predictions")
     .select("resolved_verdict, resolution_tuple")
-    .eq("scope_id", DEMO_SCOPE_ID)
+    .eq("scope_id", params.scopeId)
     .eq("metric_id", params.metricId)
     .not("resolved_at", "is", null);
   if (res.error) throw res.error;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type {
   Action,
   ImpactStat,
@@ -42,13 +43,13 @@ export function ReportsPageClient({
       <Panel className="flex min-h-0 flex-col">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[15px] font-semibold text-[var(--text)]">Reports</h2>
-          <button
-            type="button"
+          <Link
+            href="/onboarding"
             className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--brand-blue)] px-2.5 text-[12px] font-semibold text-white hover:brightness-105"
           >
             <PlusIcon />
             New Report
-          </button>
+          </Link>
         </div>
 
         <div className="scroll-slim -mx-1 min-h-0 flex-1 space-y-1.5 overflow-y-auto px-1">
@@ -101,7 +102,7 @@ export function ReportsPageClient({
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
             <ReportIcon className="text-[var(--text-subtle)]" />
             <p className="text-[14px] text-[var(--text-muted)]">
-              No reports yet. Create one to roll up this project for stakeholders.
+              No reports yet.
             </p>
           </div>
         )}

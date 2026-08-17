@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import type { ReportAssetView } from "@/lib/decision-reports/assets";
 
-export function SuppliedMockup({ asset, readOnly, disabled, pending, error, onUpload, onRemove, title = "Chart or graph", emptyMessage = "Add a chart or graph if it helps explain the evidence.", imageAlt = "User-supplied supporting chart", uploadLabel = "Add PNG or JPEG" }: {
+export function SuppliedMockup({ asset, readOnly, disabled, pending, error, onUpload, onRemove, title = "Chart or graph", emptyMessage = "", imageAlt = "User-supplied supporting chart", uploadLabel = "Add chart or graph" }: {
   asset: ReportAssetView | null;
   readOnly: boolean;
   disabled: boolean;
@@ -38,9 +38,7 @@ export function SuppliedMockup({ asset, readOnly, disabled, pending, error, onUp
         </div>
       ) : (
         <div className="mt-3 flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/70 px-4 text-center">
-          <p className="max-w-xs text-[12px] leading-5 text-[var(--text-muted)]">
-            {emptyMessage}
-          </p>
+          {emptyMessage ? <p className="max-w-xs text-[12px] leading-5 text-[var(--text-muted)]">{emptyMessage}</p> : null}
           {!readOnly ? <button type="button" disabled={disabled || pending} onClick={() => inputRef.current?.click()} className="mt-3 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[11px] font-semibold text-[var(--text)] disabled:opacity-45">
             {disabled ? "Waiting for autosave…" : pending ? "Processing…" : uploadLabel}
           </button> : null}
@@ -58,7 +56,7 @@ export function SuppliedMockup({ asset, readOnly, disabled, pending, error, onUp
           if (file) onUpload(file);
         }}
       /> : null}
-      <p className="mt-2 text-[10px] leading-4 text-[var(--text-subtle)]">One PNG/JPEG · 5 MB · 4096×4096 · 16 MP. Metadata and original bytes are discarded.</p>
+      <p className="mt-2 text-[10px] leading-4 text-[var(--text-subtle)]">PNG/JPEG · 5 MB max · original discarded after sanitization.</p>
       {error ? <p role="alert" className="mt-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[11px] text-red-800">{error}</p> : null}
     </div>
   );

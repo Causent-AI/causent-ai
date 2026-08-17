@@ -86,11 +86,13 @@ export function Wordmark({ height = 20 }: { height?: number }) {
   );
 }
 
-export function Logo() {
+export function Logo({ compactOnMobile = false }: { compactOnMobile?: boolean }) {
   return (
     <div className="flex shrink-0 items-center gap-2.5 select-none">
       <LogoMark height={28} />
-      <Wordmark height={19} />
+      <span className={compactOnMobile ? "hidden sm:block" : undefined}>
+        <Wordmark height={19} />
+      </span>
     </div>
   );
 }

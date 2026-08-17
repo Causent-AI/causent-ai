@@ -5,28 +5,40 @@ import {
 import { ReportSection } from "@/components/decision-report/ReportSection";
 import { SuppliedMockup } from "@/components/decision-report/SuppliedMockup";
 import type { ReportAssetView } from "@/lib/decision-reports/assets";
-import type { DecisionReportV1 } from "@/lib/decision-reports/schema";
+import type {
+  DecisionReportV1,
+  PortableRichTextDocument,
+} from "@/lib/decision-reports/schema";
 
 export function SupportingEvidenceSection({
   evidence,
+  claimDocuments,
   asset,
   assetPending,
   assetDisabled,
   assetError,
   readOnly = false,
   onClaimChange,
+  onClaimDocumentChange,
   onClaimAdd,
+  onClaimDocumentAdd,
   onAssetUpload,
   onAssetRemove,
 }: {
   evidence: DecisionReportV1["supportingEvidence"];
+  claimDocuments?: Record<string, PortableRichTextDocument>;
   asset: ReportAssetView | null;
   assetPending: boolean;
   assetDisabled: boolean;
   assetError: string | null;
   readOnly?: boolean;
   onClaimChange: (claimId: string, text: string) => void;
+  onClaimDocumentChange: (
+    claimId: string,
+    document: PortableRichTextDocument,
+  ) => void;
   onClaimAdd: (text: string) => void;
+  onClaimDocumentAdd: (document: PortableRichTextDocument) => void;
   onAssetUpload: (file: File) => void;
   onAssetRemove: () => void;
 }) {
@@ -53,6 +65,7 @@ export function SupportingEvidenceSection({
             optional
             variant="document"
             readOnly={readOnly}
+            onDocumentChange={onClaimDocumentAdd}
             onChange={onClaimAdd}
           />
         ) : (
@@ -62,6 +75,8 @@ export function SupportingEvidenceSection({
             optional
             variant="document"
             readOnly={readOnly}
+            claimDocuments={claimDocuments}
+            onDocumentChange={onClaimDocumentChange}
             onChange={onClaimChange}
           />
         )}

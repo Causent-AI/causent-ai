@@ -9,14 +9,14 @@
 //     a per-request client built from the caller's Supabase session cookie
 //     (@supabase/ssr createServerClient), running as `authenticated` so
 //     has_scope_access() RLS gates every row by the user's membership. The
-//     lib/data/* callers are UNCHANGED — they keep querying WHERE scope_id =
-//     DEMO_SCOPE_ID, but now under the user's session (defense in depth: a
-//     non-member gets zero rows). The service-role key never touches this path.
+//     lib/data/* callers receive the verified active workspace and keep an
+//     explicit scope predicate in addition to RLS. The service-role key never
+//     touches this path.
 //
 //   getServiceRoleSupabase() — the RLS-BYPASSING service-role client, for the
 //     seed/provisioner, the invite CLI, GitHub ingestion backfill, and the
 //     unauthenticated webhook + cron jobs (#16). NEVER the dashboard read path in
-//     prod. Pinned scoping (DEMO_SCOPE_ID) is still what keeps these safe.
+//     prod. Explicit server-owned scope arguments still keep these safe.
 //
 // LOCAL DEMO (CAUSENT_LOCAL_DEMO=1, never set in prod): there is no real Google
 // login locally, so a session-scoped read would return zero rows and blank the

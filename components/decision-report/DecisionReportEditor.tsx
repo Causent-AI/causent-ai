@@ -12,19 +12,20 @@ import {
   saveDecisionReportAction,
   type SaveDecisionReportActionResult,
 } from "@/app/(onboarding)/onboarding/decision-report-persistence-actions";
-import { DecisionSection } from "@/components/decision-report/DecisionSection";
+import { startDecisionReportAction } from "@/app/(onboarding)/onboarding/decision-report-activation-actions";
+import { ActionPlanCanvas } from "@/components/decision-report/ActionPlanCanvas";
+import { DecisionNarrativeCanvas } from "@/components/decision-report/DecisionNarrativeCanvas";
 import {
-  ImplementationSection,
   type ActionExecutionPatch,
 } from "@/components/decision-report/ImplementationSection";
-import { ReportActivationPanel } from "@/components/decision-report/ReportActivationPanel";
-import { ReportCompletionPanel } from "@/components/decision-report/ReportCompletionPanel";
-import { ReportCoreMetricsSection } from "@/components/decision-report/ReportCoreMetricsSection";
-import { SupportingEvidenceSection } from "@/components/decision-report/SupportingEvidenceSection";
+import { DocumentEditorProvider } from "@/components/decision-report/rich-text/DocumentEditorContext";
+import { DocumentEditorToolbar } from "@/components/decision-report/rich-text/DocumentEditorToolbar";
+import type { ReportCanvasDocumentChange } from "@/components/decision-report/rich-text/ReportCanvasEditor";
+import { AutoGrowingTextarea } from "@/components/ui/AutoGrowingTextarea";
+import { decisionReportActionDestination } from "@/lib/decision-reports/action-navigation";
 import type { ReportAssetView } from "@/lib/decision-reports/assets";
 import {
   applyReportEditCommand,
-  createGapAnswerCommand,
   scanDecisionReportGaps,
   type DecisionReportGap,
   type ReportEditCommandV1,
@@ -34,12 +35,16 @@ import type {
   DecisionReportActivationPointer,
   DecisionReportPersistenceStatus,
 } from "@/lib/decision-reports/persistence";
+import { reportLifecyclePresentation } from "@/lib/decision-reports/product-continuity";
 import {
   cloneDecisionReport,
   emptyDecisionReportActivationDraft,
+  flattenPortableRichText,
   type DecisionReportActivationDraft,
   type DecisionReportV1,
   type MetricProjection,
+  type PortableRichTextDocument,
+  resolveDecisionReportSelectedMetricIds,
 } from "@/lib/decision-reports/schema";
 
 type ReportPersistenceState = {
@@ -59,6 +64,18 @@ type PendingSave = {
 };
 
 const AUTOSAVE_DELAY_MS = 750;
+
+function focusEditableAtEnd(target: HTMLElement) {
+  target.focus();
+  if (!target.isContentEditable) return;
+  const selection = target.ownerDocument.getSelection();
+  if (!selection) return;
+  const range = target.ownerDocument.createRange();
+  range.selectNodeContents(target);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
 
 export function DecisionReportEditor({
   initialReport,
@@ -102,6 +119,8 @@ export function DecisionReportEditor({
   const [editError, setEditError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveConflictReportId, setSaveConflictReportId] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [startPendingActionId, setStartPendingActionId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(
     initialPersistence ? "saved" : "waiting",
   );
@@ -114,8 +133,10 @@ export function DecisionReportEditor({
     initialPersistence ? JSON.stringify(initialReport) : null,
   );
   const [isChangingAsset, startChangingAsset] = useTransition();
+  const [isStartingAction, startActionTransition] = useTransition();
 
   const reportSnapshot = JSON.stringify(report);
+  const reportIsActive = persistence?.status === "active";
   const activationDraft = report.activationDraft ??
     emptyDecisionReportActivationDraft();
   const projectionMetricId = activationMetrics.find(
@@ -125,16 +146,39 @@ export function DecisionReportEditor({
     initialPersistence?.activation?.metricId ??
     projectionMetricId ??
     "";
+  const selectedMetricIds = (() => {
+    const selected = resolveDecisionReportSelectedMetricIds(activationDraft);
+    return selected.length > 0
+      ? selected
+      : metricId
+        ? [metricId]
+        : [];
+  })();
   const metricAvailable = activationMetrics.some(
     (metric) => metric.metricId === metricId,
   );
-  const selectedActionIds = report.activationDraft?.selectedActionSourceItemIds ??
-    (initialPersistence?.activation?.primaryLeverActionId
-      ? [initialPersistence.activation.primaryLeverActionId]
-      : []);
+  const selectedActionIds = reportIsActive
+    ? report.activationDraft?.selectedActionSourceItemIds ??
+      (initialPersistence?.activation?.primaryLeverActionId
+        ? [initialPersistence.activation.primaryLeverActionId]
+        : [])
+    : report.implementation.actions.map((action) => action.sourceItemId);
   const primaryActionId = report.activationDraft?.primaryLeverActionSourceItemId ??
     initialPersistence?.activation?.primaryLeverActionId ??
+    selectedActionIds[0] ??
     "";
+  const actionMetricAssignments = selectedActionIds.flatMap((sourceItemId) => {
+    const action = report.implementation.actions.find(
+      (candidate) => candidate.sourceItemId === sourceItemId,
+    );
+    if (!action) return [];
+    const assignedMetricId = sourceItemId === primaryActionId
+      ? metricId
+      : action.metricId ?? metricId;
+    return assignedMetricId
+      ? [{ actionSourceItemId: sourceItemId, metricId: assignedMetricId }]
+      : [];
+  });
   const gaps = scanDecisionReportGaps(report);
   const titleBlocked = titleDraft.trim() === "";
   const invalidActionTitleIds = report.implementation.actions
@@ -153,7 +197,73 @@ export function DecisionReportEditor({
     savedSnapshot !== reportSnapshot ||
     titleDraft !== report.title ||
     hasActionTitleDraftChanges;
-  const reportIsActive = persistence?.status === "active";
+  const exactSavedRevision =
+    persistence?.status === "report_ready" &&
+    !hasUnsavedChanges &&
+    !isChangingAsset;
+  const magnitudeReady =
+    activationDraft.prediction.magnitudePctMean !== null &&
+    Number.isFinite(activationDraft.prediction.magnitudePctMean) &&
+    activationDraft.prediction.magnitudePctMean > 0;
+  const resolutionDate = activationDraft.prediction.resolutionDate ?? "";
+  const resolutionDateReady =
+    /^\d{4}-\d{2}-\d{2}$/.test(resolutionDate) &&
+    resolutionDate > activationDateBounds.today;
+  const assignedActionIds = new Set(
+    actionMetricAssignments.map((assignment) => assignment.actionSourceItemId),
+  );
+  const activationInputsReady =
+    metricAvailable &&
+    selectedMetricIds.length >= 1 &&
+    selectedMetricIds.length <= 5 &&
+    selectedMetricIds.includes(metricId) &&
+    selectedActionIds.length >= 1 &&
+    selectedActionIds.length <= 25 &&
+    selectedActionIds.includes(primaryActionId) &&
+    actionMetricAssignments.length === selectedActionIds.length &&
+    assignedActionIds.size === actionMetricAssignments.length &&
+    actionMetricAssignments.every((assignment) =>
+      selectedMetricIds.includes(assignment.metricId)
+    ) &&
+    actionMetricAssignments.find(
+      (assignment) => assignment.actionSourceItemId === primaryActionId,
+    )?.metricId === metricId &&
+    magnitudeReady &&
+    resolutionDateReady;
+  const requiredFieldCount =
+    gaps.length + (titleBlocked ? 1 : 0) + invalidActionTitleIds.length;
+  const lifecycle = reportLifecyclePresentation({
+    active: reportIsActive,
+    requiredFieldCount,
+    commitmentReady: activationInputsReady,
+    actionCount: selectedActionIds.length,
+  });
+  const firstInvalidAssignment = actionMetricAssignments.find(
+    (assignment) => !selectedMetricIds.includes(assignment.metricId),
+  );
+  const nextCommitmentTargetId = (() => {
+    if (activationMetrics.length === 0) return "core-metrics-manage";
+    if (
+      !metricAvailable ||
+      selectedMetricIds.length < 1 ||
+      selectedMetricIds.length > 5 ||
+      !selectedMetricIds.includes(metricId)
+    ) {
+      return metricId && selectedMetricIds.includes(metricId)
+        ? `primary-metric-${metricId}`
+        : `core-metric-${activationMetrics[0].metricId}`;
+    }
+    if (selectedActionIds.length === 0) return "report-actions-empty";
+    if (!selectedActionIds.includes(primaryActionId)) {
+      return "commitment-primary-action";
+    }
+    if (firstInvalidAssignment) {
+      return `action-metric-${firstInvalidAssignment.actionSourceItemId}`;
+    }
+    if (!magnitudeReady) return "commitment-magnitude";
+    if (!resolutionDateReady) return "commitment-date";
+    return "report-decision-commitment";
+  })();
 
   const reportRef = useRef(report);
   const persistenceRef = useRef<ReportPersistenceState | null>(persistence);
@@ -164,9 +274,9 @@ export function DecisionReportEditor({
   const conflictHaltedRef = useRef(false);
   const saveInFlightRef = useRef(false);
   const assetMutationInFlightRef = useRef(false);
+  const actionStartInFlightRef = useRef(false);
   const mountedRef = useRef(true);
   const editedFields = useRef(new Set<string>());
-  const answeredFollowUps = useRef(new Set<string>());
   const drainSaveQueueRef = useRef<() => Promise<void>>(async () => undefined);
 
   useEffect(() => {
@@ -212,7 +322,7 @@ export function DecisionReportEditor({
               sessionKey: telemetrySessionKey,
               msSinceStart: Math.max(0, Math.round(performance.now() - telemetryStartedAtMs)),
               editCount: editedFields.current.size,
-              followUpCount: answeredFollowUps.current.size,
+              followUpCount: 0,
               missingFieldCount: pending.missingFieldCount,
             },
       });
@@ -351,6 +461,20 @@ export function DecisionReportEditor({
     dispatchEdit({ type: "replace_claim_text", claimId, text }, `claim:${claimId}`);
   }
 
+  function updateCanvasDocuments(
+    canvasId: "decision" | "action_plan",
+    changes: ReportCanvasDocumentChange[],
+  ) {
+    dispatchEdit(
+      {
+        type: "replace_canvas_documents",
+        canvasId,
+        documents: changes,
+      },
+      `canvas:${canvasId}`,
+    );
+  }
+
   function updateActivationDraft(
     update: (draft: DecisionReportActivationDraft) => void,
     editKey: string,
@@ -366,10 +490,43 @@ export function DecisionReportEditor({
     );
   }
 
-  function updateMetric(metricId: string) {
+  function toggleMetric(metricId: string) {
+    const wasSelected = selectedMetricIds.includes(metricId);
     updateActivationDraft((draft) => {
-      draft.confirmedMetricId = metricId || null;
-    }, "activation:metric");
+      const stored = resolveDecisionReportSelectedMetricIds(draft);
+      const current = stored.length > 0 ? stored : selectedMetricIds;
+      const next = wasSelected
+        ? current.filter((selectedId) => selectedId !== metricId)
+        : [...current, metricId].slice(0, 5);
+      draft.selectedMetricIds = next;
+      if (!draft.confirmedMetricId || !next.includes(draft.confirmedMetricId)) {
+        draft.confirmedMetricId = next[0] ?? null;
+      }
+    }, `activation:metric:${metricId}`);
+  }
+
+  function updatePrimaryMetric(metricId: string) {
+    updateActivationDraft((draft) => {
+      const stored = resolveDecisionReportSelectedMetricIds(draft);
+      const selected = stored.length > 0 ? stored : selectedMetricIds;
+      draft.selectedMetricIds = selected.includes(metricId)
+        ? selected
+        : [...selected, metricId].slice(0, 5);
+      draft.confirmedMetricId = metricId;
+    }, "activation:primary-metric");
+    const primary = reportRef.current.implementation.actions.find(
+      (action) => action.sourceItemId === primaryActionId,
+    );
+    if (primary && primary.metricId !== metricId) {
+      dispatchEdit(
+        {
+          type: "edit_action_metric",
+          sourceItemId: primary.sourceItemId,
+          metricId,
+        },
+        `action-metric:${primary.sourceItemId}`,
+      );
+    }
   }
 
   function updatePredictionDirection(direction: "POSITIVE" | "NEGATIVE") {
@@ -417,12 +574,43 @@ export function DecisionReportEditor({
       `claim:${claimId}`,
     );
     if (!applied) return;
-    queueMicrotask(() => {
+    window.requestAnimationFrame(() => {
       const target = document.getElementById(`claim-${claimId}`);
-      if (!(target instanceof HTMLTextAreaElement)) return;
-      target.focus();
-      target.setSelectionRange(text.length, text.length);
+      if (!(target instanceof HTMLElement)) return;
+      focusEditableAtEnd(target);
     });
+  }
+
+  function addSupportingEvidenceDocument(
+    document: PortableRichTextDocument,
+  ) {
+    const claimId = `user-evidence-${crypto.randomUUID()}`;
+    const added = dispatchEdit(
+      {
+        type: "add_supporting_evidence",
+        claimId,
+        text: flattenPortableRichText(document),
+      },
+      `claim:${claimId}`,
+    );
+    if (!added) return;
+    const formatted = dispatchEdit(
+      { type: "replace_claim_document", claimId, document },
+      `claim:${claimId}`,
+    );
+    if (!formatted) return;
+    window.requestAnimationFrame(() => {
+      const target = window.document.getElementById(`claim-${claimId}`);
+      if (!(target instanceof HTMLElement)) return;
+      focusEditableAtEnd(target);
+    });
+  }
+
+  function removeSupportingEvidence(claimId: string) {
+    dispatchEdit(
+      { type: "remove_supporting_evidence", claimId },
+      `claim-remove:${claimId}`,
+    );
   }
 
   function updateActionTitle(sourceItemId: string, title: string) {
@@ -441,12 +629,41 @@ export function DecisionReportEditor({
     );
   }
 
-  function updateActionSummary(sourceItemId: string, text: string) {
-    dispatchEdit({ type: "edit_action_summary", sourceItemId, text }, `action-summary:${sourceItemId}`);
+  function updateActionMetric(sourceItemId: string, nextMetricId: string | null) {
+    const currentPrimaryMetricId =
+      reportRef.current.activationDraft?.confirmedMetricId ?? metricId;
+    if (
+      sourceItemId === primaryActionId &&
+      nextMetricId !== null &&
+      nextMetricId !== currentPrimaryMetricId
+    ) {
+      setEditError("The primary action uses the outcome metric.");
+      return;
+    }
+    dispatchEdit(
+      { type: "edit_action_metric", sourceItemId, metricId: nextMetricId },
+      `action-metric:${sourceItemId}`,
+    );
   }
 
   function updateActionOwner(sourceItemId: string, text: string) {
     dispatchEdit({ type: "edit_action_owner", sourceItemId, text }, `action-owner:${sourceItemId}`);
+  }
+
+  function updateActionMonitoring(
+    sourceItemId: string,
+    expectedDirection: "INCREASE" | "DECREASE" | null,
+    checkDate: string | null,
+  ) {
+    dispatchEdit(
+      {
+        type: "edit_action_monitoring",
+        sourceItemId,
+        expectedDirection,
+        checkDate,
+      },
+      `action-monitoring:${sourceItemId}`,
+    );
   }
 
   function updateActionExecution(sourceItemId: string, patch: ActionExecutionPatch) {
@@ -508,30 +725,22 @@ export function DecisionReportEditor({
     });
   }
 
-  function toggleActionSelection(sourceItemId: string) {
-    updateActivationDraft((draft) => {
-      const current = draft.selectedActionSourceItemIds;
-      if (current.includes(sourceItemId)) {
-        draft.selectedActionSourceItemIds = current.filter(
-          (id) => id !== sourceItemId,
-        );
-        if (draft.primaryLeverActionSourceItemId === sourceItemId) {
-          draft.primaryLeverActionSourceItemId = null;
-        }
-        return;
-      }
-      if (current.length >= 3) return;
-      draft.selectedActionSourceItemIds = [...current, sourceItemId];
-      if (!draft.primaryLeverActionSourceItemId) {
-        draft.primaryLeverActionSourceItemId = sourceItemId;
-      }
-    }, `activation:action:${sourceItemId}`);
-  }
-
   function updatePrimaryAction(sourceItemId: string) {
     updateActivationDraft((draft) => {
+      draft.selectedActionSourceItemIds = reportRef.current.implementation.actions.map(
+        (action) => action.sourceItemId,
+      );
       draft.primaryLeverActionSourceItemId = sourceItemId;
     }, "activation:primary-action");
+    const action = reportRef.current.implementation.actions.find(
+      (candidate) => candidate.sourceItemId === sourceItemId,
+    );
+    if (action && (action.monitoringExpectedDirection || action.monitoringCheckDate)) {
+      updateActionMonitoring(sourceItemId, null, null);
+    }
+    if (action && metricId && action.metricId !== metricId) {
+      updateActionMetric(sourceItemId, metricId);
+    }
   }
 
   function focusGap(gap: DecisionReportGap) {
@@ -541,19 +750,11 @@ export function DecisionReportEditor({
     target.focus({ preventScroll: true });
   }
 
-  function answerGap(gap: DecisionReportGap, answer: string): boolean {
-    const command = createGapAnswerCommand(
-      gap,
-      answer,
-      gap.kind === "action" ? `user-action-${crypto.randomUUID()}` : undefined,
-    );
-    if (!command.ok) {
-      setEditError(command.error);
-      return false;
-    }
-    const applied = dispatchEdit(command.command, `gap:${gap.targetId}`);
-    if (applied) answeredFollowUps.current.add(gap.targetId);
-    return applied;
+  function focusLifecycleTarget(targetId: string) {
+    const target = document.getElementById(targetId);
+    if (!(target instanceof HTMLElement)) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.focus({ preventScroll: true });
   }
 
   function retryAutosave() {
@@ -563,6 +764,83 @@ export function DecisionReportEditor({
     blockedSnapshotRef.current = null;
     pendingSaveRef.current = candidate;
     void drainSaveQueueRef.current();
+  }
+
+  function startReportAction(sourceItemId: string) {
+    const currentPersistence = persistenceRef.current;
+    const alreadyActive =
+      currentPersistence?.status === "active" &&
+      currentPersistence.activation !== null;
+    if (
+      actionStartInFlightRef.current ||
+      !currentPersistence ||
+      !selectedActionIds.includes(sourceItemId) ||
+      (!alreadyActive &&
+        (!exactSavedRevision || !ready || !activationInputsReady))
+    ) {
+      return;
+    }
+
+    actionStartInFlightRef.current = true;
+    setStartError(null);
+    setStartPendingActionId(sourceItemId);
+    startActionTransition(async () => {
+      try {
+        const result = await startDecisionReportAction({
+          schemaVersion: 2,
+          reportId: currentPersistence.reportId,
+          revisionId: currentPersistence.revisionId,
+          confirmedMetricId: metricId,
+          selectedMetricIds,
+          prediction: {
+            direction: activationDraft.prediction.direction,
+            magnitudePctMean: activationDraft.prediction.magnitudePctMean!,
+            resolutionDate,
+          },
+          selectedActionSourceItemIds: selectedActionIds,
+          actionMetricAssignments,
+          primaryLeverActionSourceItemId: primaryActionId,
+        }, sourceItemId, {
+          sessionKey: telemetrySessionKey,
+          msSinceStart: Math.max(
+            0,
+            Math.round(performance.now() - telemetryStartedAtMs),
+          ),
+        });
+        if (!result.ok) {
+          setStartError(result.error);
+          return;
+        }
+
+        const nextPersistence: ReportPersistenceState = {
+          ...currentPersistence,
+          status: "active",
+          activation: {
+            activationId: result.activation.activationId,
+            decisionId: result.activation.decisionId,
+            predictionId: result.activation.predictionId,
+            metricId,
+            primaryLeverActionId: result.activation.primaryLeverActionId,
+            activatedAt: result.activation.activatedAt,
+          },
+        };
+        persistenceRef.current = nextPersistence;
+        setPersistence(nextPersistence);
+        router.push(
+          decisionReportActionDestination({
+            actionId: result.selectedActionId,
+            decisionId: result.activation.decisionId,
+          }),
+        );
+      } catch {
+        setStartError(
+          "Causent could not confirm whether this action started. Reload the report before trying again.",
+        );
+      } finally {
+        actionStartInFlightRef.current = false;
+        setStartPendingActionId(null);
+      }
+    });
   }
 
   function uploadAsset(file: File) {
@@ -701,12 +979,13 @@ export function DecisionReportEditor({
   const assetDisabled =
     !persistence ||
     isChangingAsset ||
+    isStartingAction ||
     hasUnsavedChanges ||
     saveStatus === "waiting" ||
     saveStatus === "saving" ||
     saveStatus === "error" ||
     saveStatus === "conflict";
-  const editorReadOnly = reportIsActive || isChangingAsset;
+  const editorReadOnly = reportIsActive || isChangingAsset || isStartingAction;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 pb-16">
@@ -715,7 +994,7 @@ export function DecisionReportEditor({
           {generationMeta.warning}
         </div>
       ) : null}
-      <article className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm shadow-slate-200/40">
+      <article className="overflow-clip rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm shadow-slate-200/40">
         <header className="px-5 py-7 sm:px-9 sm:py-9">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
@@ -727,15 +1006,21 @@ export function DecisionReportEditor({
                   {reportIsActive ? "Active" : "Draft"}
                 </span>
               </div>
-              <input
+              <AutoGrowingTextarea
                 id="report-title"
-                className={`mt-3 w-full rounded-lg border bg-transparent px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.025em] text-[var(--text)] outline-none sm:text-[34px] ${titleBlocked ? "border-amber-400 bg-amber-50/70 focus:border-amber-500" : "border-transparent focus:border-[var(--brand-blue)]"}`}
+                rows={1}
+                className={`mt-3 min-h-11 w-full rounded-lg border bg-transparent px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.025em] text-[var(--text)] outline-none sm:text-[34px] ${titleBlocked ? "border-amber-400 bg-amber-50/70 focus:border-amber-500" : "border-transparent focus:border-[var(--brand-blue)]"}`}
                 aria-label="Report title"
                 aria-describedby={titleError ? "report-title-error" : undefined}
                 aria-invalid={titleBlocked}
                 value={titleDraft}
                 disabled={editorReadOnly}
-                onChange={(event) => updateReportTitle(event.target.value)}
+                onChange={(event) =>
+                  updateReportTitle(event.target.value.replace(/[\r\n]+/g, " "))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.preventDefault();
+                }}
               />
               {titleError ? (
                 <p id="report-title-error" className="mt-1 px-2 text-[11px] font-medium text-amber-800" role="alert">
@@ -749,108 +1034,83 @@ export function DecisionReportEditor({
           </div>
         </header>
 
-        <div
-          className="border-t border-[var(--border)] bg-white"
-          role="region"
-          aria-labelledby="decision-document-editor-heading"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-slate-50/70 px-5 py-3 sm:px-9">
-            <div>
-              <p id="decision-document-editor-heading" className="text-[12px] font-semibold text-[var(--text)]">
-                Decision document
-              </p>
-              <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
-                {reportIsActive
-                  ? "This activated report is read-only."
-                  : "Click into any paragraph to edit. Each block expands as you write."}
-              </p>
-            </div>
+        <DocumentEditorProvider>
+          <div
+            className="border-t border-[var(--border)] bg-white"
+            role="region"
+            aria-label="Decision report editor"
+          >
             {!reportIsActive ? (
-              <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[10px] font-semibold text-teal-800">
-                Autosaves
-              </span>
+              <div className="sticky top-0 z-20 min-w-0 max-w-full overflow-hidden border-b border-[var(--border)] bg-white/95 px-2 py-1.5 shadow-sm shadow-slate-200/30 backdrop-blur md:hidden">
+                <DocumentEditorToolbar
+                  readOnly={editorReadOnly}
+                  variant="mobile"
+                />
+              </div>
             ) : null}
+
+            <DecisionNarrativeCanvas
+              report={report}
+              asset={asset}
+              assetPending={isChangingAsset}
+              assetDisabled={assetDisabled}
+              assetError={assetError}
+              readOnly={editorReadOnly}
+              onDocumentsChange={(changes) =>
+                updateCanvasDocuments("decision", changes)
+              }
+              onEvidenceAdd={addSupportingEvidence}
+              onEvidenceDocumentAdd={addSupportingEvidenceDocument}
+              onEvidenceRemove={removeSupportingEvidence}
+              onAssetUpload={uploadAsset}
+              onAssetRemove={removeAsset}
+            />
+            <ActionPlanCanvas
+              report={report}
+              projection={projection}
+              metrics={activationMetrics}
+              selectedMetricIds={selectedMetricIds}
+              primaryMetricId={metricId}
+              primaryActionId={primaryActionId}
+              includedActionIds={selectedActionIds}
+              reportId={persistence?.reportId ?? null}
+              readOnly={editorReadOnly}
+              actionTitleDrafts={actionTitleDrafts}
+              invalidActionTitleIds={invalidActionTitleIds}
+              direction={activationDraft.prediction.direction}
+              magnitudePctMean={activationDraft.prediction.magnitudePctMean}
+              resolutionDate={resolutionDate}
+              activationDateBounds={activationDateBounds}
+              exactSavedRevision={exactSavedRevision}
+              startReady={ready && activationInputsReady}
+              startPendingActionId={startPendingActionId}
+              startError={startError}
+              activeDecisionId={persistence?.activation?.decisionId ?? null}
+              activationCommittedAt={persistence?.activation?.activatedAt ?? null}
+              onDocumentsChange={(changes) =>
+                updateCanvasDocuments("action_plan", changes)
+              }
+              onMetricToggle={toggleMetric}
+              onPrimaryMetricChange={updatePrimaryMetric}
+              onActionMetricChange={updateActionMetric}
+              onActionTitleChange={updateActionTitle}
+              onActionOwnerChange={updateActionOwner}
+              onActionMonitoringChange={updateActionMonitoring}
+              onActionExecutionChange={updateActionExecution}
+              onPrimaryActionChange={updatePrimaryAction}
+              onActionAdd={addAction}
+              onActionRemove={removeAction}
+              onClaimChange={updateClaim}
+              onCustomerAdd={addCustomer}
+              onStakeholderAdd={addStakeholder}
+              onDirectionChange={updatePredictionDirection}
+              onMagnitudeChange={updatePredictionMagnitude}
+              onResolutionDateChange={updatePredictionResolutionDate}
+              onStartAction={startReportAction}
+            />
           </div>
-
-          <DecisionSection decision={report.decision} readOnly={editorReadOnly} onClaimChange={updateClaim} />
-          <SupportingEvidenceSection
-            evidence={report.supportingEvidence}
-            asset={asset}
-            assetPending={isChangingAsset}
-            assetDisabled={assetDisabled}
-            assetError={assetError}
-            readOnly={editorReadOnly}
-            onClaimChange={updateClaim}
-            onClaimAdd={addSupportingEvidence}
-            onAssetUpload={uploadAsset}
-            onAssetRemove={removeAsset}
-          />
-          <ReportCoreMetricsSection
-            projection={projection}
-            metrics={activationMetrics}
-            metricId={metricId}
-            reportId={persistence?.reportId ?? null}
-            readOnly={editorReadOnly}
-            onMetricChange={updateMetric}
-          />
-          <ImplementationSection
-            implementation={report.implementation}
-            projection={projection}
-            readOnly={editorReadOnly}
-            onClaimChange={updateClaim}
-            onActionTitleChange={updateActionTitle}
-            onActionSummaryChange={updateActionSummary}
-            onActionOwnerChange={updateActionOwner}
-            onActionExecutionChange={updateActionExecution}
-            actionTitleDrafts={actionTitleDrafts}
-            invalidActionTitleIds={invalidActionTitleIds}
-            selectedActionIds={selectedActionIds}
-            primaryActionId={primaryActionId}
-            onActionSelectionChange={toggleActionSelection}
-            onPrimaryActionChange={updatePrimaryAction}
-            onActionAdd={addAction}
-            onActionRemove={removeAction}
-            onCustomerAdd={addCustomer}
-            onStakeholderAdd={addStakeholder}
-          />
-        </div>
-
-        <footer className="border-t border-[var(--border)] px-5 py-4 text-[10px] leading-4 text-[var(--text-muted)] sm:px-9">
-          <span className="font-semibold text-[var(--text)]">AI Assisted</span>
-          {generationMeta?.mode === "live"
-            ? ` · ${(generationMeta.latencyMs / 1000).toFixed(1)}s${generationMeta.totalTokens ? ` · ${generationMeta.totalTokens.toLocaleString()} tokens` : ""}`
-            : generationMeta?.mode === "fixture"
-              ? " · sample fixture"
-              : generationMeta?.mode === "fallback"
-                ? " · safe fallback"
-                : ""}
-          {reportIsActive ? " · This activated revision is locked." : " · Complete the highlighted fields before activation."}
-        </footer>
+        </DocumentEditorProvider>
       </article>
-
-      {!reportIsActive && !titleBlocked && !hasInvalidActionTitle ? (
-        <ReportCompletionPanel gaps={gaps} onAnswer={answerGap} onFocus={focusGap} />
-      ) : null}
-
-      {ready ? (
-        <ReportActivationPanel
-          persistence={persistence}
-          hasUnsavedChanges={hasUnsavedChanges || isChangingAsset}
-          metricId={metricId}
-          metricAvailable={metricAvailable}
-          selectedActionIds={selectedActionIds}
-          primaryActionId={primaryActionId}
-          direction={activationDraft.prediction.direction}
-          magnitudePctMean={activationDraft.prediction.magnitudePctMean}
-          resolutionDate={activationDraft.prediction.resolutionDate ?? ""}
-          onDirectionChange={updatePredictionDirection}
-          onMagnitudeChange={updatePredictionMagnitude}
-          onResolutionDateChange={updatePredictionResolutionDate}
-          telemetrySessionKey={telemetrySessionKey}
-          telemetryStartedAtMs={telemetryStartedAtMs}
-          activationDateBounds={activationDateBounds}
-        />
-      ) : null}
 
       {editError ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800" role="alert">
@@ -876,61 +1136,79 @@ export function DecisionReportEditor({
         </div>
       ) : null}
 
-      {!reportIsActive ? (
-        <div
-          className={`sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-lg shadow-slate-300/30 backdrop-blur ${ready ? "border-emerald-200 bg-emerald-50/95" : "border-[var(--border)] bg-white/95"}`}
-          aria-live="polite"
-        >
+      <div
+        className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-white/95 px-4 py-3 shadow-lg shadow-slate-300/30 backdrop-blur"
+        aria-live="polite"
+      >
           <div>
-            <p className={`text-[12px] font-semibold ${ready ? "text-emerald-900" : "text-[var(--text)]"}`}>
-              {ready ? "Report complete" : "A few details still need you"}
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--brand-teal)]">
+              {lifecycle.label}
             </p>
-            <p className={`text-[11px] ${ready ? "text-emerald-900/75" : "text-[var(--text-muted)]"}`}>
-              {saveStatus === "conflict"
-                ? "Autosave stopped because this report changed elsewhere."
-                : titleBlocked
-                  ? "Add a report title to resume autosave."
-                  : hasInvalidActionTitle
-                    ? "Add an action title to resume autosave."
-                  : saveStatus === "error"
-                    ? "Autosave paused. Your edits are still here."
-                    : saveStatus === "saving"
-                      ? "Autosaving…"
-                      : isChangingAsset
-                        ? "Updating the private chart…"
-                        : saveStatus === "waiting" || hasUnsavedChanges
-                          ? "Changes will save automatically."
-                          : "All changes saved."}
-            </p>
+            <p className="mt-0.5 text-[12px] font-semibold text-[var(--text)]">{lifecycle.title}</p>
+            {lifecycle.detail ? (
+              <p className="text-[11px] text-[var(--text-muted)]">
+                {lifecycle.stage === "start_action" && !exactSavedRevision
+                  ? saveStatus === "conflict"
+                    ? "Resolve the save conflict before starting."
+                    : saveStatus === "error"
+                      ? "Retry autosave before starting."
+                      : "Saving commitment…"
+                  : lifecycle.detail}
+              </p>
+            ) : null}
           </div>
-          {!ready ? (
-            <button
-              type="button"
-              className="rounded-lg bg-[var(--text)] px-4 py-2 text-[12px] font-semibold text-white"
-              aria-controls={
-                titleBlocked
+          {lifecycle.actionLabel ? <button
+            type="button"
+            className="min-h-11 rounded-lg bg-[var(--text)] px-4 py-2 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={
+              isChangingAsset ||
+              isStartingAction ||
+              (lifecycle.stage === "start_action" && !exactSavedRevision)
+            }
+            aria-controls={
+              lifecycle.stage === "finish_report"
+                ? titleBlocked
                   ? "report-title"
                   : hasInvalidActionTitle
                     ? `action-title-${invalidActionTitleIds[0]}`
-                    : gaps[0].targetId
-              }
-              onClick={() => {
+                    : gaps[0]?.targetId
+                : lifecycle.stage === "set_commitment"
+                  ? nextCommitmentTargetId
+                  : `action-start-${primaryActionId || selectedActionIds[0]}`
+            }
+            onClick={() => {
+              if (lifecycle.stage === "finish_report") {
                 if (titleBlocked) {
-                  document.getElementById("report-title")?.focus();
+                  focusLifecycleTarget("report-title");
                   return;
                 }
                 if (hasInvalidActionTitle) {
-                  document.getElementById(`action-title-${invalidActionTitleIds[0]}`)?.focus();
+                  const target = document.getElementById(
+                    `action-title-${invalidActionTitleIds[0]}`,
+                  );
+                  if (target instanceof HTMLElement) {
+                    target.scrollIntoView({ behavior: "smooth", block: "center" });
+                    focusEditableAtEnd(target);
+                  }
                   return;
                 }
-                focusGap(gaps[0]);
-              }}
-            >
-              Review next required field
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+                if (gaps[0]) focusGap(gaps[0]);
+                return;
+              }
+              if (lifecycle.stage === "set_commitment") {
+                focusLifecycleTarget(nextCommitmentTargetId);
+                return;
+              }
+              if (lifecycle.stage === "start_action") {
+                focusLifecycleTarget(
+                  `action-start-${primaryActionId || selectedActionIds[0]}`,
+                );
+              }
+            }}
+          >
+            {lifecycle.actionLabel}
+          </button> : null}
+      </div>
     </div>
   );
 }

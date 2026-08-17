@@ -40,8 +40,11 @@ function netConfidentLift(
  * impact in that metric's native units. Metrics with no confident edge read a neutral
  * "—" (honest: no confident claim yet), not a fabricated zero-delta.
  */
-export async function getImpactByMetric(): Promise<MetricImpact[]> {
-  const [records, edges] = await Promise.all([getMetricRecords(), loadEdgeReadouts()]);
+export async function getImpactByMetric(scopeId: string): Promise<MetricImpact[]> {
+  const [records, edges] = await Promise.all([
+    getMetricRecords(scopeId),
+    loadEdgeReadouts(scopeId),
+  ]);
   const net = netConfidentLift(records, edges);
 
   return records.map((rec) => {
@@ -64,8 +67,11 @@ export async function getImpactByMetric(): Promise<MetricImpact[]> {
  * good business outcome. No invented "vs prior period" numbers (the engine
  * produces none) — the sublabel states what the figure is measured over.
  */
-export async function getAggregatedImpact(): Promise<ImpactStat[]> {
-  const [records, edges] = await Promise.all([getMetricRecords(), loadEdgeReadouts()]);
+export async function getAggregatedImpact(scopeId: string): Promise<ImpactStat[]> {
+  const [records, edges] = await Promise.all([
+    getMetricRecords(scopeId),
+    loadEdgeReadouts(scopeId),
+  ]);
 
   const higherIsBetterByMetric = new Map(
     records.map((r) => [r.metricId, r.metric.higherIsBetter]),

@@ -55,12 +55,15 @@ export default async function OnboardingPage({
   let activationMetrics: ReportActivationMetric[] = [];
   const session = await getSession();
   const sb = await getServerSupabase();
-  const rolloutEnabled = await isDecisionReportRolloutEnabled(
-    sb,
-    session.workspaceId,
-    session.userId,
-    isLocalDemo() && process.env.CAUSENT_DECISION_REPORT_LOCAL_ROLLOUT === "1",
-  ).catch(() => false);
+  const [rolloutEnabled, activeScope] = await Promise.all([
+    isDecisionReportRolloutEnabled(
+      sb,
+      session.workspaceId,
+      session.userId,
+      isLocalDemo() && process.env.CAUSENT_DECISION_REPORT_LOCAL_ROLLOUT === "1",
+    ).catch(() => false),
+    getScope(session.workspaceId),
+  ]);
   const flow = resolveOnboardingFlow({
     requestedFlow: requestedFlow ?? null,
     hasSavedReport: Boolean(requestedReportId),
@@ -90,22 +93,22 @@ export default async function OnboardingPage({
         initialLoadError = "Sign in to open this saved report.";
       } else {
         try {
-          const [loaded, scope, asset] = await Promise.all([
+          const [loaded, asset] = await Promise.all([
             loadDecisionReport(
               sb,
               session.workspaceId,
               requestedReportId,
             ),
-            getScope(),
-            loadAttachedReportAsset(sb, requestedReportId),
+            loadAttachedReportAsset(sb, session.workspaceId, requestedReportId),
           ]);
 
-          if (loaded.ok && scope) {
+          if (loaded.ok) {
             initialSavedReport = {
+              workspaceId: session.workspaceId,
               report: loaded.saved.report,
               metricProjection: loaded.saved.metricProjection,
-              workspaceName: scope.project,
-              projectName: scope.workspace,
+              workspaceName: activeScope.project,
+              projectName: activeScope.workspace,
               sourceSummaries: loaded.saved.report.sourceSummaries,
               persistence: {
                 reportId: loaded.saved.reportId,
@@ -123,12 +126,14 @@ export default async function OnboardingPage({
               asset: asset ?? null,
             };
           } else {
-            console.error("[decision-report onboarding] direct report load failed", {
-              reportId: requestedReportId,
-              workspaceId: session.workspaceId,
-              loadCode: loaded.ok ? "scope_unavailable" : loaded.code,
-              diagnostic: loaded.ok ? undefined : loaded.error,
-            });
+            if (loaded.code === "database") {
+              console.error("[decision-report onboarding] direct report load failed", {
+                reportId: requestedReportId,
+                workspaceId: session.workspaceId,
+                loadCode: loaded.code,
+                diagnostic: loaded.error,
+              });
+            }
             initialLoadError =
               "That report could not be opened. Return to Reports to confirm it is available in this workspace, then try again.";
           }
@@ -152,6 +157,7 @@ export default async function OnboardingPage({
       activationMetrics={activationMetrics}
       activationDateBounds={activationDateBounds}
       initialTelemetrySessionKey={initialTelemetrySessionKey}
+      activeWorkspaceName={activeScope.workspace}
     />
   );
 }

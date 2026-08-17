@@ -4,15 +4,17 @@
 
 import type {
   Decision,
-  DriftReadout,
   Metric,
   Prediction,
   PredictionVerdict,
   ResolutionTuple,
 } from "@/lib/types";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { DEMO_SCOPE_ID, METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
-import { getDriftByPrediction } from "@/lib/data/drift";
+import { METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
+import {
+  getCurrentDriftSnapshot,
+  type DriftSnapshot,
+} from "@/lib/data/drift";
 import { toActionIdentity } from "@/lib/data/action-identifiers";
 import { getMetricRecords } from "@/lib/data/metrics";
 import { metricUiIdForExpectedName } from "@/lib/data/action-metric";
@@ -69,7 +71,7 @@ function paragraphs(doc: RationaleDoc | null): string[] {
 
 function mapPrediction(
   row: PredictionRow,
-  driftByPrediction: Map<string, DriftReadout>,
+  driftSnapshot: DriftSnapshot,
   metrics: Array<Pick<Metric, "id" | "name">>,
 ): Prediction {
   const metricName = row.metric?.name ?? "";
@@ -88,8 +90,10 @@ function mapPrediction(
     resolvedAt: row.resolved_at ? row.resolved_at.slice(0, 10) : null,
     measuredPct: typeof measured === "number" ? measured : null,
     resolutionTuple: row.resolution_tuple ?? null,
-    // Baseline drift, computed on read (empty map when the engine is unavailable).
-    drift: driftByPrediction.get(row.prediction_id) ?? null,
+    // Only an exactly-current materialized generation carries a detector claim.
+    drift: driftSnapshot.byPrediction.get(row.prediction_id) ?? null,
+    driftRefresh:
+      driftSnapshot.freshnessByPrediction.get(row.prediction_id) ?? null,
     revisions: row.prediction_revisions
       .map((r) => ({
         oldMagnitudePct: r.old_magnitude ?? 0,
@@ -101,11 +105,15 @@ function mapPrediction(
   };
 }
 
-/** All decisions in the demo scope, newest first, actions mapped to UI ids. */
-export async function getDecisions(): Promise<Decision[]> {
+/** All decisions in one authorized workspace, newest first, with mapped action ids. */
+export async function getDecisions(
+  scopeId: string,
+  _userId: string | null,
+): Promise<Decision[]> {
+  void _userId; // Compatibility with the request-scoped dashboard loader.
   const sb = await getServerSupabase();
 
-  const [decisionsRes, actionsRes, driftByPrediction, metricRecords] = await Promise.all([
+  const [decisionsRes, actionsRes, driftSnapshot, metricRecords] = await Promise.all([
     sb
       .from("decisions")
       .select(
@@ -115,15 +123,15 @@ export async function getDecisions(): Promise<Decision[]> {
           "committed_at, resolved_verdict, resolved_at, resolution_tuple, " +
           "metric:metrics(name), prediction_revisions(old_magnitude, new_magnitude, reason, revised_at))",
       )
-      .eq("scope_id", DEMO_SCOPE_ID)
+      .eq("scope_id", scopeId)
       .order("created_at", { ascending: false }),
     // uuid -> UI "a-<pr>" id map (same derivation as lib/data/actions.ts).
-    sb.from("actions").select("action_id, source, external_ref").eq("scope_id", DEMO_SCOPE_ID),
-    // Baseline drift, computed on read through the engine (empty on any failure).
-    getDriftByPrediction(),
+    sb.from("actions").select("action_id, source, external_ref").eq("scope_id", scopeId),
+    // One bounded workspace RPC; queued/stale/failed generations contain no fact.
+    getCurrentDriftSnapshot(scopeId),
     // Dynamic report metrics use generated UI ids. React cache shares this
     // request-scoped load with the dashboard's own metric query.
-    getMetricRecords(),
+    getMetricRecords(scopeId),
   ]);
   if (decisionsRes.error) throw decisionsRes.error;
   if (actionsRes.error) throw actionsRes.error;
@@ -159,7 +167,7 @@ export async function getDecisions(): Promise<Decision[]> {
       predictions: row.predictions.map((p) =>
         mapPrediction(
           p,
-          driftByPrediction,
+          driftSnapshot,
           loadedMetrics,
         ),
       ),

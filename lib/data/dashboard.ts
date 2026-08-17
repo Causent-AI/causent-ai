@@ -35,6 +35,8 @@ import { selectReportProjectView } from "@/lib/data/report-project-view";
 import { numberDecisionActions } from "@/lib/data/action-numbering";
 import type { CausalRecomputeStatus } from "@/lib/data/causal-recompute-status";
 import { getCurrentCausalRecomputeStatus } from "@/lib/data/causal-recompute-status-server";
+import { getSession } from "@/lib/auth/session";
+import { DEMO_SCOPE_ID } from "@/lib/data/config";
 import * as seed from "@/lib/seed";
 
 /** The 30-day-ish reporting window shown in the drawer/impact headers. */
@@ -109,23 +111,29 @@ function seedForced(): boolean {
  * Memoized per
  * request (React cache): layout + page share the same load.
  */
-export const loadDashboardData = cache(async function loadDashboardData(): Promise<
-  DashboardData
-> {
-  if (seedForced()) return seedData();
+export const loadDashboardDataForWorkspace = cache(async function loadDashboardDataForWorkspace(
+  scopeId: string,
+  userId: string | null,
+): Promise<DashboardData> {
+  if (seedForced()) {
+    if (scopeId !== DEMO_SCOPE_ID) {
+      throw new Error("The static seed supports only the Gummy Alpha workspace.");
+    }
+    return seedData();
+  }
 
   try {
     const [scope, metricRecords, actions, decisions, aggregatedImpact, impactByMetric, objective, decisionReports, causalRecomputeStatus] =
       await Promise.all([
-        getScope(),
-        getMetricRecords(),
-        getActions(),
-        getDecisions(),
-        getAggregatedImpact(),
-        getImpactByMetric(),
-        getObjective(),
-        getDecisionReports(),
-        getCurrentCausalRecomputeStatus(),
+        getScope(scopeId),
+        getMetricRecords(scopeId),
+        getActions(scopeId),
+        getDecisions(scopeId, userId),
+        getAggregatedImpact(scopeId),
+        getImpactByMetric(scopeId),
+        getObjective(scopeId),
+        getDecisionReports(scopeId),
+        getCurrentCausalRecomputeStatus(scopeId),
       ]);
     const allMetrics = metricRecords.map((record) => record.metric);
     const project = selectReportProjectView({
@@ -189,4 +197,11 @@ export const loadDashboardData = cache(async function loadDashboardData(): Promi
     unstable_rethrow(err);
     throw err;
   }
+});
+
+export const loadDashboardData = cache(async function loadDashboardData(): Promise<
+  DashboardData
+> {
+  const session = await getSession();
+  return loadDashboardDataForWorkspace(session.workspaceId, session.userId);
 });

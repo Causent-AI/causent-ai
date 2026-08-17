@@ -26,6 +26,14 @@ import { DecisionLoopHandoff } from "@/components/actions/DecisionLoopHandoff";
 import { MetricHistoryExplorer } from "@/components/charts/MetricHistoryExplorer";
 import { CheckIcon, ChevronIcon } from "@/components/ui/icons";
 import type { Claim, DecisionReportV1, DraftAction } from "@/lib/decision-reports/schema";
+import { calculateNativePredictionTarget } from "@/lib/decision-reports/prediction-calibration";
+import {
+  inferMetricPercentScale,
+  latestMetricValueAt,
+  reportExecutionState,
+  signedCommitmentLabel,
+} from "@/lib/decision-reports/product-continuity";
+import { formatLongDate } from "@/lib/format";
 import type {
   DecisionLoopCopyTarget,
   DecisionLoopHandoff as DecisionLoopHandoffContract,
@@ -163,7 +171,7 @@ function PredictionRow({
           onClick={() => setRevising(true)}
           className="mt-2 rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg)]"
         >
-          Revise (with a logged reason)
+          Revise prediction
         </button>
       )}
       {revising && (
@@ -180,10 +188,16 @@ function PredictionRow({
               className="w-24 rounded border border-[var(--border)] px-2 py-1 text-[12px] tabular-nums"
             />
           </div>
+          <label
+            className="text-[11px] text-[var(--text-muted)]"
+            htmlFor={`revision-reason-${prediction.id}`}
+          >
+            Reason for revision
+          </label>
           <textarea
+            id={`revision-reason-${prediction.id}`}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Why did the team's number change? A revision is data, not a failure."
             rows={2}
             className="w-full rounded border border-[var(--border)] px-2 py-1 text-[12px]"
           />
@@ -229,9 +243,9 @@ function DecisionSummary({ report, reportId }: { report: DecisionReportV1; repor
   const decisions = presentClaims(report.decision.decision);
   const problems = presentClaims(report.decision.problem);
   return (
-    <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm shadow-slate-200/40">
+    <section className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm shadow-slate-200/40">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[15px] font-semibold text-[var(--text)]">Project Summary</h2>
+        <h2 className="text-[15px] font-semibold text-[var(--text)]">Decision</h2>
         {reportId ? (
           <Link
             href={`/onboarding?report=${encodeURIComponent(reportId)}`}
@@ -242,14 +256,109 @@ function DecisionSummary({ report, reportId }: { report: DecisionReportV1; repor
         ) : null}
       </div>
       <div className="mt-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Decision</h3>
         {decisions.map((claim) => (
-          <p key={claim.id} className="mt-2 text-[15px] font-semibold leading-6 text-[var(--text)]">{claim.text}</p>
+          <p key={claim.id} className="text-[15px] font-semibold leading-6 text-[var(--text)]">{claim.text}</p>
         ))}
         {problems.map((claim) => (
           <p key={claim.id} className="mt-2 text-[12px] leading-5 text-[var(--text-muted)]">{claim.text}</p>
         ))}
       </div>
+    </section>
+  );
+}
+
+function ReportCommitmentHeader({
+  decision,
+  prediction,
+  metric,
+  actions,
+}: {
+  decision: Decision;
+  prediction: Prediction | null;
+  metric: Metric | undefined;
+  actions: Action[];
+}) {
+  const primaryAction = decision.leverActionId
+    ? actions.find((action) => action.id === decision.leverActionId)
+    : undefined;
+  const completedActionCount = actions.filter((action) => action.shippedAt !== null).length;
+  const state = reportExecutionState({
+    actionCount: actions.length,
+    completedActionCount,
+    verdictLabel: prediction?.verdict ? presentVerdict(prediction.verdict).label : null,
+  });
+  const baselineNative = prediction && metric
+    ? latestMetricValueAt(metric.series, prediction.committedAt)
+    : null;
+  const nativeTarget = prediction && metric
+    ? calculateNativePredictionTarget({
+        baselineNative,
+        format: metric.format,
+        percentScale: inferMetricPercentScale(metric.format, metric.series),
+        direction: prediction.direction,
+        magnitudePctMean: prediction.magnitudePctMean,
+      })
+    : null;
+
+  return (
+    <section
+      className="shrink-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+      aria-labelledby="report-commitment-title"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--brand-teal)]">
+            Outcome commitment
+          </p>
+          <h2 id="report-commitment-title" className="mt-0.5 text-[15px] font-semibold text-[var(--text)]">
+            {metric?.name ?? prediction?.metricId ?? "Outcome metric"}
+          </h2>
+        </div>
+        <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[10px] font-semibold text-teal-900">
+          {state}
+        </span>
+      </div>
+      <dl className="grid border-t border-[var(--border)] sm:grid-cols-2 lg:grid-cols-4">
+        <div className="px-4 py-3">
+          <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-subtle)]">Commitment</dt>
+          <dd className="mt-1 text-[12px] font-semibold text-[var(--text)]">
+            {prediction
+              ? signedCommitmentLabel(prediction.direction, prediction.magnitudePctMean)
+              : "Not committed"}
+          </dd>
+          {nativeTarget?.available ? (
+            <dd className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+              Baseline at commitment {nativeTarget.baselineLabel} · target {nativeTarget.impliedTargetLabel}
+            </dd>
+          ) : null}
+        </div>
+        <div className="border-t border-[var(--border)] px-4 py-3 sm:border-l sm:border-t-0">
+          <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-subtle)]">Resolution</dt>
+          <dd className="mt-1 text-[12px] font-semibold text-[var(--text)]">
+            {prediction ? formatLongDate(prediction.resolutionDate) : "Not scheduled"}
+          </dd>
+        </div>
+        <div className="border-t border-[var(--border)] px-4 py-3 lg:border-l lg:border-t-0">
+          <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-subtle)]">Primary action</dt>
+          <dd className="mt-1 text-[12px] font-semibold text-[var(--text)]">
+            {primaryAction?.title ?? "Not assigned"}
+          </dd>
+        </div>
+        <div className="flex min-h-11 items-center gap-2 border-t border-[var(--border)] px-2 py-2 sm:border-l lg:border-t-0">
+          <Link
+            href="/impact"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50"
+          >
+            Impact
+          </Link>
+          <Link
+            href="/data-workshop"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50"
+          >
+            Data
+          </Link>
+        </div>
+      </dl>
     </section>
   );
 }
@@ -310,7 +419,7 @@ function ReportActionRows({
     : null;
 
   return (
-    <section>
+    <section className="shrink-0">
       <h2 className="text-[15px] font-semibold text-[var(--text)]">Actions</h2>
       <div className="mt-3 space-y-2">
         {actions.map((action) => {
@@ -368,7 +477,7 @@ function ReportActionRows({
                         <span key={tag} className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-semibold text-blue-800">{tag}</span>
                       ))}
                       <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[9px] font-semibold text-teal-800">
-                        Metric: {assignedMetric?.name ?? "Not assigned"}
+                        {assignedMetric?.name ?? "Metric not assigned"}
                       </span>
                     </span>
                   </span>
@@ -428,7 +537,7 @@ function ReportActionRows({
                       {assignedMetric?.name ?? "Not assigned"}
                       {assignedMetric ? (
                         <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
-                          {driftWatchArmed ? "Primary causal target" : "Report target · supporting action"}
+                          {driftWatchArmed ? "Primary action" : "Supporting action"}
                         </span>
                       ) : null}
                     </dd>
@@ -446,7 +555,7 @@ function ReportActionRows({
                   {report.implementation.governance.dataClassification
                     ? `${report.implementation.governance.dataClassification} data. `
                     : "Data classification not set. "}
-                  {[...governanceSources, ...governanceNotes].map((claim) => claim.text).join(" ") || "No additional governance notes."}
+                  {[...governanceSources, ...governanceNotes].map((claim) => claim.text).join(" ")}
                 </div>
                 {action.manualCompletion ? (
                   <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
@@ -503,6 +612,11 @@ export function DecisionDetail({
     : decision.predictions[0]
       ? metricById.get(decision.predictions[0].metricId)
       : undefined;
+  const reportPrediction = reportMetric
+    ? decision.predictions.find((prediction) => prediction.metricId === reportMetric.id) ??
+      decision.predictions[0] ??
+      null
+    : decision.predictions[0] ?? null;
   const [resolvePending, startResolve] = useTransition();
   const [resolveMsg, setResolveMsg] = useState<string | null>(null);
   const hasUnresolved = decision.predictions.some((p) => p.resolvedAt === null);
@@ -521,12 +635,23 @@ export function DecisionDetail({
         </p>
       </div>}
 
-      {report && reportMetric ? (
-        <MetricHistoryExplorer
+      {report ? (
+        <ReportCommitmentHeader
+          decision={decision}
+          prediction={reportPrediction}
           metric={reportMetric}
           actions={reportActions}
-          primaryActionId={decision.leverActionId}
         />
+      ) : null}
+
+      {report && reportMetric ? (
+        <div className="shrink-0">
+          <MetricHistoryExplorer
+            metric={reportMetric}
+            actions={reportActions}
+            primaryActionId={decision.leverActionId}
+          />
+        </div>
       ) : null}
 
       {!report && decision.rationale.body.length > 0 && (
@@ -550,7 +675,7 @@ export function DecisionDetail({
         />
       ) : <section>
         <h3 className="text-[12px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
-          Actions carrying this decision
+          Actions
         </h3>
         <ul className="mt-2 flex flex-col gap-1">
           {decision.actionIds.map((id) => {
@@ -567,7 +692,7 @@ export function DecisionDetail({
                 </button>
                 {isLever && (
                   <span className="rounded-full border border-[var(--text)]/20 bg-[var(--bg)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                    lever
+                    primary
                   </span>
                 )}
                 {a && a.shippedAt === null && (

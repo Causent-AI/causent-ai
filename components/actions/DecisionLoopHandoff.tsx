@@ -208,16 +208,9 @@ function DecisionLoopHandoffInner({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-indigo-700">
-            Manual task handoff
-          </p>
-          <h4 id={`${id}-title`} className="mt-1 text-[13px] font-semibold text-[var(--text)]">
-            Copy task instructions to {destination}
+          <h4 id={`${id}-title`} className="text-[13px] font-semibold text-[var(--text)]">
+            Copy to {destination}
           </h4>
-          <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">
-            Causent prepares bounded agent instructions. Nothing is sent
-            automatically, and {destination} receives no access to Causent.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-indigo-700">
@@ -295,7 +288,7 @@ function DecisionLoopHandoffInner({
       <div id={copyStatusId} className="mt-2 min-h-4" aria-live="polite">
         {copyState === "success" ? (
           <p className="text-[10px] text-emerald-800" role="status">
-            Copied for {destination}. Open {destination} and paste manually; nothing was sent.
+            Copied to clipboard.
           </p>
         ) : null}
         {copyState === "failure" ? (
@@ -328,11 +321,8 @@ function DecisionLoopHandoffInner({
       {copyEnabled ? (
         <details className="mt-2 rounded-lg border border-indigo-100 bg-white/60 px-3 py-2">
           <summary className="cursor-pointer text-[10px] font-semibold text-[var(--text-muted)]">
-            Preview agent instructions
+            Preview instructions
           </summary>
-          <p className="mt-2 text-[10px] leading-4 text-[var(--text-subtle)]">
-            This is the exact text the copy button places on your clipboard.
-          </p>
           <pre
             aria-label="Implementation brief preview"
             className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-[var(--border)] bg-white p-2.5 font-mono text-[10px] leading-4 text-[var(--text-muted)]"
@@ -340,24 +330,19 @@ function DecisionLoopHandoffInner({
             {handoff.clipboardText}
           </pre>
         </details>
-      ) : (
-        <p className="mt-2 text-[10px] text-[var(--text-subtle)]">
-            The agent instructions preview unlocks after egress confirmation.
-        </p>
-      )}
+      ) : null}
 
       <div className="mt-4 border-t border-indigo-200 pt-4">
-        <h4 className="text-[12px] font-semibold text-[var(--text)]">Bring the result back</h4>
+        <h4 className="text-[12px] font-semibold text-[var(--text)]">Review result</h4>
         <p id={reviewHelpId} className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">
-          Paste the bounded JSON handback from the AI workspace, then review it here.
-          Causent does not save or apply it in this preview.
+          Paste the JSON result below. Nothing is saved or applied.
         </p>
 
         <label
           htmlFor={`${id}-review`}
           className="mt-3 block text-[10px] font-semibold text-[var(--text-muted)]"
         >
-          Paste the agent&apos;s handback
+          JSON result
         </label>
         <textarea
           id={`${id}-review`}
@@ -401,7 +386,7 @@ function DecisionLoopHandoffInner({
             role="alert"
           >
             <p className="text-[10px] font-semibold text-red-800">
-              This handback could not be reviewed.
+              This result could not be reviewed.
             </p>
             <ul className="mt-1 list-disc space-y-1 pl-4 text-[10px] leading-4 text-red-700">
               {parseErrors.map((error, index) => (
@@ -418,7 +403,7 @@ function DecisionLoopHandoffInner({
             onClick={parseReview}
             className="rounded-lg border border-indigo-300 bg-white px-3 py-2 text-[11px] font-semibold text-indigo-800 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Review pasted handback
+            Review result
           </button>
           {pastedReview !== "" ? (
             <button
@@ -430,7 +415,7 @@ function DecisionLoopHandoffInner({
               }}
               className="rounded-lg px-3 py-2 text-[11px] font-medium text-[var(--text-muted)] hover:bg-white/70"
             >
-              Clear handback
+              Clear
             </button>
           ) : null}
         </div>

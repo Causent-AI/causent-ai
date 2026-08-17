@@ -139,6 +139,18 @@ test("server materialization assigns IDs and verifies exact prompt evidence", ()
   assert.equal(result.metricProjection.predictedPct, 55);
   assert.deepEqual(result.sourceSummaries.map((source) => source.kind), ["brief"]);
   assert.deepEqual(result.report.sourceSummaries, result.sourceSummaries);
+  assert.deepEqual(
+    result.report.activationDraft?.selectedActionSourceItemIds,
+    result.report.implementation.actions.map((action) => action.sourceItemId),
+  );
+  assert.equal(
+    result.report.activationDraft?.primaryLeverActionSourceItemId,
+    result.report.implementation.actions[0].sourceItemId,
+  );
+  assert.deepEqual(result.report.activationDraft?.selectedMetricIds, []);
+  assert.ok(
+    result.report.implementation.actions.every((action) => action.metricId === null),
+  );
 });
 
 test("proposed rationale stays labeled as a suggestion without source attribution", () => {
@@ -358,6 +370,17 @@ test("safe fallback preserves the brief and leaves unsupported fields missing", 
   assert.equal(fallback.report.decision.decision[0].status, "missing");
   assert.equal(fallback.metricProjection.evidenceState, "missing");
   assert.deepEqual(fallback.report.sourceSummaries, fallback.sourceSummaries);
+  assert.deepEqual(fallback.report.activationDraft, {
+    confirmedMetricId: null,
+    selectedMetricIds: [],
+    selectedActionSourceItemIds: [],
+    primaryLeverActionSourceItemId: null,
+    prediction: {
+      direction: "POSITIVE",
+      magnitudePctMean: null,
+      resolutionDate: null,
+    },
+  });
 });
 
 test("generation policy retries exactly once after a refusal", async () => {

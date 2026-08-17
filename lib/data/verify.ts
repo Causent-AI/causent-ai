@@ -13,7 +13,7 @@ import { getScope } from "@/lib/data/scope";
 import { getMetrics } from "@/lib/data/metrics";
 import { getActions } from "@/lib/data/actions";
 import { getImpactByMetric, getAggregatedImpact } from "@/lib/data/impact";
-import { METRIC_ORDER } from "@/lib/data/config";
+import { DEMO_SCOPE_ID, GUMMY_METRIC_ORDER } from "@/lib/data/config";
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) throw new Error(`data-layer check failed: ${msg}`);
@@ -24,7 +24,7 @@ export async function verifyDataLayer(): Promise<string[]> {
   const ok = (msg: string) => checks.push(`ok: ${msg}`);
 
   // --- Scope ---------------------------------------------------------------
-  const scope = await getScope();
+  const scope = await getScope(DEMO_SCOPE_ID);
   assert(scope.org === "Causent", `scope.org == Causent (got ${scope.org})`);
   assert(scope.project === "Orbit", `scope.project == Orbit (got ${scope.project})`);
   assert(
@@ -34,10 +34,10 @@ export async function verifyDataLayer(): Promise<string[]> {
   ok("scope maps to Causent / Orbit / Gummy Alpha");
 
   // --- Metrics -------------------------------------------------------------
-  const metrics = await getMetrics();
+  const metrics = await getMetrics(DEMO_SCOPE_ID);
   assert(metrics.length === 5, `5 metrics (got ${metrics.length})`);
   assert(
-    metrics.map((m) => m.id).join(",") === METRIC_ORDER.join(","),
+    metrics.map((m) => m.id).join(",") === GUMMY_METRIC_ORDER.join(","),
     "metrics in canonical order",
   );
   const arr = metrics.find((m) => m.id === "arr")!;
@@ -52,7 +52,7 @@ export async function verifyDataLayer(): Promise<string[]> {
   ok("5 metrics, 210 daily points each, correct format/inversion");
 
   // --- Actions + honest impact cells --------------------------------------
-  const actions = await getActions();
+  const actions = await getActions(DEMO_SCOPE_ID);
   // 12 = the 10 retrospective PRs + the INCONCLUSIVE churn probe (#8290) + the
   // never-shipped VOIDED lever (#8440) added by the prospective layer (#11).
   assert(actions.length === 12, `12 actions (got ${actions.length})`);
@@ -99,7 +99,7 @@ export async function verifyDataLayer(): Promise<string[]> {
   ok("actions: confident landmarks show real ITS lifts; May cohort withholds honestly");
 
   // --- Impact by metric ----------------------------------------------------
-  const byMetric = await getImpactByMetric();
+  const byMetric = await getImpactByMetric(DEMO_SCOPE_ID);
   assert(byMetric.length === 5, "impact-by-metric has 5 rows");
   const arrImpact = byMetric.find((r) => r.metricId === "arr")!;
   assert(
@@ -119,7 +119,7 @@ export async function verifyDataLayer(): Promise<string[]> {
   // getAggregatedImpact() was trimmed (UI-v3) to the single improvement-rate
   // figure the redesigned strip reads; the old Actions-Shipped/Gathering-Data
   // labels no longer exist.
-  const agg = await getAggregatedImpact();
+  const agg = await getAggregatedImpact(DEMO_SCOPE_ID);
   const improvement = agg.find((s) => s.label === "Improvement Rate")!;
   assert(
     improvement !== undefined && /%$/.test(improvement.value),

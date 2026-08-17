@@ -13,7 +13,7 @@
 // the TEAM types the number in Step 4.
 
 import { revalidatePath } from "next/cache";
-import { getServerSupabase } from "@/lib/supabase-server";
+import { getServerSupabase, isLocalDemo } from "@/lib/supabase-server";
 import { getSession } from "@/lib/auth/session";
 import { parsePasteWithLLM } from "@/lib/onboarding/llm";
 import type { DecisionCard } from "@/lib/onboarding/parse";
@@ -30,6 +30,7 @@ import { recordFunnelEvent, type RecordFunnelEventInput } from "@/lib/data/funne
 import { draftLeverFromDecision, type TargetSource } from "@/lib/levers/draft";
 import { detectLever, markLeverCreated, parseIssueUrl } from "@/lib/levers/detect";
 import { autoCreateLever } from "@/lib/levers/autocreate";
+import { connectorHttpsOrigin } from "@/lib/levers/webhook-inbox";
 import { draftTicketCopy } from "@/lib/levers/llm";
 import { issueExternalRef } from "@/lib/connectors/github";
 import { jiraIssueExternalRef, parseJiraIssueUrl } from "@/lib/connectors/jira";
@@ -44,7 +45,7 @@ import {
 /** The Jira target params the read-only deep-link + write-scope create need. */
 type JiraTarget = {
   projectKey: string;
-  baseUrl?: string;
+  baseUrl: string;
   projectId?: string;
   issueTypeId?: string;
 };
@@ -92,7 +93,8 @@ export async function fetchOnboardingPriors(params: {
   metricId: string;
   mechanismCategory?: string | null;
 }): Promise<ReferenceClassPriors> {
-  return getPriorsForReferenceClass(params);
+  const session = await getSession();
+  return getPriorsForReferenceClass({ ...params, scopeId: session.workspaceId });
 }
 
 /** Step 4 commit: decision + prediction, RLS-scoped to the session workspace.
@@ -227,6 +229,9 @@ function writeCreatorFromEnv(
   const email = process.env.JIRA_EMAIL;
   const apiToken = process.env.JIRA_API_TOKEN;
   if (!baseUrl || !email || !apiToken || !jira?.projectKey || !jira.issueTypeId) return null;
+  const configuredOrigin = connectorHttpsOrigin(baseUrl);
+  const requestedOrigin = connectorHttpsOrigin(jira.baseUrl);
+  if (!configuredOrigin || requestedOrigin !== configuredOrigin) return null;
   return jiraIssueCreator(createJiraWriteTransport({ email, apiToken }), {
     baseUrl,
     projectKey: jira.projectKey,
@@ -259,9 +264,21 @@ export async function attributeLeverByUrl(input: {
       error: "That doesn’t look like a GitHub (…/issues/123) or Jira (…/browse/ABC-123) issue URL.",
     };
   }
+  const session = await getSession();
+  if (!isLocalDemo() && !session.userId) {
+    return { ok: false, error: "Sign in before attributing this action." };
+  }
   const sb = await getServerSupabase();
-  await markLeverCreated(sb, input.token);
-  const det = await detectLever(sb, { token: input.token, externalRef, htmlUrl: url });
+  const created = await markLeverCreated(sb, input.token, session.workspaceId);
+  if (!created.ok) {
+    return { ok: false, error: "No draft lever matched — draft the ticket first." };
+  }
+  const det = await detectLever(sb, {
+    scopeId: session.workspaceId,
+    token: input.token,
+    externalRef,
+    htmlUrl: url,
+  });
   if (!det.ok) {
     return { ok: false, error: "No draft lever matched — draft the ticket first." };
   }

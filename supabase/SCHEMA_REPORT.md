@@ -139,6 +139,138 @@ runtime validator enforce the same future-date rule, but the trigger independent
 or forged request at the final write boundary. Its trigger function is not executable by public,
 anonymous, authenticated, or service roles.
 
+The 2026-08-16 multi-metric rollout is now ordered as expand, bounded backfill, validation, and
+contract rather than one production-sized transaction:
+
+1. `20260817012313_decision_report_multi_metric_activation.sql` expands the activation identity and
+   append-only child relations while leaving v3 unavailable.
+2. `20260817062054_decision_report_multi_metric_backfill.sql` normalizes at most 100 activations
+   during migration and retains an owner-only, resumable 500-row worker for material histories.
+3. `20260817062057_decision_report_multi_metric_validate.sql` installs new foreign keys as `NOT
+   VALID`, validates historical rows separately, and attaches prebuilt parent identity indexes.
+4. `20260817062102_decision_report_multi_metric_contract.sql` swaps only validated checks, removes
+   the rollout-only worker, and exposes `activate_decision_report_v3`.
+
+The operator runbook at `supabase/rollouts/decision_report_multi_metric_activation.md` builds the
+three parent identity indexes concurrently outside the migration transaction, rehearses and drains
+the bounded backfill, and keeps v1/v2 callers live until the final contract phase. The reset-safe
+index statements in the expand migration are fallbacks for new/empty databases. A production-clone
+rehearsal is still required; the split design is not evidence that its lock time is acceptable at
+material volume.
+
+`activate_decision_report_v3` accepts one to five unique selected daily metrics and one to twenty-five
+unique selected report actions, requires exactly one selected-metric assignment for every action,
+and requires the registered primary action to target the confirmed primary metric. Its canonical
+SHA-256 receipt makes reordered exact retries reuse the one immutable activation while changed metric
+sets or action mappings conflict. Existing v1/v2 function signatures and their one-to-three-action
+validation remain callable through the rolling deployment.
+
+Two append-only, viewer-readable relations make the richer receipt durable:
+`decision_report_activation_metrics` records the complete selected metric set and
+`decision_report_activation_action_metrics` records each canonical action's source identity and
+assigned metric. Composite foreign keys bind activation, metric, action, and workspace scope;
+deferred parent references prove that the compatibility `activation.metric_id` is selected and that
+the primary lever action/source is one real binding. Application and service-role DML is revoked.
+Historical activations are backfilled to their original single-metric meaning by joining each
+canonical action's stored `rationale_richtext.meta.source_item_id`; the migration aborts on incomplete
+or mismatched history. An `AFTER INSERT` normalizer gives rolling v1/v2 clients the same child rows.
+Unbounded historical source IDs are retained as raw audit text but keyed relationally by SHA-256, so
+the compatibility path does not depend on an unsafe large-text B-tree key.
+
+V3 still materializes exactly one canonical decision and one human prediction for the confirmed
+primary outcome. Every selected action is canonical, and its `rationale_richtext.meta.expected_metric`
+uses that action's assigned metric name. Only the primary action receives the primary manual lever,
+and only the confirmed primary metric queues causal recomputation; secondary metrics are explicit
+context/action assignments, not fabricated secondary causal predictions. Successor activation still
+moves the series/workspace current pointers in the same transaction, so the prior report stays
+operational until commit.
+
+`20260817055407_decision_report_scientific_contracts.sql` extends normalized supporting-action
+bindings with optional `monitoring_expected_direction` and `monitoring_check_date`. A private trigger
+derives those values only from the exact immutable revision action; the registered primary action
+always leaves them null. `list_decision_report_activation_metrics_v2` replaces per-metric probes with
+one viewer-checked catalog that reports unit, latest observation/value, observation count, history
+days, readiness, earliest confident review date, and percent scale. Cross-workspace and
+unauthenticated callers receive the same non-enumerating denial. Readiness is descriptive and does
+not relax activation or the 45-day-per-side ITS floor.
+
+The same migration adds viewer-readable, append-only
+`decision_report_package_interventions`. A V3/multi-action activation does not become a causal
+intervention until every included canonical action is complete. The checked manual-completion RPC
+then records the included action with the latest effective completion date as the package
+intervention, using immutable report order as the same-day tie-break. It preserves the original
+registered primary action and primary metric, writes its content-bound package hash, and enqueues the
+current report. Primary-lever state changes under the same private transaction
+capability; exact action-completion retries reuse while changed retries conflict. A trigger proves
+that the package matches the immutable activation and that every included action is complete. This
+models the whole decision package and creates no per-action causal prediction.
+
+The 2026-08-16 founder UX follow-up adds no database object. Its local review fixture creates a real
+Northstar project and Support Operations workspace alongside Gummy Alpha through the existing
+org/project/workspace schema. The two workspaces intentionally share the synthetic demo organization,
+so the demo owner is authorized for both by the existing downward-inheriting membership model.
+Application selection is therefore a narrower current-operating-scope boundary: an HttpOnly cookie is
+intersected with the server registry and visible workspace rows, and every service-role-backed report,
+revision, asset, metric, action, dashboard, and resolver operation carries the selected `scope_id`
+explicitly. This does not replace RLS or prove separate-customer tenant isolation.
+
+Action-start activation retains `activate_decision_report_v3` unchanged. Before materialization, the
+Server Action performs a non-enumerating report/revision lookup constrained by the selected session
+workspace. A report ID from the other authorized demo workspace therefore fails before the atomic RPC,
+even though the synthetic organization owner can otherwise read both workspaces. The database RPC still
+owns report/revision consistency, immutable receipt hashing, action/metric bindings, current-pointer
+movement, exact retry, and rollback behavior.
+
+The historical upgrade still requires a production-clone dry run before remote apply. Apply the
+database phases first and the v3 application second; roll back the application to v1/v2 first and do
+not remove the append-only audit rows or validated constraints. The companion
+`docs/reviews/2026-08-16-engineering-schema-scale-review.md` still concludes that integrity is suitable
+for the partner MVP but 10,000 active users/hour over gigabytes is not capacity-proven. The unbounded
+dashboard/history contract, representative query plans, hosted worker capacity, pool budget, and
+staging load/soak evidence remain open.
+
+`20260817055415_materialize_current_prediction_drift.sql` moves baseline drift off the dashboard
+request path. Private `drift_refresh_jobs` coalesce source changes by workspace and generation;
+service-role workers lease with bounded attempts and replace only the matching generation of
+viewer-readable `current_prediction_drift`. The public `get_current_prediction_drift_v1` RPC returns
+at most 500 rows for the explicit workspace and exposes sanitized queued/current/retrying/failed
+freshness metadata. Authenticated users have SELECT only; application roles cannot mutate the queue
+or projection. The separate worker endpoint, database URL, shared secret, and five-minute app cron
+still require deployment and authenticated canaries.
+
+`20260817055412_connector_webhook_inbox.sql` adds a service-only durable connector inbox. The checked
+RPC identifies one GitHub/Jira delivery by provider ID plus SHA-256 payload digest, records attempt and
+retry/dead-letter state, applies the canonical transition/lever/action mutation, and marks the delivery
+processed in one transaction. Exact processed redelivery is a duplicate; the same provider identity
+with changed bytes conflicts. Authenticated/anonymous roles have no table or function access. A
+service-only `SKIP LOCKED` retry RPC drains bounded due work; the app cron still needs its production
+secret and provider-specific canaries.
+
+`20260817055817_chunked_metric_csv_imports.sql` adds viewer-readable
+`metric_csv_import_jobs` plus private chunk receipts. Report and workspace begin RPCs establish the
+exact scope/metric/import identity. Each append accepts at most 250 ordered rows and is idempotent by
+import, chunk index, and digest; finalize requires complete contiguous progress. The application caps
+one file at 2,000 rows and retries only bounded serialization/deadlock/lock-unavailable failures. CSV
+bytes are not retained. Authenticated callers may read their workspace receipts but cannot write the
+tables directly.
+
+`20260817060606_hot_read_path_indexes.sql` adds workload-shaped indexes for scope/effective-date
+actions, scope/created-at decisions and report series, latest evidence by
+scope/methodology/edge/time, and open lever reconciliation. The canonical reset migration uses
+idempotent ordinary DDL; `scripts/query-plans/create-hot-indexes-concurrently.sql` is the
+production-clone preflight for online builds. `scripts/query-plans/hot-read-paths.sql` runs the five
+queries as an authenticated fixture user. Plans against representative volume are pending, and these
+indexes do not close the separately deferred unbounded dashboard contract.
+
+The private-image schema and sanitation contract are unchanged. The application read route now
+authorizes the asset metadata by exact workspace/status and optional content hash, then issues a
+60-second signed Storage URL for the server-owned object path. Next.js no longer proxies the image
+bytes. The final local gate covers the exact
+workspace lookup, optional content-hash mismatch, 60-second signer call, opaque failures, 307
+`private, no-store` response, unauthenticated short circuit, and the existing Storage upload/
+replacement/removal integration. Production URL lifetime, CDN/egress behavior, and authenticated
+cross-workspace denial still require a canary.
+
 `get_current_causal_recompute_status_v1` is a stable, viewer-scoped security-definer RPC over the
 explicit current workspace series/report/activation. It returns only `idle`, `queued`, `retrying`,
 `failed`, or `current` with request/processed/next-attempt timestamps. Missing and unauthorized
@@ -163,8 +295,24 @@ or delete them directly.
 
 ## Current local verdict
 
-**The 2026-08-12 release candidate passes the complete local schema and application gate; production
-release is not claimed.** A clean reset applies all 31 migrations. The serialized
+**The product/science/engineering hardening schema and its exact local combined gate pass; production
+release is not claimed.** The clean reset replayed every migration and reseeded both workspaces.
+Warning-level schema lint passed with four pre-existing advisories. The credentialed application/
+Supabase/RLS/Storage suite reported 660 total, 641 passed, 19 intentional live-model skips, and zero
+failures; the full Python engine/bridge/isolation suite passed 1,251/1,251. Authenticated hot-query
+EXPLAINs, the deterministic 1.19 GiB fixture plan, Next.js 16.2.11 webpack build, dashboard guard,
+desktop/390 px browser acceptance, and final diff audit passed. Browser QA also found and fixed a
+collapsed Actions commitment card before publication.
+
+The k6 profiles and scale fixture remain instruments only. Protected staging/soak execution,
+representative-volume plans, production-clone migration rehearsal, hosted drift/recompute workers,
+remote migration application, production CDN/egress behavior, and authenticated canaries remain
+pending. This is not evidence for 10,000 active users/hour.
+
+### Historical checkpoint before this hardening round
+
+**The 2026-08-12 release candidate passed its then-complete local schema and application gate;
+production release was not claimed.** A clean reset applied all 31 migrations. The serialized
 Node/Supabase/RLS/Storage suite reports 556 total: 537 passed, 19 intentional live-model skips, and
 zero failures. The complete engine/bridge/isolation/recompute suite reports 1,217/1,217 passed, and
 error-level schema lint passes. TypeScript, full application lint, the audited 18-file recompute
@@ -179,9 +327,10 @@ The dedicated Northstar review metric contains 122 synthetic observations. The c
 the current report `CONFIRMED` at +14.7pp (95% CI +14.5pp to +14.9pp; 75 pre / 47 post), while the
 workspace current-series pointer remains unchanged during data preparation. This is local synthetic
 engineering evidence and does not satisfy the partner-session or partner-environment gates.
-The remote production migration state was not freshly inspectable because the Supabase CLI is not
-authenticated or linked. All seven documented migrations therefore remain operator-pending until
-history verification, dry-run, deliberate apply, and authenticated database canaries complete. The
+The remote production migration state was not freshly inspectable because the Supabase CLI was not
+authenticated or linked. The seven migrations documented at that checkpoint and every later
+2026-08-17 hardening migration remain operator-pending until exact history verification,
+production-clone rehearsal, deliberate apply, and authenticated database canaries complete. The
 missing partner-session gate remains open.
 
 The original v1 verdict remains historical evidence: all 11 base tables shipped with RLS enabled;
@@ -290,16 +439,18 @@ blocked while legitimate within-rank grants still succeed.
   stored, but bounded source chunks remain inside append-only revisions so later claims are auditable.
   Soft deletion removes authenticated visibility; physical retention/garbage-collection policy still
   needs the same operator discipline as other retained audit history.
-- **Expanded Slice 10, the MVP finish, and Review #2 are not yet production-verified.** Migrations `20260723053444`,
-  `20260723061012`, `20260723061925`, `20260723064500`, `20260723151939`, `20260810005135`, and
-  `20260810044832` still need deliberate partner-environment application plus authenticated
-  RLS/Storage/recompute-status canaries. The app
+- **Expanded Slice 10, the MVP finish, Review #2, and the 2026-08-17 hardening migrations are not
+  production-verified.** The previously listed seven migrations plus the split multi-metric,
+  scientific-contract, connector-inbox, drift-projection, chunked-import, and hot-index migrations
+  need exact remote-history comparison, production-clone rehearsal, deliberate partner-environment
+  application, and authenticated RLS/Storage/recompute/drift/import/connector canaries. The app
   also needs a server-only service-role key for receipt minting, and the recompute app/worker secrets
   must pass their release checks. The production app currently lacks the service-role and recompute
-  settings, `causent-recompute` does not exist, and `causent-resolve` lacks `DATABASE_URL`. The app
+  settings; the new drift worker needs its URL/secret/database configuration;
+  `causent-recompute` does not exist; and `causent-resolve` lacks `DATABASE_URL`. The app
   release check now requires the resolve URL/secret, and the resolver must pass its dedicated
   `DATABASE_URL`/secret config check. Passing local reset is not production evidence.
-- **The gate is a point-in-time result** against the seeded fixture. The expanded workflow is
-  configured to rerun it on every PR/push, but this working tree has not yet produced a hosted CI
-  result. The passing webpack/manifest checks and browser acceptance are useful product evidence,
-  but they do not replace the authenticated partner-environment database canary.
+- **The gate is a point-in-time result** against the seeded fixture. The current hardening tree has
+  not completed its coordinated local gate or produced a hosted CI result. Prior webpack/manifest
+  and browser acceptance remain useful historical product evidence, but they do not verify this
+  source and cannot replace staging capacity or authenticated partner-environment database canaries.

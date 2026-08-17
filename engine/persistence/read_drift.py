@@ -1,11 +1,9 @@
-"""Drift read CLI — emit baseline-drift for a scope's unresolved predictions.
+"""Local diagnostic CLI for a scope's unresolved baseline-drift inputs.
 
-The Next app's server read (lib/data/drift.ts) shells out to this, exactly like
-the "Resolve now" affordance shells out to run_resolution.py: compute-on-read
-through the real engine, over an RLS-scoped connection AS the demo owner (never
-the service role). Prints ONE json object to stdout: {prediction_id: drift}. On
-any failure the caller treats a missing/empty map as "no notice", so the page
-never depends on the Python toolchain being present.
+The dashboard does not call this file. Production reads the checked current
+projection while ``drift_materialization.py`` owns asynchronous engine work.
+This command remains a developer-only way to inspect the pure detector through
+an RLS-scoped connection without writing the projection.
 
 Run:
     cd engine && .venv/bin/python persistence/read_drift.py

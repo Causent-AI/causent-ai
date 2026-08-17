@@ -72,7 +72,7 @@ export function MechanismChain({
           <span className="truncate">{lever.title}</span>
         </Chip>
       ) : (
-        <Chip dashed>no lever mapped</Chip>
+        <Chip dashed>no primary action</Chip>
       )}
       {supportingCount > 0 && (
         <span className="text-[11px] text-[var(--text-subtle)]">

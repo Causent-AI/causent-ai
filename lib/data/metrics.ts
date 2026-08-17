@@ -5,7 +5,6 @@ import { cache } from "react";
 import type { Metric, Observation } from "@/lib/types";
 import { getServerSupabase } from "@/lib/supabase-server";
 import {
-  DEMO_SCOPE_ID,
   METRIC_CONFIG_BY_NAME,
   METRIC_ORDER,
   formatFromUnit,
@@ -39,7 +38,7 @@ export type MetricRecord = {
  * canonical metric order (lib/seed.ts). A metric whose name has no UI config is
  * skipped (we never guess a color / inversion for an unknown metric).
  */
-export const getMetricRecords = cache(async function getMetricRecords(): Promise<
+export const getMetricRecords = cache(async function getMetricRecords(scopeId: string): Promise<
   MetricRecord[]
 > {
   const sb = await getServerSupabase();
@@ -47,7 +46,7 @@ export const getMetricRecords = cache(async function getMetricRecords(): Promise
   const metricsRes = await sb
     .from("metrics")
     .select("metric_id, name, unit, source, granularity, is_core")
-    .eq("scope_id", DEMO_SCOPE_ID);
+    .eq("scope_id", scopeId);
   if (metricsRes.error) throw metricsRes.error;
   const metricRows = (metricsRes.data ?? []) as MetricRow[];
   if (metricRows.length === 0) return [];
@@ -124,6 +123,6 @@ export const getMetricRecords = cache(async function getMetricRecords(): Promise
  * All metrics in the demo scope with their full daily series, ordered to match the
  * UI's canonical metric order. Mirrors the lib/seed.ts `metrics` export.
  */
-export async function getMetrics(): Promise<Metric[]> {
-  return (await getMetricRecords()).map((r) => r.metric);
+export async function getMetrics(scopeId: string): Promise<Metric[]> {
+  return (await getMetricRecords(scopeId)).map((r) => r.metric);
 }

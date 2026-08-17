@@ -25,6 +25,7 @@
 import { NextResponse } from "next/server";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { DEMO_WORKSPACES } from "@/lib/data/config";
 
 export const dynamic = "force-dynamic";
 // The remote fn call is fast; the local spawn path wants Node runtime headroom.
@@ -42,7 +43,8 @@ async function resolveViaRemote(
   url: string,
   secret: string,
   today: string | undefined,
-): Promise<NextResponse> {
+  scopeId: string,
+): Promise<{ ok: boolean; status: number; body: unknown }> {
   let res: Response;
   try {
     res = await fetch(url, {
@@ -51,26 +53,29 @@ async function resolveViaRemote(
         "content-type": "application/json",
         "x-causent-resolve-secret": secret,
       },
-      body: JSON.stringify(today ? { today } : {}),
+      body: JSON.stringify({ scope_id: scopeId, ...(today ? { today } : {}) }),
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: "resolution function unreachable", resolver: "remote", detail: String(err) },
-      { status: 502 },
-    );
+    return {
+      ok: false,
+      status: 502,
+      body: { error: "resolution function unreachable", detail: String(err) },
+    };
   }
   const body = await res.json().catch(() => ({ error: "non-JSON response from resolver" }));
-  return NextResponse.json({ resolver: "remote", ...body }, { status: res.status });
+  return { ok: res.ok, status: res.status, body };
 }
 
 /** DEV path: shell the Python runner (needs the local venv). */
-async function runLocalResolution(): Promise<{ code: number | null; out: string }> {
+async function runLocalResolution(
+  scopeId: string,
+): Promise<{ code: number | null; out: string }> {
   const engineDir = process.env.CAUSENT_ENGINE_DIR ?? path.join(process.cwd(), "engine");
   const python =
     process.env.CAUSENT_ENGINE_PYTHON ?? path.join(engineDir, ".venv", "bin", "python");
   const today = process.env.CAUSENT_DEMO_TODAY; // demo data lives in the past
 
-  const args = [path.join("persistence", "run_resolution.py")];
+  const args = [path.join("persistence", "run_resolution.py"), "--scope", scopeId];
   if (today) args.push("--today", today);
 
   return new Promise((resolve) => {
@@ -93,15 +98,46 @@ export async function GET(request: Request): Promise<NextResponse> {
   const today = process.env.CAUSENT_DEMO_TODAY;
 
   // Prefer the deployed function whenever it's configured — the only path that
-  // works in a serverless runtime.
+  // works in a serverless runtime. Each registered demo workspace is explicit;
+  // neither the hosted function nor the local runner may fall back to Gummy.
   if (remoteUrl && remoteSecret) {
-    return resolveViaRemote(remoteUrl, remoteSecret, today);
+    const workspaces = await Promise.all(
+      DEMO_WORKSPACES.map(async (workspace) => ({
+        workspace: workspace.key,
+        outcome: await resolveViaRemote(
+          remoteUrl,
+          remoteSecret,
+          today,
+          workspace.id,
+        ),
+      })),
+    );
+    const failed = workspaces.find(({ outcome }) => !outcome.ok);
+    return NextResponse.json(
+      {
+        ...(failed ? { error: "workspace resolution failed" } : { ok: true }),
+        resolver: "remote",
+        workspaces: workspaces.map(({ workspace, outcome }) => ({
+          workspace,
+          ok: outcome.ok,
+          status: outcome.status,
+          result: outcome.body,
+        })),
+      },
+      { status: failed?.outcome.status ?? 200 },
+    );
   }
 
   // No remote configured — fall back to the local runner (dev). On Vercel there
   // is no Python venv, so this fails loudly rather than pretending to resolve.
-  const result = await runLocalResolution();
-  if (result.code !== 0) {
+  const workspaces = await Promise.all(
+    DEMO_WORKSPACES.map(async (workspace) => ({
+      workspace: workspace.key,
+      result: await runLocalResolution(workspace.id),
+    })),
+  );
+  const failed = workspaces.find(({ result }) => result.code !== 0);
+  if (failed) {
     console.warn(
       "[cron/resolve] no CAUSENT_RESOLVE_URL and local runner failed — resolution " +
         "is degraded. Deploy causent-resolve (scripts/deploy-resolve.sh) and set " +
@@ -112,15 +148,21 @@ export async function GET(request: Request): Promise<NextResponse> {
         error: "resolution runner failed",
         resolver: "local",
         hint: "set CAUSENT_RESOLVE_URL + CAUSENT_RESOLVE_SECRET to use the deployed function",
-        detail: result.out.split("\n").slice(-4).join("\n"),
+        workspace: failed.workspace,
+        detail: failed.result.out.split("\n").slice(-4).join("\n"),
       },
       { status: 500 },
     );
   }
-  const summary =
-    result.out
-      .split("\n")
-      .reverse()
-      .find((l) => l.startsWith("RESULT:")) ?? "resolution sweep complete";
-  return NextResponse.json({ ok: true, resolver: "local", summary }, { status: 200 });
+  return NextResponse.json({
+    ok: true,
+    resolver: "local",
+    workspaces: workspaces.map(({ workspace, result }) => ({
+      workspace,
+      summary: result.out
+        .split("\n")
+        .reverse()
+        .find((line) => line.startsWith("RESULT:")) ?? "resolution sweep complete",
+    })),
+  }, { status: 200 });
 }

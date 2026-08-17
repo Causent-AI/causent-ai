@@ -152,16 +152,6 @@ export function PredictionOutcomeChart({
           </div>
         </>
       )}
-
-      <figcaption className="mt-3 text-[11px] leading-5 text-[var(--text-muted)]">
-        {hasMeasurement
-          ? state === "no-signal"
-            ? "The estimate is shown for learning, but the engine did not classify it as a confident causal result."
-            : ci95Pct
-              ? "Plan and outcome use the same signed %-of-mean scale; the whisker is the engine's 95% confidence interval."
-              : "Plan and outcome use the same signed %-of-mean scale. The engine did not provide a 95% confidence interval for this result."
-          : "An unresolved or unavailable outcome is left blank rather than displayed as zero."}
-      </figcaption>
     </figure>
   );
 }

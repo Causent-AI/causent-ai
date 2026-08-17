@@ -50,8 +50,8 @@ const ACTION_KNOWLEDGE = "northstar-action-knowledge";
 const ACTION_ASSISTANT = "northstar-action-assistant";
 
 export const NORTHSTAR_SUPPORT_GOLDEN_EXAMPLE: DecisionReportGoldenExample = {
-  workspaceName: "Orbit",
-  projectName: "Northstar Support",
+  workspaceName: "Northstar",
+  projectName: "Support Operations",
   initialPrompt: INITIAL_PROMPT,
   report: {
     schemaVersion: 2,

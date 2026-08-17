@@ -58,6 +58,15 @@ let sb: SupabaseClient | null = null;
 let available = false;
 
 async function teardown(client: SupabaseClient) {
+  // Unresolved/quarantined deliveries can intentionally have no scope FK yet,
+  // so deleting the scratch tenant alone cannot remove them. Clear this
+  // fixture's deterministic token explicitly to keep each test isolated.
+  const inbox = await client
+    .from("connector_webhook_inbox")
+    .delete()
+    .eq("provider", "jira")
+    .eq("provenance_token", provenanceToken(DECISION));
+  assert.equal(inbox.error, null, inbox.error?.message);
   const result = await client.from("orgs").delete().eq("org_id", ORG); // cascades the tenant
   assert.equal(result.error, null, result.error?.message);
 }
@@ -138,6 +147,18 @@ function mockCreator(created: CreatedIssue): { creator: IssueCreator; count: () 
   };
   return { creator, count: () => n };
 }
+
+test("new Jira drafts require an explicit site binding before database access", async () => {
+  const result = await draftLeverFromDecision(
+    null as unknown as SupabaseClient,
+    WS,
+    {
+      ...jiraDraftInput(),
+      jira: { ...jiraDraftInput().jira, baseUrl: "" },
+    },
+  );
+  assert.deepEqual(result, { ok: false, error: "Jira target needs a site URL." });
+});
 
 // ============================================================================
 // 1. Jira read-only: draft → paste → scan-detect → attributed
@@ -235,6 +256,7 @@ test("Jira webhook detects; redelivery dedups; Won't-Do records LEVER_DROPPED", 
     issue: {
       id: "10050",
       key: "ORB-50",
+      self: "https://acme.atlassian.net/rest/api/3/issue/10050",
       fields: {
         labels: [token],
         status: { statusCategory: { key: "done" } },
@@ -254,6 +276,175 @@ test("Jira webhook detects; redelivery dedups; Won't-Do records LEVER_DROPPED", 
     .eq("source", "jira")
     .eq("canonical", "LEVER_DROPPED");
   assert.equal((drop.data ?? []).length, 1, "a LEVER_DROPPED transition was recorded");
+});
+
+test("a valid Jira secret cannot attribute a known token from another site", async (t) => {
+  if (!available || !sb) return t.skip("local Supabase stack not reachable");
+  const client = sb;
+  const drafted = await draftLeverFromDecision(client, WS, jiraDraftInput());
+  assert.equal(drafted.ok, true);
+  const token = provenanceToken(DECISION);
+  const payload = {
+    timestamp: 1_700_000_200_000,
+    webhookEvent: "jira:issue_created",
+    issue: {
+      id: "10051",
+      key: "ORB-51",
+      self: "https://other.atlassian.net/rest/api/3/issue/10051",
+      fields: { description: `the work\n\n${token}`, labels: [] },
+    },
+  };
+  const outcome = await processJiraWebhook(client, {
+    rawBody: JSON.stringify(payload),
+    providedSecret: JIRA_SECRET,
+    secret: JIRA_SECRET,
+  });
+  assert.equal(outcome.result, "queued_retry");
+  assert.equal(await isAttributed(client), false);
+});
+
+test("legacy Jira rows quarantine without retries, then process after an explicit site rebind", async (t) => {
+  if (!available || !sb) return t.skip("local Supabase stack not reachable");
+  const client = sb;
+  const input = jiraDraftInput();
+  const drafted = await draftLeverFromDecision(client, WS, input);
+  assert.equal(drafted.ok, true);
+  if (!drafted.ok) return;
+
+  // Simulate the shape left by the pre-target_origin release: the project and
+  // provider are known, but neither the lever payload nor its action can prove
+  // which Jira tenant owns that project key.
+  const legacyLever = await client
+    .from("levers")
+    .update({
+      target_origin: null,
+      drafted_payload: {
+        title: input.title,
+        body: input.body,
+        label: drafted.token,
+        deep_link: null,
+        target_source: "jira",
+      },
+    })
+    .eq("lever_id", drafted.leverId)
+    .eq("scope_id", WS)
+    .select("action_id")
+    .single();
+  assert.equal(legacyLever.error, null, legacyLever.error?.message);
+  const actionId = (legacyLever.data as { action_id: string }).action_id;
+  const legacyAction = await client
+    .from("actions")
+    .update({
+      rationale_richtext: {
+        type: "doc",
+        title: input.title,
+        content: [{ type: "paragraph", content: [{ type: "text", text: input.body }] }],
+        meta: {
+          provenance_token: drafted.token,
+          target_ref: "ORB",
+          target_source: "jira",
+        },
+      },
+    })
+    .eq("action_id", actionId)
+    .eq("scope_id", WS);
+  assert.equal(legacyAction.error, null, legacyAction.error?.message);
+
+  const payload = {
+    timestamp: 1_700_000_300_000,
+    webhookEvent: "jira:issue_created",
+    issue: {
+      id: "10052",
+      key: "ORB-52",
+      self: "https://acme.atlassian.net/rest/api/3/issue/10052",
+      fields: { description: `the work\n\n${drafted.token}`, labels: [] },
+    },
+  };
+  const params = {
+    rawBody: JSON.stringify(payload),
+    providedSecret: JIRA_SECRET,
+    secret: JIRA_SECRET,
+  };
+
+  const first = await processJiraWebhook(client, params);
+  assert.equal(first.status, 202);
+  assert.equal(first.result, "quarantined");
+  assert.equal(await isAttributed(client), false);
+
+  const quarantined = await client
+    .from("connector_webhook_inbox")
+    .select("status, attempts, scope_id, lever_id, action_id, last_error, quarantined_at")
+    .eq("provider", "jira")
+    .eq("provenance_token", drafted.token)
+    .single();
+  assert.equal(quarantined.error, null, quarantined.error?.message);
+  assert.deepEqual(
+    {
+      status: quarantined.data?.status,
+      attempts: quarantined.data?.attempts,
+      scopeId: quarantined.data?.scope_id,
+      leverId: quarantined.data?.lever_id,
+      actionId: quarantined.data?.action_id,
+      lastError: quarantined.data?.last_error,
+    },
+    {
+      status: "quarantined",
+      attempts: 0,
+      scopeId: WS,
+      leverId: drafted.leverId,
+      actionId,
+      lastError: "LEGACY_JIRA_TARGET_ORIGIN_UNBOUND",
+    },
+  );
+  assert.ok(quarantined.data?.quarantined_at);
+
+  for (let delivery = 0; delivery < 6; delivery += 1) {
+    const redelivery = await processJiraWebhook(client, params);
+    assert.equal(redelivery.status, 202);
+    assert.equal(redelivery.result, "quarantined");
+  }
+  const stillQuarantined = await client
+    .from("connector_webhook_inbox")
+    .select("status, attempts")
+    .eq("provider", "jira")
+    .eq("provenance_token", drafted.token)
+    .single();
+  assert.deepEqual(stillQuarantined.data, { status: "quarantined", attempts: 0 });
+  const transitionsBeforeBinding = await client
+    .from("transition_events")
+    .select("provider_event_id", { count: "exact", head: true })
+    .eq("source", "jira")
+    .eq("action_id", actionId);
+  assert.equal(transitionsBeforeBinding.count, 0);
+
+  // Re-drafting the same decision/project/site is an explicit, scope-checked
+  // compare-and-set from NULL. It does not create a second action or lever.
+  const rebound = await draftLeverFromDecision(client, WS, input);
+  assert.equal(rebound.ok, true);
+  if (!rebound.ok) return;
+  assert.equal(rebound.reused, true);
+  assert.equal(rebound.leverId, drafted.leverId);
+  const bound = await client
+    .from("levers")
+    .select("target_origin")
+    .eq("lever_id", drafted.leverId)
+    .single();
+  assert.deepEqual(bound.data, { target_origin: "https://acme.atlassian.net" });
+
+  const processed = await processJiraWebhook(client, params);
+  assert.equal(processed.status, 200);
+  assert.equal(processed.result, "detected");
+  assert.equal(await isAttributed(client), true);
+  const finalInbox = await client
+    .from("connector_webhook_inbox")
+    .select("status, attempts, quarantined_at, processed_at")
+    .eq("provider", "jira")
+    .eq("provenance_token", drafted.token)
+    .single();
+  assert.equal(finalInbox.data?.status, "processed");
+  assert.equal(finalInbox.data?.attempts, 1);
+  assert.equal(finalInbox.data?.quarantined_at, null);
+  assert.ok(finalInbox.data?.processed_at);
 });
 
 // ============================================================================

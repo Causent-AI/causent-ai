@@ -43,6 +43,13 @@ class _ClaimedJob:
     requested_by: UUID | None
 
 
+@dataclass(frozen=True)
+class _ResolvedTarget:
+    action_ids: list[UUID]
+    actor_id: UUID
+    package_context: dict[str, object] | None
+
+
 def canonical_input_hash(
     *,
     activation_id: object,
@@ -52,6 +59,7 @@ def canonical_input_hash(
     observations: list[tuple[object, object]],
     actions: list[tuple[object, object, object, object, object]],
     lever_rows: list[tuple[object, object, object]],
+    package_context: dict[str, object] | None = None,
 ) -> str:
     """Stable SHA-256 over every bridge-relevant current-activation input."""
 
@@ -72,6 +80,11 @@ def canonical_input_hash(
         ],
         "actions": [[normalized(value) for value in row] for row in actions],
         "levers": [[normalized(value) for value in row] for row in lever_rows],
+        "package_context": None if package_context is None else {
+            key: normalized(value) if not isinstance(value, list)
+            else [normalized(item) for item in value]
+            for key, value in package_context.items()
+        },
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -108,7 +121,7 @@ def _claim_job(
     return _ClaimedJob(*row)
 
 
-def _resolve_current_target(conn: Connection, job: _ClaimedJob) -> tuple[list[UUID], UUID] | None:
+def _resolve_current_target(conn: Connection, job: _ClaimedJob) -> _ResolvedTarget | None:
     """Lock and return the current activation target + stored member actor, or stale.
 
     The explicit report -> series -> workspace order mirrors activation's
@@ -150,7 +163,7 @@ def _resolve_current_target(conn: Connection, job: _ClaimedJob) -> tuple[list[UU
         return None
 
     activation = conn.execute(
-        "select action_ids, activated_by "
+        "select action_ids, activated_by, contract_version, primary_lever_action_id "
         "from public.decision_report_activations "
         "where activation_id = %s and report_id = %s and scope_id = %s "
         "and metric_id = %s for update",
@@ -159,7 +172,41 @@ def _resolve_current_target(conn: Connection, job: _ClaimedJob) -> tuple[list[UU
     if activation is None:
         return None
 
-    action_ids, activated_by = activation
+    action_ids, activated_by, contract_version, registered_primary_action_id = activation
+    package_context: dict[str, object] | None = None
+    target_action_ids = list(action_ids)
+    if contract_version == 2:
+        package = conn.execute(
+            "select intervention_action_id, intervention_date, included_action_ids, "
+            "registered_primary_action_id, package_hash, completed_at "
+            "from public.decision_report_package_interventions "
+            "where activation_id = %s and scope_id = %s and report_id = %s",
+            (job.activation_id, job.scope_id, job.report_id),
+        ).fetchone()
+        # A v2 report has no valid causal breakpoint until the entire decision
+        # package is complete. Pre-completion jobs are consumed without a model run.
+        if package is None:
+            return None
+        (intervention_action_id, intervention_date, included_action_ids,
+         package_primary_action_id, package_hash, completed_at) = package
+        if (
+            list(included_action_ids) != list(action_ids)
+            or package_primary_action_id != registered_primary_action_id
+            or intervention_action_id not in action_ids
+        ):
+            raise RuntimeError("DECISION_PACKAGE_CONTRACT_MISMATCH")
+        target_action_ids = [intervention_action_id]
+        package_context = {
+            "causal_object": "decision_package",
+            "intervention_rule": "latest_effective_included_action",
+            "registered_primary_action_id": registered_primary_action_id,
+            "intervention_action_id": intervention_action_id,
+            "intervention_date": intervention_date,
+            "included_action_ids": list(included_action_ids),
+            "package_hash": package_hash,
+            "completed_at": completed_at,
+            "individual_attribution": False,
+        }
     actor_id = job.requested_by or activated_by
     if actor_id is None:
         actor = conn.execute(
@@ -175,13 +222,14 @@ def _resolve_current_target(conn: Connection, job: _ClaimedJob) -> tuple[list[UU
         actor_id = actor[0] if actor is not None else None
     if actor_id is None:
         raise RuntimeError("MISSING_STORED_ACTOR")
-    return list(action_ids), actor_id
+    return _ResolvedTarget(target_action_ids, actor_id, package_context)
 
 
 def _load_input_hash(
     conn: Connection,
     job: _ClaimedJob,
     action_ids: list[UUID],
+    package_context: dict[str, object] | None = None,
 ) -> str:
     observations = conn.execute(
         "select obs_date, value from public.metric_observations "
@@ -228,6 +276,7 @@ def _load_input_hash(
         observations=observations,
         actions=actions,
         lever_rows=levers,
+        package_context=package_context,
     )
 
 
@@ -325,9 +374,13 @@ def process_next_recompute_job(
             return RecomputeResult(
                 job.activation_id, job.generation, "SUPERSEDED", "current pointer moved"
             )
-        action_ids, actor_id = target
-        _set_actor(conn, actor_id)
-        input_hash = _load_input_hash(conn, job, action_ids)
+        _set_actor(conn, target.actor_id)
+        input_hash = _load_input_hash(
+            conn,
+            job,
+            target.action_ids,
+            target.package_context,
+        )
         if input_hash == job.last_input_hash:
             _finish(conn, job, input_hash=input_hash, error_code=None)
             return RecomputeResult(
@@ -338,7 +391,7 @@ def process_next_recompute_job(
             conn,
             job.scope_id,
             job.metric_id,
-            action_ids=action_ids,
+            action_ids=target.action_ids,
             commit=False,
         )
         _finish(conn, job, input_hash=input_hash, error_code=None)

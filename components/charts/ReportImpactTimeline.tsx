@@ -39,10 +39,10 @@ export function ReportImpactTimeline({
       <Panel>
         <h2 className="text-[15px] font-semibold text-[var(--text)]">Observed outcome timeline</h2>
         <div className="mt-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/50 px-4 py-6">
-          <p className="text-[12px] font-semibold text-amber-950">No daily observations connected</p>
-          <p className="mt-1 text-[11px] leading-5 text-amber-900/80">
-            Import daily history in Data Workshop. Causent will not infer a trend or replace missing observations with zero.
-          </p>
+          <p className="text-[12px] font-semibold text-amber-950">No daily observations</p>
+          <Link href="/data-workshop" className="mt-2 inline-flex text-[11px] font-semibold text-amber-900 underline-offset-2 hover:underline">
+            Import data →
+          </Link>
         </div>
       </Panel>
     );
@@ -65,7 +65,7 @@ export function ReportImpactTimeline({
     ...levels.map((level) => `${level.label} ${level.displayLabel}.`),
     markers.length === 0
       ? "No completed report actions fall inside the observation window."
-      : `${markers.length} completed report action markers; ${markers.find((marker) => marker.isPrimary)?.label ?? "no action"} is the primary lever.`,
+      : `${markers.length} completed report action markers; ${markers.find((marker) => marker.isPrimary)?.label ?? "no action"} is the primary action.`,
   ];
 
   return (
@@ -76,13 +76,10 @@ export function ReportImpactTimeline({
             Observed history
           </p>
           <h2 className="mt-1 text-[15px] font-semibold text-[var(--text)]">{metric.name} over time</h2>
-          <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">
-            Daily values with the activation-time baseline, planned target, and completed report actions.
-          </p>
         </div>
         <Link
           href="/data-workshop"
-          className="min-h-9 rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50"
+          className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50"
         >
           Review data →
         </Link>
@@ -242,7 +239,7 @@ export function ReportImpactTimeline({
           {markers.some((marker) => marker.isPrimary) ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-[var(--brand-amber)]" aria-hidden="true" />
-              Primary lever
+              Primary action
             </span>
           ) : null}
         </div>

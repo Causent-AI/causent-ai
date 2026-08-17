@@ -12,6 +12,14 @@
     {
       "path": "/api/cron/recompute",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/connector-inbox",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/drift",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

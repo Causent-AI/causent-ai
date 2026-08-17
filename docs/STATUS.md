@@ -1,5 +1,70 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-08-17 — Product, science, and engineering hardening locally verified
+
+The founder selected the recommended product-continuity changes, a bounded scientific-contract
+upgrade, and most of the first engineering hardening steps from the three 2026-08-16 reviews. The
+current working tree now has one **Finish report -> Set commitment -> Start an action** lifecycle
+footer, a live primary-metric commitment chart, an always-visible full action/metric review, and a
+compact outcome-commitment header on report-native Actions. The existing **Data -> Reports ->
+Actions -> Impact** navigation remains unchanged because the discoverability item was already
+addressed in the prior founder-selected UX round.
+
+The current report no longer reconstructs metric meaning from action compatibility metadata. A
+fail-closed normalized activation reader supplies the selected metric set, exact action bindings,
+optional supporting-action monitoring direction/check date, and one primary outcome. Percent-of-mean
+remains the registered prediction unit, while the UI shows the connected native baseline and implied
+target. Metric selection exposes latest observation, history count/days, earliest confident review,
+and **Ready to monitor / Needs data / Causal window not ready** without blocking activation or lowering
+the 45-day-per-side ITS floor.
+
+For a V3 multi-action plan, the registered primary action remains part of the immutable commitment,
+but the causal object is the whole **Decision package**. Completion creates the package intervention
+only after every included action is complete; the included action with the latest effective completion
+date supplies the intervention action/date, with immutable report order breaking same-day ties.
+Recompute and resolution use that package breakpoint and do not imply that one supporting action
+caused the measured change.
+
+The engineering pass adds:
+
+- asynchronous coalesced drift refreshes with a bounded Python worker and viewer-checked
+  `current_prediction_drift` projection, removing Python/database work from dashboard requests;
+- resumable digest-bound CSV imports capped at 2,000 rows in deterministic 250-row transactions;
+- a service-only connector webhook inbox with atomic mutation/processed state, bounded retries, and
+  dead-letter state;
+- short-lived signed private-Storage redirects after the existing asset/workspace/status/content-hash
+  authorization check;
+- workload-shaped indexes and authenticated plan scripts;
+- an expand -> bounded backfill -> validate -> contract multi-metric rollout plus an online-index
+  runbook; and
+- a guarded k6 staging matrix, deterministic scale-fixture planner, and initial p95/p99/error budgets.
+
+The exact local combined gate is green on this source: a clean demo reset applied all migrations;
+warning-level schema lint passed with four pre-existing advisories; TypeScript and full ESLint passed;
+the credentialed Node/Supabase/RLS/Storage suite reported 660 total, 641 passed, 19 intentional
+live-model skips, and zero failures; and all 1,251 Python engine/bridge/isolation tests passed.
+Authenticated hot-query EXPLAINs and the deterministic 1.19 GiB scale plan ran successfully. Next.js
+16.2.11 completed the webpack build under bundled Node 24.19 (the repo/CI pin remains Node 22.23), and
+the request-bound dashboard guard passed.
+
+Desktop and 390 x 844 browser acceptance covered the two editors, supporting-action monitoring,
+two selected metrics, one action-to-monitoring-metric reassignment, activation by starting a support
+action, exact clicked-action deep linking, the preserved registered primary action, workspace switch
+isolation, Data/Reports/Actions/Impact continuity, Core Metrics ordering, and a clean warning/error
+console. That pass found and fixed a visually collapsed Actions commitment card plus the remaining
+sub-44 px Impact/Core Metrics links. The local Northstar report remains open for review at
+`http://localhost:3100/impact`.
+
+Protected staging load/soak, representative-volume query plans, production-clone migration rehearsal,
+hosted worker configuration, production migrations, deployment canaries, founder sign-off, and the
+missing unassisted partner evidence remain open. The unbounded dashboard/history read model and
+production automatic causal-worker capacity were deliberately deferred. No 10,000-users/hour or
+gigabyte-scale capacity claim is made.
+
+Decision and evidence map:
+`docs/reviews/2026-08-16-product-science-engineering-hardening-follow-up.md` and
+`memory/2026-08-16-decision-report-product-science-engineering-hardening.md`.
+
 ## 2026-08-12 — PR #30 merged; production release rolled back
 
 The founder opened and merged [PR #30](https://github.com/Causent-AI/causent-ai/pull/30). Its two
@@ -82,6 +147,83 @@ build, and its request-bound dashboard guard also pass. This is synthetic local 
 for the founder's second review, not customer/partner evidence. The final founder review, unassisted
 partner sessions, partner-environment configuration/migrations, deployment, and authenticated
 canaries remain open.
+
+## 2026-08-16 — Founder-selected UX review follow-up implemented locally
+
+The founder selected one response for each major finding in the independent UX review. This round
+replaces display-only Northstar context with a genuine local Northstar project and Support Operations
+workspace, adds a compact server-resolved workspace selector, and carries that explicit operating
+scope through report generation, persistence, private assets, dashboard reads, Actions writes,
+recomputation, reconciliation, and prediction resolution. Gummy Alpha and Northstar remain two real
+workspace rows under one synthetic demo organization; that is a product-review fixture, not evidence
+of separate-customer tenant scale.
+
+The Decision Report still has exactly two typed rich editors. Each canvas now owns its formatting
+surface: selected desktop text gets a contextual bubble and mobile gets a continuously reachable,
+single-row 44 px toolbar. The title grows and wraps. Each action is one document block with one
+editable heading, its rich summary, compact metric/primary state, and a details dialog for execution
+metadata. The report-wide commitment and complete action-to-monitoring-metric map appear after Core
+Metrics and before the action list.
+
+The separate activation acceptance panel is removed. The first deliberate **Start** on any included
+action submits the exact autosaved report-wide plan through the existing checked, atomic, idempotent
+activation path and opens the clicked canonical action. The clicked action remains a navigation
+destination only: it never replaces the registered primary action or outcome. Passive editing,
+autosave, blur, navigation, metric selection, action add/remove, and opening details never activate.
+The Server Action independently binds the requested report and revision to the selected session
+workspace before calling materialization; changed, stale, forged, viewer, and cross-workspace requests
+fail closed. Primary navigation is now **Data -> Reports -> Actions -> Impact**.
+
+Implementation decisions and the final validation record live in
+`docs/reviews/2026-08-16-ux-design-review-follow-up.md` and
+`memory/2026-08-16-decision-report-ux-review-follow-up.md`. The exact local gate completed a clean
+Supabase reset; schema lint with four pre-existing warnings; full TypeScript and application lint;
+40/40 credentialed TypeScript integrations; 1,219 Python engine/bridge/isolation/recompute/function/
+concurrency tests; the Next.js 16 webpack build and request-bound dashboard contract; and desktop and
+390 px full-loop browser acceptance across both real local workspaces with no browser warning or
+error. This round does not satisfy the outstanding human-only partner
+session gate and does not claim a commit, push, PR, production migration, or deployment.
+
+## 2026-08-16 — Two-canvas, multi-metric Decision Report implemented locally
+
+The founder explicitly expanded Review #2 after finding both the native fields and the first rich
+editor pass too fragmented. A report now mounts exactly two Tiptap 3/ProseMirror applications under
+one sticky formatting toolbar. **Decision** contains fixed Background, Problem, Decision, and optional
+Evidence subsections. **Action Plan** contains its summary, embedded Core Metric controls, and every
+action's editable description plus typed execution controls. Suggested actions are included by
+default; users may add or remove actions up to the existing 25-action ceiling.
+
+This remains a typed report, not an arbitrary document schema. Every narrative subsection stays bound
+to a stable claim ID and the checked edit reducer. `Claim.text` remains authoritative for readiness,
+activation, Actions & Decisions, handoff, and causal processing. Optional
+`presentation.claimDocuments` stores a bounded application-owned rich-text projection. Formatting-only
+changes preserve sourced provenance; semantic edits remain `user_confirmed` and clear inherited source
+authority. Active reports remain read-only, stale revisions halt autosave without rebasing, and a
+successor continues through the immutable linear-series path. The editor runtime is loaded only after
+a generated or saved report is shown.
+
+The Action Plan now selects one to five report metrics, distinguishes one **Primary outcome**, and
+assigns exactly one selected **Monitoring metric** to every action. The primary action is locked to the
+primary outcome. A checked V2 input and independent atomic `activate_decision_report_v3` transaction
+materialize every included action, retain one human prediction and one primary lever, and enqueue
+causal recomputation only for the primary outcome. Two append-only, scope-bound activation audit tables
+store the selected metrics and normalized action bindings. Exact retries are order-independent and
+duplicate-free; changed mappings conflict; stale, viewer, forged-actor, and cross-workspace requests
+fail closed. Historical V1/V2 activations are semantically normalized without rewriting their graph.
+Actions and Impact retain each support action's monitoring metric, while the prediction, aggregate
+impact, and causal readout stay limited to the primary outcome.
+
+Redundant help and promotional copy was removed across the report, Actions & Decisions, Data Workshop,
+Impact, Core Metrics, and the shell. Error recovery, data-egress authorization, access control,
+uncertainty/methodology, destructive actions, and operational state remain explicit. Independent UX,
+product-manager, data-scientist, and engineering-scale reviews are recorded under `docs/reviews/`.
+Those reviews are design evidence, not partner evidence, and their larger recommendations remain open.
+
+Final verification and browser acceptance for this exact combined tree are recorded in
+`memory/2026-08-16-decision-report-two-canvas-multi-metric.md`. The founder's second hands-on workflow review, real partner sessions,
+partner-environment migration/canaries, and production deployment remain open. Google Docs-class
+collaboration, comments, suggestion mode, pagination, offline sync, Markdown source mode, and a
+multi-outcome causal model remain outside this pass.
 
 ## 2026-08-09 — Review round 2 implemented locally; founder review pending
 
@@ -225,7 +367,7 @@ evidence; this override is not evidence that the gate passed. Slice 10 is now me
 partner-environment migration, worker configuration/deployment, authenticated canaries, and real
 partner evidence remain open.
 
-Last updated: 2026-08-12. Single source of truth for "where are we and how do I pick up."
+Last updated: 2026-08-16. Single source of truth for "where are we and how do I pick up."
 Product: **dual cold-start on one causal graph** — the retrospective wedge ("Did-It-Ship,
 Did-It-Work": tie each shipped action to a metric, honest ITS readout) PLUS the prospective
 on-ramp (human pre-registered prediction → drift watch → engine-measured resolution). See
@@ -251,12 +393,11 @@ linear iterations, bounded one-URL/one-PDF ingestion with provenance v2, and aut
 current-report causal recomputation. A current-report-only manual AI copy/paste preview demonstrates
 the proposed external-agent loop without granting it a write path. Reports retains immutable lineage; the three operational tabs
 show only the workspace's explicit current report. The 45-day-per-side ITS confidence floor is
-unchanged. The current clean reset, schema lint, TypeScript, full lint, Node/Supabase, focused
-integration, engine/bridge, webpack production build, and four-iteration browser/console acceptance
-were green at the last local checkpoint. The current dirty release candidate still needs its exact
-release gate. Three real initially unassisted partner sessions, the continuing founder UI/workflow
-review, production migration/configuration, and authenticated deployment canaries remain
-human/operator gates.**
+unchanged. The founder-selected UX follow-up has its recorded green checkpoint, but the later
+product/science/engineering hardening in the dirty working tree has not yet passed the exact combined
+gate and must not inherit those results. Three real initially unassisted partner sessions, the
+continuing founder UI/workflow review, staging scale evidence, production migration/configuration,
+hosted drift/recompute capacity, and authenticated deployment canaries remain human/operator gates.**
 The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
 all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
@@ -379,10 +520,10 @@ conversational delivery, or other production expansion before observed unassiste
 # DB-backed tests need the local Supabase stack (Docker must be running):
 supabase start            # or: supabase db reset  (clean-slate migration apply)
 
-# Current full engine/bridge/RLS suite (1,210 tests):
+# Current full engine/bridge/RLS suite (1,219 tests):
 cd engine && .venv/bin/python -m pytest -q
 
-# Current serial Node/Supabase/RLS/Storage suite (527 total; 508 pass, 19 live-model skips):
+# Current serialized Node library/Supabase/RLS/Storage suite:
 node --test --test-concurrency=1 "lib/**/*.test.ts"
 
 # Network-free release checks (run only with the target's production env loaded):
@@ -560,9 +701,11 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   `prediction_revisions` table. Seeded on a dedicated **New-User Activation** metric (avoids corrupting a
   core metric's action→metric graph). Gates: 1147 pytest, 269 lib, CI green; Restate DB-verified;
   4 states screenshotted (`docs/screenshots/drift/`). Evidence: `docs/OVERNIGHT_REPORT_6.md`.
-- **Not yet live:** the detector runs on SEEDED data (compute-on-read). Live detection needs a real
-  connected metric, and the level-shift threshold tuning is a documented open question. The notice +
-  Restate are demoable now. Design doc: `~/.gstack/projects/adam-causent-causent-ai/adamowens-main-design-20260712-220650.md`.
+- **Historical limitation, superseded in the current working tree:** PR #22 ran seeded drift
+  compute-on-read. The 2026-08-16 hardening moves that detector behind an async materialized
+  projection, but a hosted drift worker and production canary remain pending. Level-shift threshold
+  tuning is still an open scientific question. Design doc:
+  `~/.gstack/projects/adam-causent-causent-ai/adamowens-main-design-20260712-220650.md`.
 
 ## Funnel finish + ship-state/scorecard — as built (2026-07-13, PR #23)
 
@@ -632,12 +775,33 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   step left to fully arm (`DATABASE_URL` is currently absent on `causent-resolve`; add it and
   redeploy/canary both sides). The separate `causent-recompute` project does not currently exist and
   no automatic recompute worker is deployed.
-  The drift detector still spawns local Python (same pattern, not yet ported). `/login` is
-  publicly reachable and currently
+  The current working tree removes drift's request-path Python spawn and adds a materialized async
+  projection, but its separate hosted drift worker, `DATABASE_URL`, `CAUSENT_DRIFT_URL`, and matching
+  secret are not deployed or canaried. `/login` is publicly reachable and currently
   indexable (no robots.txt — the proxy redirects it; CT logs make the hostname discoverable);
   add `app/robots.ts` + proxy exclusion if stealth matters.
 
-## Current local verification — Review #2
+## Current local verification — founder-selected UX follow-up
+
+- Clean local Supabase reset: **PASS**.
+- Supabase schema lint: **COMPLETE** with four pre-existing warnings and no new error-level finding
+  attributed to this round.
+- Full TypeScript check and full application lint: **PASS**.
+- Credentialed TypeScript integrations: **40/40 passed**.
+- Complete Python engine, bridge, isolation, recompute, function, and concurrency suite:
+  **1,219 passed**.
+- Next.js 16 webpack production build and request-bound dashboard build contract: **PASS**.
+- Desktop browser full-loop acceptance across Gummy Alpha and Northstar's real local workspaces:
+  **PASS**.
+- Mobile responsive browser acceptance at 390 x 844: **PASS**. The two-editor draft has no horizontal
+  overflow, the title wraps, formatting and details controls meet the 44 px target, workspace changes
+  clear mounted drafts, cross-workspace direct links fail generically, and clicked actions retain their
+  exact query-and-fragment target.
+- Browser console review: **PASS** with no warning or error on the final desktop/mobile paths.
+- Git/release state: no commit, push, PR, production migration, or deployment was performed for this
+  round. Founder review and the initially unassisted partner sessions remain human-only gates.
+
+## Historical local verification — Review #2
 
 - Clean local Supabase reset: **PASS**. Error-level schema lint: **PASS**. All five local
   2026-07-23 migrations and both Review #2 readiness migrations are included in that reset.
@@ -695,12 +859,17 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 ### 3. Deliberately activate production
 
 - **Database:** authenticate and link the Supabase CLI to the intended production project; inspect
-  remote migration history, dry-run, then apply only the verified pending set from
+  remote migration history and rehearse the exact pending set on a production-sized clone. Include
   `20260723053444`, `20260723061012`, `20260723061925`, `20260723064500`, `20260723151939`,
-  `20260810005135`, and `20260810044832`. Rerun schema lint plus authenticated RLS, Storage, and
-  recompute-status probes. Never production-seed the 122-row Northstar fixture.
+  `20260810005135`, and `20260810044832` plus the current `20260817*` split multi-metric,
+  scientific, connector-inbox, drift-projection, chunked-import, and hot-index migrations. Follow
+  `supabase/rollouts/decision_report_multi_metric_activation.md` and build the documented large
+  parent/hot indexes concurrently before the canonical migrations. Rerun schema lint plus
+  authenticated RLS, Storage, import, connector, drift, package-intervention, and recompute probes.
+  Never production-seed the 122-row Northstar fixture.
 - **App environment:** add server-only `SUPABASE_SERVICE_ROLE_KEY`,
-  `CAUSENT_RECOMPUTE_URL`, and `CAUSENT_RECOMPUTE_SECRET`; remove stale `CAUSENT_DEMO_TODAY`; and
+  `CAUSENT_RECOMPUTE_URL`/`CAUSENT_RECOMPUTE_SECRET`, and
+  `CAUSENT_DRIFT_URL`/`CAUSENT_DRIFT_SECRET`; remove stale `CAUSENT_DEMO_TODAY`; and
   verify all local demo, seed, fixture, and rollout flags are absent. The environment-name list
   confirms `CRON_SECRET`, `CAUSENT_RESOLVE_URL`, and `CAUSENT_RESOLVE_SECRET`; because their
   encrypted values cannot be pulled for a local config check, verify them in a secure environment
@@ -708,18 +877,23 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 - **Recompute worker:** create/link the standalone `causent-recompute` project, configure its
   session-pooler `DATABASE_URL` and matching `CAUSENT_RECOMPUTE_SECRET`, deploy it from the staged
   bundle, and verify wrong-secret denial plus bounded queue draining.
+- **Drift worker:** create/link the standalone materialization endpoint, configure its session-pooler
+  `DATABASE_URL` and matching `CAUSENT_DRIFT_SECRET`, and verify wrong-secret denial, source enqueue,
+  bounded leasing, stale-generation suppression, retry/terminal state, and the five-minute app cron.
 - **Resolver:** add the session-pooler `DATABASE_URL` to `causent-resolve`, retain the matching
   `CAUSENT_RESOLVE_SECRET`, pass `npm run check:resolve-config`, redeploy, and canary the
   authenticated app-to-resolver path. The app release check now also requires its resolve URL and
   secret.
-- **CI and merge:** finish and verify the deterministic activation-ready sample fix and
-  **Full-plan example** label, commit the exact release scope, require a green hosted run for that
-  revision, and merge through the reviewed release path before treating the git-connected app
-  deployment as current.
+- **Scale gate:** configure the protected staging-load environment and isolated write probe; run the
+  selected k6 profiles against the representative fixture, retain artifacts plus authenticated
+  plans/lock/pool/queue telemetry, and treat the stated SLOs as targets until the run passes.
+- **CI and merge:** commit the exact release scope, require a green hosted run for that revision, and
+  merge through the reviewed release path before treating the git-connected app deployment as current.
 - **Authenticated canaries:** verify the live app, database, worker, and resolver together using a
   clean account across URL/PDF generation, save/activate, three successors, private-image
-  reattachment, observation import, action completion, recompute status, deletion rollback, direct
-  links, and rollout disablement. Preserve the legacy-flow rollback and review production logs.
+  reattachment/signed delivery, resumable observation import, all-action package completion,
+  connector redelivery, recompute/drift status, deletion rollback, direct links, and rollout
+  disablement. Preserve the legacy-flow rollback and review production logs.
 
 ### 4. Existing operational and gated work
 

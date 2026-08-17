@@ -43,11 +43,14 @@ async function teardown(client: SupabaseClient) { await client.from("orgs").dele
 before(async () => {
   if (!URL || !KEY) return;
   sb = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-  const probe = await sb.rpc("import_active_report_metric_csv_v1", {
+  const probe = await sb.rpc("begin_report_metric_csv_import_v2", {
     p_scope_id: WORKSPACE,
     p_report_id: randomUUID(),
     p_metric_id: METRIC,
-    p_observations: [{ date: "2026-07-20", value: 1 }],
+    p_content_hash: "0".repeat(64),
+    p_total_rows: 1,
+    p_start_date: "2026-07-20",
+    p_end_date: "2026-07-20",
     p_authored_by: null,
   }).then((result) => result, () => ({ error: { code: "unreachable" } }));
   if (probe.error && !["42501", "22023", "P0002"].includes(probe.error.code ?? "")) return;
@@ -102,6 +105,19 @@ test("imports atomically and retries idempotently without duplicating observatio
   if (!first.ok) return;
   assert.deepEqual({ inserted: first.summary.insertedRows, updated: first.summary.updatedRows }, { inserted: 2, updated: 0 });
 
+  const exactRetry = await importReportMetricObservations(sb, {
+    scopeId: WORKSPACE, reportId, metricId: METRIC, authoredBy: null,
+    observations: [{ date: "2026-07-20", value: 10 }, { date: "2026-07-21", value: 11 }],
+  });
+  assert.equal(exactRetry.ok, true, exactRetry.ok ? undefined : exactRetry.error);
+  if (!exactRetry.ok) return;
+  assert.equal(exactRetry.summary.receipt.importId, first.summary.receipt.importId);
+  assert.equal(exactRetry.summary.receipt.resumed, true);
+  assert.deepEqual(
+    { inserted: exactRetry.summary.insertedRows, updated: exactRetry.summary.updatedRows },
+    { inserted: 2, updated: 0 },
+  );
+
   const retry = await importReportMetricObservations(sb, {
     scopeId: WORKSPACE, reportId, metricId: METRIC, authoredBy: null,
     observations: [{ date: "2026-07-20", value: 10 }, { date: "2026-07-21", value: 12 }],
@@ -114,6 +130,14 @@ test("imports atomically and retries idempotently without duplicating observatio
   assert.equal(Number(rows.data?.[1].value), 12);
   const metric = await sb.from("metrics").select("source").eq("metric_id", METRIC).single();
   assert.equal(metric.data?.source, "csv");
+  const receipts = await sb.from("metric_csv_import_jobs")
+    .select("import_id, status, processed_rows, total_rows")
+    .eq("scope_id", WORKSPACE)
+    .eq("report_id", reportId)
+    .order("created_at");
+  assert.equal(receipts.error, null, receipts.error?.message);
+  assert.equal(receipts.data?.length, 2, "exact retry reuses one receipt; changed content creates one new receipt");
+  assert.ok(receipts.data?.every((row) => row.status === "complete" && row.processed_rows === row.total_rows));
 });
 
 test("rejects forged report, metric, and cross-workspace combinations with no foreign write", async (t) => {
@@ -229,4 +253,181 @@ test("workspace metric import rejects a missing workspace before writing", async
     .eq("scope_id", OTHER_WORKSPACE)
     .ilike("name", "Should not be written");
   assert.equal(foreign.data?.length, 0);
+});
+
+test("a 251-row workspace import commits as two resumable chunks", async (t) => {
+  if (!gated(t) || !sb) return;
+  const observations = Array.from({ length: 251 }, (_, index) => {
+    const next = new Date(Date.UTC(2024, 0, 1 + index));
+    return { date: next.toISOString().slice(0, 10), value: index + 1 };
+  });
+  const imported = await importWorkspaceMetricCsv(sb, {
+    scopeId: WORKSPACE,
+    name: "Chunked Volume",
+    unit: "count",
+    observations,
+    authoredBy: null,
+  });
+  assert.equal(imported.ok, true, imported.ok ? undefined : imported.error);
+  if (!imported.ok) return;
+  assert.equal(imported.summary.acceptedRows, 251);
+
+  const receipt = await sb.from("metric_csv_import_jobs")
+    .select("status, processed_rows, total_rows, next_chunk_index")
+    .eq("import_id", imported.summary.receipt.importId)
+    .single();
+  assert.equal(receipt.error, null, receipt.error?.message);
+  assert.deepEqual(receipt.data, {
+    status: "complete",
+    processed_rows: 251,
+    total_rows: 251,
+    next_chunk_index: 2,
+  });
+});
+
+test("unfinished chunks stay private, serialize changed files, and publish only at finalize", async (t) => {
+  if (!gated(t) || !sb) return;
+  const name = `Atomic staged volume ${randomUUID().slice(0, 8)}`;
+  const observations = Array.from({ length: 251 }, (_, index) => {
+    const next = new Date(Date.UTC(2027, 0, 1 + index));
+    return { date: next.toISOString().slice(0, 10), value: index + 1 };
+  });
+  const beginArgs = {
+    p_scope_id: WORKSPACE,
+    p_name: name,
+    p_unit: "count",
+    p_content_hash: "a".repeat(64),
+    p_total_rows: observations.length,
+    p_start_date: observations[0].date,
+    p_end_date: observations.at(-1)!.date,
+    p_authored_by: null,
+  };
+  const begin = await sb.rpc("begin_workspace_metric_csv_import_v2", beginArgs);
+  assert.equal(begin.error, null, begin.error?.message);
+  const receipt = Array.isArray(begin.data)
+    ? begin.data[0] as { import_id?: string; metric_id?: string; reused?: boolean }
+    : null;
+  assert.ok(receipt?.import_id);
+  assert.ok(receipt?.metric_id);
+  assert.equal(receipt?.reused, false);
+
+  const exactRetry = await sb.rpc("begin_workspace_metric_csv_import_v2", beginArgs);
+  assert.equal(exactRetry.error, null, exactRetry.error?.message);
+  assert.equal(Array.isArray(exactRetry.data) ? exactRetry.data[0]?.reused : null, true);
+
+  const changedFile = await sb.rpc("begin_workspace_metric_csv_import_v2", {
+    ...beginArgs,
+    p_content_hash: "b".repeat(64),
+  });
+  assert.equal(changedFile.error?.code, "C4090");
+
+  const shortNonFinal = await sb.rpc("append_metric_csv_import_chunk_v2", {
+    p_import_id: receipt!.import_id,
+    p_chunk_index: 0,
+    p_chunk_digest: "c".repeat(64),
+    p_observations: observations.slice(0, 249),
+    p_authored_by: null,
+  });
+  assert.equal(shortNonFinal.error?.code, "22023");
+
+  const impossibleDate = observations.slice(0, 250);
+  impossibleDate[100] = { date: "2027-02-30", value: 101 };
+  const impossible = await sb.rpc("append_metric_csv_import_chunk_v2", {
+    p_import_id: receipt!.import_id,
+    p_chunk_index: 0,
+    p_chunk_digest: "d".repeat(64),
+    p_observations: impossibleDate,
+    p_authored_by: null,
+  });
+  assert.equal(impossible.error?.code, "22023");
+
+  const firstChunk = await sb.rpc("append_metric_csv_import_chunk_v2", {
+    p_import_id: receipt!.import_id,
+    p_chunk_index: 0,
+    p_chunk_digest: "e".repeat(64),
+    p_observations: observations.slice(0, 250),
+    p_authored_by: null,
+  });
+  assert.equal(firstChunk.error, null, firstChunk.error?.message);
+  assert.deepEqual(
+    Array.isArray(firstChunk.data)
+      ? { inserted: firstChunk.data[0]?.inserted_rows, updated: firstChunk.data[0]?.updated_rows }
+      : null,
+    { inserted: 0, updated: 0 },
+  );
+  const beforeFinalChunk = await sb.from("metric_observations")
+    .select("obs_date", { count: "exact", head: true })
+    .eq("metric_id", receipt!.metric_id!);
+  assert.equal(beforeFinalChunk.count, 0);
+
+  const finalChunk = await sb.rpc("append_metric_csv_import_chunk_v2", {
+    p_import_id: receipt!.import_id,
+    p_chunk_index: 1,
+    p_chunk_digest: "f".repeat(64),
+    p_observations: observations.slice(250),
+    p_authored_by: null,
+  });
+  assert.equal(finalChunk.error, null, finalChunk.error?.message);
+  const beforeFinalize = await sb.from("metric_observations")
+    .select("obs_date", { count: "exact", head: true })
+    .eq("metric_id", receipt!.metric_id!);
+  assert.equal(beforeFinalize.count, 0, "a fully staged file must not be partially visible");
+
+  const finalized = await sb.rpc("finalize_metric_csv_import_v2", {
+    p_import_id: receipt!.import_id,
+    p_authored_by: null,
+  });
+  assert.equal(finalized.error, null, finalized.error?.message);
+  assert.deepEqual(
+    Array.isArray(finalized.data)
+      ? {
+          inserted: finalized.data[0]?.inserted_rows,
+          updated: finalized.data[0]?.updated_rows,
+          reused: finalized.data[0]?.reused,
+        }
+      : null,
+    { inserted: 251, updated: 0, reused: false },
+  );
+  const published = await sb.from("metric_observations")
+    .select("obs_date", { count: "exact", head: true })
+    .eq("metric_id", receipt!.metric_id!);
+  assert.equal(published.count, 251);
+});
+
+test("the database rejects changed chunk contents even when a caller reuses its digest", async (t) => {
+  if (!gated(t) || !sb) return;
+  const begin = await sb.rpc("begin_workspace_metric_csv_import_v2", {
+    p_scope_id: WORKSPACE,
+    p_name: "Server digest guard",
+    p_unit: "count",
+    p_content_hash: "e".repeat(64),
+    p_total_rows: 1,
+    p_start_date: "2026-06-01",
+    p_end_date: "2026-06-01",
+    p_authored_by: null,
+  });
+  assert.equal(begin.error, null, begin.error?.message);
+  const importId = Array.isArray(begin.data)
+    ? (begin.data[0] as { import_id?: string } | undefined)?.import_id
+    : undefined;
+  assert.ok(importId);
+
+  const claimedDigest = "f".repeat(64);
+  const first = await sb.rpc("append_metric_csv_import_chunk_v2", {
+    p_import_id: importId,
+    p_chunk_index: 0,
+    p_chunk_digest: claimedDigest,
+    p_observations: [{ date: "2026-06-01", value: 1 }],
+    p_authored_by: null,
+  });
+  assert.equal(first.error, null, first.error?.message);
+
+  const forgedRetry = await sb.rpc("append_metric_csv_import_chunk_v2", {
+    p_import_id: importId,
+    p_chunk_index: 0,
+    p_chunk_digest: claimedDigest,
+    p_observations: [{ date: "2026-06-01", value: 2 }],
+    p_authored_by: null,
+  });
+  assert.equal(forgedRetry.error?.code, "C4090");
 });

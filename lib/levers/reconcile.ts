@@ -72,6 +72,7 @@ export async function reconcileLevers(
     }
     if (!hit) continue;
     const det = await detectLever(sb, {
+      scopeId: opts.scopeId,
       token: lever.provenance_token,
       externalRef: issueExternalRef(hit.number),
       htmlUrl: hit.htmlUrl,

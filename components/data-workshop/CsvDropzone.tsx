@@ -48,7 +48,7 @@ export function CsvDropzone({ enabled, metricName }: { enabled: boolean; metricN
       </div>
       <div className="mt-1 text-[13px] text-[var(--text-muted)]">
         {enabled ? (
-          <>Drop one CSV here or browse · exact <span className="font-mono">date,value</span> header · daily · 256 KB max</>
+          <>CSV · <span className="font-mono">date,value</span> · daily · 256 KB max</>
         ) : (
           "Activate a Decision Report to choose the only metric this importer may update."
         )}
@@ -73,13 +73,24 @@ export function CsvDropzone({ enabled, metricName }: { enabled: boolean; metricN
         {pending ? "Validating and importing…" : "Choose CSV"}
       </button>
       {state.status === "error" ? (
-        <div role="alert" className="mt-4 w-full max-w-2xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-[12px] text-red-900">
+        <div
+          role="alert"
+          data-error-code={state.code}
+          className={`mt-4 w-full max-w-2xl rounded-lg border px-4 py-3 text-left text-[12px] ${
+            state.code === "conflict"
+              ? "border-amber-200 bg-amber-50 text-amber-950"
+              : "border-red-200 bg-red-50 text-red-900"
+          }`}
+        >
           <p className="font-semibold">{state.error}</p>
           {(state.acceptedRows > 0 || state.rejectedRows > 0) ? (
             <p className="mt-1">Parsed {state.acceptedRows} valid · rejected {state.rejectedRows} · wrote 0</p>
           ) : null}
           {state.details.length > 0 ? (
             <ul className="mt-2 list-disc space-y-1 pl-4">{state.details.map((detail) => <li key={detail}>{detail}</li>)}</ul>
+          ) : null}
+          {state.progress ? (
+            <p className="mt-1 font-mono">Receipt {state.progress.importId.slice(0, 8)} · {state.progress.processedRows}/{state.progress.totalRows}</p>
           ) : null}
         </div>
       ) : null}
@@ -89,11 +100,7 @@ export function CsvDropzone({ enabled, metricName }: { enabled: boolean; metricN
           <p className="mt-1">
             {state.summary.startDate} to {state.summary.endDate} · {state.summary.insertedRows} new · {state.summary.updatedRows} updated · {state.summary.rejectedRows} rejected
           </p>
-          <p className="mt-1 text-teal-900/75">
-            {state.summary.existingObservationsUpdated
-              ? "Existing observations on matching dates were updated; all other dates were preserved."
-              : "No existing observations were changed."}
-          </p>
+          <p className="mt-1 font-mono text-teal-900/75">Receipt {state.summary.receipt.importId.slice(0, 8)}{state.summary.receipt.resumed ? " · resumed" : ""}</p>
         </div>
       ) : null}
     </form>
