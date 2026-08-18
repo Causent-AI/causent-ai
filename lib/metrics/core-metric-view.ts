@@ -9,6 +9,7 @@ export type CoreMetricChoice = {
 
 export type CoreMetricDrawerView = {
   choices: CoreMetricChoice[];
+  summaryChoices: CoreMetricChoice[];
   selectedChoice: CoreMetricChoice | null;
   reportMetric: Metric | null;
   contextMetricCount: number;
@@ -44,10 +45,17 @@ export function selectCoreMetricDrawerView(input: {
   const selectedChoice = choices.find(
     ({ metric }) => metric.id === input.selectedMetricId,
   ) ?? choices[0] ?? null;
+  const summaryChoices = selectedChoice
+    ? [
+        selectedChoice,
+        ...choices.filter(({ metric }) => metric.id !== selectedChoice.metric.id),
+      ]
+    : choices;
   const contextMetricCount = choices.filter(({ role }) => role === "context").length;
 
   return {
     choices,
+    summaryChoices,
     selectedChoice,
     reportMetric,
     contextMetricCount,

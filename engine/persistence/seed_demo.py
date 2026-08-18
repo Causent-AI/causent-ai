@@ -8,11 +8,13 @@ demo data). This script stands up the SAME demo semantics inside Postgres so the
 UI can be wired to RLS-scoped Supabase reads that carry REAL engine output:
 honest ITS causal readouts, not hand-authored impact cells.
 
-It seeds exactly one tenant that mirrors lib/seed.ts:
+It seeds one synthetic org with two genuine project/workspace boundaries:
   org "Causent" -> project "Orbit" -> workspace "Gummy Alpha"
+                -> project "Northstar" -> workspace "Support Operations"
   5 metrics: ARR, Activation Rate, Churn Rate, Gross Profit, Support Tickets
-  210 DAILY metric_observations per metric, ending 2025-05-23
+  210 DAILY metric_observations per Gummy Alpha metric, ending 2025-05-23
   actions as shipped GitHub PRs (#8324..#8421 = the lib/seed.ts May cohort)
+  2 Northstar metrics x 122 DAILY observations for the completed-loop fixture
 
 The product boundary it demonstrates (docs: FLOOR_CONFIDENT=45)
 --------------------------------------------------------------
@@ -62,11 +64,13 @@ Run:
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import sys
 import uuid
 from datetime import date, timedelta
+from pathlib import Path
 
 import numpy as np
 import psycopg
@@ -88,6 +92,8 @@ DSN = os.environ.get(
 ORG = uuid.UUID("ca5e0000-0000-0000-0000-0000000000d1")
 PROJ = uuid.UUID("ca5e0000-0000-0000-0000-0000000000d2")
 SCOPE = uuid.UUID("ca5e0000-0000-0000-0000-0000000000d3")  # workspace = operating level
+NORTHSTAR_PROJ = uuid.UUID("ca5e0000-0000-0000-0000-0000000000d4")
+NORTHSTAR_SCOPE = uuid.UUID("ca5e0000-0000-0000-0000-0000000000d5")
 USER = uuid.UUID("ca5e1111-0000-0000-0000-0000000000d9")   # OWNER of the demo org
 
 
@@ -120,6 +126,8 @@ METRICS = [
     (_metric_uuid(5), "Support Tickets", "csv", "count"),
 ]
 M_ARR, M_ACTIVATION, M_CHURN, M_GP, M_SUPPORT = (m[0] for m in METRICS)
+M_NORTHSTAR_SETUP = _metric_uuid(8)
+M_NORTHSTAR_SUPPORT = _metric_uuid(9)
 # Four populated context metrics plus a future report target fill the five-choice
 # demo drawer without silently marking that report target as a workspace core.
 DEMO_CORE_METRIC_NAMES = {
@@ -128,6 +136,23 @@ DEMO_CORE_METRIC_NAMES = {
     "Churn Rate",
     "Support Tickets",
 }
+
+
+def _northstar_metric_rows() -> list[tuple[date, float, float]]:
+    """Load the checked-in completed-loop outcome and derive one deterministic
+    monitoring series for the synthetic Northstar fixture."""
+    fixture = Path(__file__).resolve().parents[2] / "test-fixtures" / "northstar-support-full-loop.csv"
+    rows: list[tuple[date, float, float]] = []
+    with fixture.open(newline="", encoding="utf-8") as handle:
+        for index, row in enumerate(csv.DictReader(handle)):
+            obs_date = date.fromisoformat(row["date"])
+            completion = float(row["value"])
+            weekly_noise = ((index % 7) - 3) * 4.0
+            support_tickets = max(0.0, 1_020.0 - completion * 11.5 + weekly_noise)
+            rows.append((obs_date, completion, round(support_tickets, 2)))
+    if len(rows) != 122 or any(rows[index][0] <= rows[index - 1][0] for index in range(1, len(rows))):
+        raise RuntimeError("Northstar completed-loop fixture must contain 122 ordered daily rows.")
+    return rows
 
 # --- Landmark (confident-capable) ship dates ------------------------------------------
 ARR_STEP_DATE = date(2025, 2, 3)        # PR #8107 -> clean +step on ARR
@@ -328,6 +353,14 @@ def _seed(conn: psycopg.Connection, series: dict[uuid.UUID, list[float]]) -> Non
             (SCOPE, PROJ, "Gummy Alpha"),
         )
         cur.execute(
+            "insert into public.projects (project_id, org_id, name) values (%s,%s,%s)",
+            (NORTHSTAR_PROJ, ORG, "Northstar"),
+        )
+        cur.execute(
+            "insert into public.workspaces (workspace_id, project_id, name) values (%s,%s,%s)",
+            (NORTHSTAR_SCOPE, NORTHSTAR_PROJ, "Support Operations"),
+        )
+        cur.execute(
             "insert into public.memberships (user_id, org_id, role) values (%s,%s,'owner')",
             (USER, ORG),
         )
@@ -349,6 +382,42 @@ def _seed(conn: psycopg.Connection, series: dict[uuid.UUID, list[float]]) -> Non
                 ]),
                 "2025-05-12",
             ),
+        )
+
+        cur.execute(
+            "insert into public.objectives (scope_id, title, statement, key_results, updated_at) "
+            "values (%s,'North Star',%s,%s,%s)",
+            (
+                NORTHSTAR_SCOPE,
+                "Help new self-serve customers complete setup in their first week while reducing setup-related support demand.",
+                json.dumps([
+                    "First-week Setup Completion: 40% -> 55%",
+                    "Setup Support Tickets: sustained reduction after rollout",
+                ]),
+                "2026-07-31",
+            ),
+        )
+
+        northstar_rows = _northstar_metric_rows()
+        cur.execute(
+            "insert into public.metrics "
+            "(metric_id, scope_id, name, source, granularity, unit, is_core) "
+            "values (%s,%s,'First-week Setup Completion','csv','daily','percent',true)",
+            (M_NORTHSTAR_SETUP, NORTHSTAR_SCOPE),
+        )
+        cur.executemany(
+            "insert into public.metric_observations (metric_id, obs_date, value) values (%s,%s,%s)",
+            [(M_NORTHSTAR_SETUP, obs_date, completion) for obs_date, completion, _ in northstar_rows],
+        )
+        cur.execute(
+            "insert into public.metrics "
+            "(metric_id, scope_id, name, source, granularity, unit, is_core) "
+            "values (%s,%s,'Setup Support Tickets','csv','daily','count',true)",
+            (M_NORTHSTAR_SUPPORT, NORTHSTAR_SCOPE),
+        )
+        cur.executemany(
+            "insert into public.metric_observations (metric_id, obs_date, value) values (%s,%s,%s)",
+            [(M_NORTHSTAR_SUPPORT, obs_date, tickets) for obs_date, _, tickets in northstar_rows],
         )
 
         for metric_id, name, source, unit in [*METRICS, DRIFT_METRIC]:
@@ -566,6 +635,10 @@ def _verify(conn: psycopg.Connection) -> dict:
         "orgs": scalar("select count(*) from public.orgs where org_id=%s", (ORG,)),
         "projects": scalar("select count(*) from public.projects where org_id=%s", (ORG,)),
         "workspaces": scalar("select count(*) from public.workspaces where project_id=%s", (PROJ,)),
+        "northstar_workspaces": scalar(
+            "select count(*) from public.workspaces where workspace_id=%s and project_id=%s",
+            (NORTHSTAR_SCOPE, NORTHSTAR_PROJ),
+        ),
         "memberships": scalar("select count(*) from public.memberships where org_id=%s", (ORG,)),
         "metrics": scalar("select count(*) from public.metrics where scope_id=%s", (SCOPE,)),
         "metric_observations": scalar(
@@ -577,6 +650,12 @@ def _verify(conn: psycopg.Connection) -> dict:
         "causal_edges": scalar("select count(*) from public.causal_edges where scope_id=%s", (SCOPE,)),
         "evidence_objects": scalar(
             "select count(*) from public.evidence_objects where scope_id=%s", (SCOPE,)),
+        "northstar_metrics": scalar(
+            "select count(*) from public.metrics where scope_id=%s", (NORTHSTAR_SCOPE,)),
+        "northstar_metric_observations": scalar(
+            "select count(*) from public.metric_observations as observation "
+            "join public.metrics as metric on metric.metric_id=observation.metric_id "
+            "where metric.scope_id=%s", (NORTHSTAR_SCOPE,)),
     }
 
     counts["decisions"] = scalar(
@@ -702,7 +781,11 @@ def main() -> int:
               "INCONCLUSIVE", "GATHERING", "VOIDED", "UNMEASURABLE_NO_METRIC"}
 
     ok = (
-        c["metrics"] == 7                            # + drift metric + declared (no-obs) metric
+        c["projects"] == 2
+        and c["northstar_workspaces"] == 1
+        and c["northstar_metrics"] == 2
+        and c["northstar_metric_observations"] == 244
+        and c["metrics"] == 7                            # + drift metric + declared (no-obs) metric
         and c["metric_observations"] == 6 * SERIES_DAYS  # declared metric has NO observations
         and c["actions"] == len(ACTIONS) + 2         # + the VOIDED lever + the drift lever
         and result["confident_edges"] >= 1

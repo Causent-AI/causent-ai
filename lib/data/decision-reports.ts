@@ -1,6 +1,5 @@
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { DEMO_SCOPE_ID } from "@/lib/data/config";
 import {
   validateDecisionReport,
   validateMetricProjection,
@@ -51,17 +50,17 @@ type RevisionRow = {
 };
 
 /** Saved Decision Reports are the report-native project index for the dashboard. */
-export const getDecisionReports = cache(async function getDecisionReports(): Promise<
+export const getDecisionReports = cache(async function getDecisionReports(scopeId: string): Promise<
   DashboardDecisionReport[]
 > {
   const sb = await getServerSupabase();
   const [seriesRes, workspaceRes] = await Promise.all([
     sb.from("decision_report_series")
       .select("series_id, current_active_report_id")
-      .eq("scope_id", DEMO_SCOPE_ID),
+      .eq("scope_id", scopeId),
     sb.from("workspaces")
       .select("current_decision_report_series_id")
-      .eq("workspace_id", DEMO_SCOPE_ID)
+      .eq("workspace_id", scopeId)
       .single(),
   ]);
   if (seriesRes.error) throw seriesRes.error;
@@ -75,7 +74,7 @@ export const getDecisionReports = cache(async function getDecisionReports(): Pro
         "active_prediction_id, active_metric_id, updated_at, series_id, iteration_number, " +
         "predecessor_report_id, iteration_reason",
     )
-    .eq("scope_id", DEMO_SCOPE_ID)
+    .eq("scope_id", scopeId)
     .is("deleted_at", null)
     .order("updated_at", { ascending: false });
   if (reportsRes.error) throw reportsRes.error;
@@ -89,7 +88,7 @@ export const getDecisionReports = cache(async function getDecisionReports(): Pro
   const revisionsRes = await sb
     .from("decision_report_revisions")
     .select("revision_id, snapshot, metric_projection")
-    .eq("scope_id", DEMO_SCOPE_ID)
+    .eq("scope_id", scopeId)
     .in("revision_id", revisionIds);
   if (revisionsRes.error) throw revisionsRes.error;
   const revisionById = new Map(

@@ -5,7 +5,6 @@
 
 import type { ProjectObjective } from "@/lib/types";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { DEMO_SCOPE_ID } from "@/lib/data/config";
 
 type ObjectiveRow = {
   title: string;
@@ -15,12 +14,12 @@ type ObjectiveRow = {
 };
 
 /** The demo scope's north-star objective, or null if none is set. */
-export async function getObjective(): Promise<ProjectObjective | null> {
+export async function getObjective(scopeId: string): Promise<ProjectObjective | null> {
   const sb = await getServerSupabase();
   const res = await sb
     .from("objectives")
     .select("title, statement, key_results, updated_at")
-    .eq("scope_id", DEMO_SCOPE_ID)
+    .eq("scope_id", scopeId)
     .maybeSingle();
   if (res.error) throw res.error;
   if (!res.data) return null;

@@ -20,6 +20,8 @@ export type DetectInput = {
   htmlUrl?: string | null;
   /** Detection timestamp (ISO). Injected so tests are deterministic. */
   detectedAt?: string;
+  /** Optional application-selected workspace boundary for interactive paths. */
+  scopeId?: string;
 };
 
 export type DetectResult =
@@ -42,11 +44,12 @@ export async function detectLever(
   sb: SupabaseClient,
   input: DetectInput,
 ): Promise<DetectResult> {
-  const found = await sb
+  let foundQuery = sb
     .from("levers")
     .select("lever_id, action_id, status, drafted_payload")
-    .eq("provenance_token", input.token)
-    .maybeSingle();
+    .eq("provenance_token", input.token);
+  if (input.scopeId) foundQuery = foundQuery.eq("scope_id", input.scopeId);
+  const found = await foundQuery.maybeSingle();
   if (found.error) return { ok: false, reason: "no_lever", error: found.error.message };
   if (!found.data) return { ok: false, reason: "no_lever" };
   const lever = found.data as LeverRow;
@@ -57,20 +60,30 @@ export async function detectLever(
 
   const detectedAt = input.detectedAt ?? new Date().toISOString();
 
-  const actionUpd = await sb
+  let actionUpdate = sb
     .from("actions")
     .update({ external_ref: input.externalRef })
     .eq("action_id", lever.action_id);
-  if (actionUpd.error) {
-    return { ok: false, reason: "no_lever", error: actionUpd.error.message };
+  if (input.scopeId) actionUpdate = actionUpdate.eq("scope_id", input.scopeId);
+  const actionUpd = await actionUpdate.select("action_id");
+  if (actionUpd.error || (actionUpd.data ?? []).length !== 1) {
+    return { ok: false, reason: "no_lever", error: actionUpd.error?.message };
   }
 
   const payload = { ...(lever.drafted_payload ?? {}), detected_url: input.htmlUrl ?? null };
-  const leverUpd = await sb
+  let leverUpdate = sb
     .from("levers")
     .update({ status: "DETECTED", detected_at: detectedAt, drafted_payload: payload })
     .eq("lever_id", lever.lever_id);
-  if (leverUpd.error) return { ok: false, reason: "no_lever", error: leverUpd.error.message };
+  if (input.scopeId) leverUpdate = leverUpdate.eq("scope_id", input.scopeId);
+  const leverUpd = await leverUpdate.select("lever_id");
+  if (leverUpd.error || (leverUpd.data ?? []).length !== 1) {
+    return {
+      ok: false,
+      reason: "no_lever",
+      error: leverUpd.error?.message,
+    };
+  }
 
   return { ok: true, leverId: lever.lever_id, actionId: lever.action_id, alreadyDetected: false };
 }
@@ -80,14 +93,17 @@ export async function detectLever(
 export async function markLeverCreated(
   sb: SupabaseClient,
   token: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const res = await sb
+  scopeId?: string,
+): Promise<{ ok: boolean; updated: boolean; error?: string }> {
+  let update = sb
     .from("levers")
     .update({ status: "CREATED" })
     .eq("provenance_token", token)
     .eq("status", "DRAFTED");
-  if (res.error) return { ok: false, error: res.error.message };
-  return { ok: true };
+  if (scopeId) update = update.eq("scope_id", scopeId);
+  const res = await update.select("lever_id");
+  if (res.error) return { ok: false, updated: false, error: res.error.message };
+  return { ok: true, updated: (res.data ?? []).length === 1 };
 }
 
 /** Default detection window before a stale draft times out (env-overridable). */

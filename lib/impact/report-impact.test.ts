@@ -5,6 +5,7 @@ import type { MetricProjection } from "../decision-reports/schema.ts";
 import type { Action, Decision, Metric, Prediction } from "../types.ts";
 import {
   buildReportImpactViewModel,
+  buildCommittedPredictionTimelineLevels,
   buildReportTimelineLevels,
   formatReportMetricLevel,
 } from "./report-impact.ts";
@@ -26,6 +27,14 @@ const metric: Metric = {
   ],
 };
 
+const monitoringMetric: Metric = {
+  ...metric,
+  id: "support",
+  name: "Support Tickets",
+  format: "count",
+  higherIsBetter: false,
+};
+
 const projection: MetricProjection = {
   metricName: "Adoption Rate",
   definition: "Share of eligible users who activate.",
@@ -41,6 +50,7 @@ function action(
   displayCode: string,
   shippedAt: string | null,
   impact: Action["impact"] = [],
+  primaryMetricId = metric.id,
 ): Action {
   return {
     id,
@@ -49,7 +59,7 @@ function action(
     source: "manual",
     title: `Action ${displayCode}`,
     shippedAt,
-    primaryMetricId: metric.id,
+    primaryMetricId,
     impact,
   };
 }
@@ -106,9 +116,15 @@ test("the active-report view keeps one causal lever and traces support actions w
     label: "+4.0pp",
   };
   const actions = [
-    action("support-2", "D1A3", null),
+    action("support-2", "D1A3", null, [], monitoringMetric.id),
     action("primary", "D1A2", "2026-06-15", [confidentCell]),
-    action("support-1", "D1A1", "2026-04-02", [misleadingSupportCell]),
+    action(
+      "support-1",
+      "D1A1",
+      "2026-04-02",
+      [misleadingSupportCell],
+      monitoringMetric.id,
+    ),
   ];
 
   const view = buildReportImpactViewModel({
@@ -117,6 +133,7 @@ test("the active-report view keeps one causal lever and traces support actions w
     predictionId: "prediction",
     projection,
     metric,
+    metrics: [metric, monitoringMetric],
     actions,
   });
 
@@ -135,7 +152,9 @@ test("the active-report view keeps one causal lever and traces support actions w
   );
   assert.equal(view.actionTraces[0].state, "not-independently-estimated");
   assert.equal(view.actionTraces[0].impactLabel, "—", "support evidence must stay hidden");
+  assert.equal(view.actionTraces[0].metricName, "Support Tickets");
   assert.equal(view.actionTraces[1].state, "measured");
+  assert.equal(view.actionTraces[1].metricName, "Adoption Rate");
   assert.equal(view.actionTraces[1].impactLabel, "+14.7pp");
   assert.equal(view.actionTraces[1].ci95Label, "95% CI +14.5pp to +14.9pp");
   assert.equal(view.actionTraces[1].sampleLabel, "75 pre · 47 post");
@@ -162,6 +181,29 @@ test("timeline references share the connected ratio-form percent scale", () => {
     buildReportTimelineLevels({ ...metric, format: "count" }, projection),
     [],
     "percentage planning levels must not be overlaid on a different native unit",
+  );
+});
+
+test("active timeline levels use the commitment baseline and implied native target", () => {
+  assert.deepEqual(buildCommittedPredictionTimelineLevels(metric, prediction()), [
+    {
+      kind: "baseline",
+      value: 0.4,
+      label: "Baseline at commitment",
+      displayLabel: "40.0%",
+    },
+    {
+      kind: "target",
+      value: 0.55,
+      label: "Implied target",
+      displayLabel: "55.0%",
+    },
+  ]);
+
+  const countMetric = { ...monitoringMetric, series: [{ date: "2026-04-01", value: 100 }] };
+  assert.equal(
+    buildCommittedPredictionTimelineLevels(countMetric, prediction({ magnitudePctMean: 10 }))[1].value,
+    110,
   );
 });
 
@@ -192,6 +234,7 @@ test("an unresolved primary action stays blank instead of becoming a zero result
     predictionId: unresolved.id,
     projection,
     metric,
+    metrics: [metric],
     actions: [action("primary", "D1A1", "2026-06-15", [gatheringCell])],
   });
 
@@ -202,6 +245,56 @@ test("an unresolved primary action stays blank instead of becoming a zero result
   assert.equal(view.actionTraces[0].state, "gathering");
   assert.equal(view.actionTraces[0].impactLabel, "—");
   assert.match(view.actionTraces[0].detail, /No zero is substituted/);
+});
+
+test("decision package uses the latest-effective action as timing without individual attribution", () => {
+  const packageCell: Action["impact"][number] = {
+    metricId: metric.id,
+    direction: "up",
+    value: 5,
+    label: "+5.0pp",
+    good: true,
+    evidence: "causal",
+  };
+  const registered = action("primary", "D1A1", "2026-06-01");
+  registered.reportContext = {
+    activationId: "activation",
+    role: "registered-primary",
+    causalObject: "decision_package",
+    isPackageIntervention: false,
+    packageCompletedAt: "2026-06-15T12:00:00Z",
+    monitoringExpectedDirection: null,
+    monitoringCheckDate: null,
+  };
+  const finalAction = action("support-1", "D1A2", "2026-06-15", [packageCell], monitoringMetric.id);
+  finalAction.reportContext = {
+    activationId: "activation",
+    role: "supporting",
+    causalObject: "decision_package",
+    isPackageIntervention: true,
+    packageCompletedAt: "2026-06-15T12:00:00Z",
+    monitoringExpectedDirection: "DECREASE",
+    monitoringCheckDate: "2026-07-31",
+  };
+  const unmeasuredDecision = decision([prediction({ verdict: null, measuredPct: null })]);
+  const view = buildReportImpactViewModel({
+    reportTitle: "Package report",
+    decision: unmeasuredDecision,
+    predictionId: "prediction",
+    projection,
+    metric,
+    metrics: [metric, monitoringMetric],
+    actions: [registered, finalAction],
+  });
+
+  assert.equal(view.causalObject, "decision_package");
+  assert.equal(view.primaryActionId, "primary");
+  assert.equal(view.interventionActionId, "support-1");
+  assert.equal(view.packageCompletedAt, "2026-06-15T12:00:00Z");
+  assert.equal(view.actionTraces[0].state, "not-independently-estimated");
+  assert.equal(view.actionTraces[1].state, "measured");
+  assert.match(view.actionTraces[1].detail, /decision-package impact/i);
+  assert.match(view.actionTraces[1].detail, /individual action attribution is unavailable/i);
 });
 
 test("an inconclusive numeric result stays visibly non-confident", () => {
@@ -215,6 +308,7 @@ test("an inconclusive numeric result stays visibly non-confident", () => {
     predictionId: inconclusive.id,
     projection,
     metric,
+    metrics: [metric],
     actions: [action("primary", "D1A1", "2026-06-15")],
   });
 

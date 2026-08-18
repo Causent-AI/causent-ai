@@ -15,7 +15,16 @@ type Input = {
 async function context(input: Input) {
   const session = await getSession();
   if (!isLocalDemo() && !session.userId) return null;
-  return { sb: await getServerSupabase(), session, input: { ...input, authoredBy: session.userId } };
+  const sb = await getServerSupabase();
+  const report = await sb
+    .from("decision_reports")
+    .select("report_id")
+    .eq("report_id", input.reportId)
+    .eq("scope_id", session.workspaceId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (report.error || !report.data) return null;
+  return { sb, session, input: { ...input, authoredBy: session.userId } };
 }
 
 export async function uploadDecisionReportImageAction(input: Input, formData: FormData): Promise<ReportAssetMutationResult> {

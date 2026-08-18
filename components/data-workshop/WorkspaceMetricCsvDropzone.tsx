@@ -2,7 +2,6 @@
 
 import { useActionState } from "react";
 import { FileCsvIcon } from "@/components/ui/icons";
-import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import {
   importWorkspaceMetricCsvAction,
   type WorkspaceMetricCsvImportActionState,
@@ -30,12 +29,7 @@ export function WorkspaceMetricCsvDropzone({
           <FileCsvIcon />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <h2 id="workspace-metric-import-title" className="text-[15px] font-semibold text-[var(--text)]">Add a core metric</h2>
-            <InfoTooltip label="How metric import works">
-              <p>Import one daily <span className="font-mono">date,value</span> CSV. Reusing a metric name updates matching dates while dates absent from the file remain unchanged. Add the result to Core Metrics below.</p>
-            </InfoTooltip>
-          </div>
+          <h2 id="workspace-metric-import-title" className="text-[15px] font-semibold text-[var(--text)]">Add a core metric</h2>
           {activeMetricName ? <p className="mt-1 text-[11px] text-[var(--text-muted)]">Current report metric: <span className="font-semibold text-[var(--text)]">{activeMetricName}</span></p> : null}
         </div>
       </div>
@@ -88,13 +82,24 @@ export function WorkspaceMetricCsvDropzone({
       </form>
 
       {state.status === "error" ? (
-        <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-[12px] text-red-900">
+        <div
+          role="alert"
+          data-error-code={state.code}
+          className={`mt-4 rounded-lg border px-4 py-3 text-left text-[12px] ${
+            state.code === "conflict"
+              ? "border-amber-200 bg-amber-50 text-amber-950"
+              : "border-red-200 bg-red-50 text-red-900"
+          }`}
+        >
           <p className="font-semibold">{state.error}</p>
           {(state.acceptedRows > 0 || state.rejectedRows > 0) ? (
             <p className="mt-1">Parsed {state.acceptedRows} valid · rejected {state.rejectedRows} · wrote 0</p>
           ) : null}
           {state.details.length > 0 ? (
             <ul className="mt-2 list-disc space-y-1 pl-4">{state.details.map((detail) => <li key={detail}>{detail}</li>)}</ul>
+          ) : null}
+          {state.progress ? (
+            <p className="mt-1 font-mono">Receipt {state.progress.importId.slice(0, 8)} · {state.progress.processedRows}/{state.progress.totalRows}</p>
           ) : null}
         </div>
       ) : null}
@@ -106,9 +111,7 @@ export function WorkspaceMetricCsvDropzone({
           <p className="mt-1">
             {state.summary.startDate} to {state.summary.endDate} · {state.summary.insertedRows} new · {state.summary.updatedRows} updated
           </p>
-          <p className="mt-1 text-teal-900/75">
-            This metric is now available in the workspace catalog. Add it to Core Metrics below to show it across the dashboard.
-          </p>
+          <p className="mt-1 font-mono text-teal-900/75">Receipt {state.summary.receipt.importId.slice(0, 8)}{state.summary.receipt.resumed ? " · resumed" : ""}</p>
         </div>
       ) : null}
     </section>

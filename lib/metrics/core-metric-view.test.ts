@@ -48,6 +48,16 @@ test("selecting a context metric changes only the drawer view", () => {
   assert.equal(view.reportMetric, report);
   assert.equal(view.selectedChoice?.metric, context);
   assert.equal(view.selectedChoice?.role, "context");
+  assert.deepEqual(
+    view.choices.map(({ metric: choice }) => choice.id),
+    ["adoption", "activation"],
+    "the report-first selector order stays canonical",
+  );
+  assert.deepEqual(
+    view.summaryChoices.map(({ metric: choice }) => choice.id),
+    ["activation", "adoption"],
+    "the selected metric is promoted only in the summary",
+  );
 });
 
 test("duplicate metrics are removed and a stale selection falls back to the report target", () => {

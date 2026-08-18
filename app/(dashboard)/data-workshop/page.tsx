@@ -49,12 +49,7 @@ export default async function DataWorkshopPage({
     <div className="mx-auto flex max-w-[1360px] flex-col gap-4 p-4 sm:p-5">
       {returnTo ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/70 px-4 py-3">
-          <div>
-            <p className="text-[12px] font-semibold text-teal-950">Decision Report metric handoff</p>
-            <p className="mt-0.5 text-[11px] leading-5 text-teal-900/75">
-              Review the workspace metrics here, then return to confirm one against the report.
-            </p>
-          </div>
+          <p className="text-[12px] font-semibold text-teal-950">Choose report metrics</p>
           <Link href={returnTo} className="rounded-lg bg-teal-900 px-3 py-2 text-[11px] font-semibold text-white">
             Return to Decision Report
           </Link>

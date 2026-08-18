@@ -21,6 +21,16 @@ export type ReportAssetView = {
   previewUrl: string;
 };
 
+/**
+ * Version private previews by the immutable sanitized-content digest. The
+ * application route still performs the workspace/attachment check before it
+ * mints a short-lived Storage URL; the query value only prevents a browser
+ * from reusing a preview after the report attaches different bytes.
+ */
+export function reportAssetPreviewUrl(assetId: string, contentHash: string): string {
+  return `/api/decision-report-assets/${assetId}?v=${encodeURIComponent(contentHash)}`;
+}
+
 export type ReportAssetMutationResult =
   | { ok: true; revisionId: string; status: "draft" | "report_ready"; asset: ReportAssetView | null }
   | { ok: false; code: "validation" | "conflict" | "forbidden" | "storage" | "database"; error: string };
@@ -76,11 +86,11 @@ async function cleanupDetached(sb: SupabaseClient, reportId: string, authoredBy:
 
 async function attachedAssetAfterRetry(sb: SupabaseClient, assetId: string, contentHash: string): Promise<ReportAssetView | null> {
   const response = await sb.from("report_assets")
-    .select("asset_id, media_type, width, height, byte_size, status")
+    .select("asset_id, media_type, width, height, byte_size, content_hash, status")
     .eq("asset_id", assetId).eq("content_hash", contentHash).eq("status", "attached").maybeSingle();
   if (response.error || !response.data) return null;
-  const row = response.data as { asset_id: string; media_type: "image/png" | "image/jpeg"; width: number; height: number; byte_size: number };
-  return { assetId: row.asset_id, mediaType: row.media_type, width: row.width, height: row.height, byteSize: row.byte_size, previewUrl: `/api/decision-report-assets/${row.asset_id}` };
+  const row = response.data as { asset_id: string; media_type: "image/png" | "image/jpeg"; width: number; height: number; byte_size: number; content_hash: string };
+  return { assetId: row.asset_id, mediaType: row.media_type, width: row.width, height: row.height, byteSize: row.byte_size, previewUrl: reportAssetPreviewUrl(row.asset_id, row.content_hash) };
 }
 
 export async function attachReportImage(
@@ -170,7 +180,7 @@ export async function attachReportImage(
       width: image.width,
       height: image.height,
       byteSize: image.bytes.length,
-      previewUrl: `/api/decision-report-assets/${row.asset_id}`,
+      previewUrl: reportAssetPreviewUrl(row.asset_id, image.contentHash),
     },
   };
 }
@@ -202,11 +212,15 @@ export async function detachReportImage(
   return { ok: true, revisionId: row.revision_id, status: row.status ?? statusFor(report), asset: null };
 }
 
-export async function loadAttachedReportAsset(sb: SupabaseClient, reportId: string): Promise<ReportAssetView | null> {
-  if (!UUID_PATTERN.test(reportId)) return null;
-  const response = await sb.from("report_assets").select("asset_id, media_type, width, height, byte_size")
-    .eq("report_id", reportId).eq("status", "attached").maybeSingle();
+export async function loadAttachedReportAsset(
+  sb: SupabaseClient,
+  scopeId: string,
+  reportId: string,
+): Promise<ReportAssetView | null> {
+  if (!UUID_PATTERN.test(scopeId) || !UUID_PATTERN.test(reportId)) return null;
+  const response = await sb.from("report_assets").select("asset_id, media_type, width, height, byte_size, content_hash")
+    .eq("scope_id", scopeId).eq("report_id", reportId).eq("status", "attached").maybeSingle();
   if (response.error || !response.data) return null;
-  const row = response.data as { asset_id: string; media_type: "image/png" | "image/jpeg"; width: number; height: number; byte_size: number };
-  return { assetId: row.asset_id, mediaType: row.media_type, width: row.width, height: row.height, byteSize: row.byte_size, previewUrl: `/api/decision-report-assets/${row.asset_id}` };
+  const row = response.data as { asset_id: string; media_type: "image/png" | "image/jpeg"; width: number; height: number; byte_size: number; content_hash: string };
+  return { assetId: row.asset_id, mediaType: row.media_type, width: row.width, height: row.height, byteSize: row.byte_size, previewUrl: reportAssetPreviewUrl(row.asset_id, row.content_hash) };
 }

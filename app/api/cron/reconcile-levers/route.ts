@@ -3,14 +3,15 @@
 // protected by CRON_SECRET: Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`
 // (configure the secret in the Vercel project). All logic is in
 // lib/levers/reconcile (tested with a MOCK poller); this adapter picks the client,
-// the poller (live only when GITHUB_TOKEN is set — else timeout-only), and scope.
+// the poller (live only when GITHUB_TOKEN is set — else timeout-only), and the
+// server-owned demo workspace registry.
 //
 // Schedule lives in vercel.json (crons). LIVE polling of a real repo is the
 // credential-gated follow-up; the timeout sweep runs regardless.
 
 import { NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
-import { DEMO_SCOPE_ID } from "@/lib/data/config";
+import { DEMO_WORKSPACES } from "@/lib/data/config";
 import { reconcileLevers } from "@/lib/levers/reconcile";
 import { createGitHubPoller, nullPoller } from "@/lib/connectors/github-poll";
 
@@ -41,14 +42,44 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
-  const out = await reconcileLevers(getServiceRoleSupabase(), poller, {
-    scopeId: DEMO_SCOPE_ID,
-    now: new Date(),
-    timeoutDays,
-  });
-  if (!out.ok) return NextResponse.json({ error: out.error }, { status: 500 });
+  const client = getServiceRoleSupabase();
+  const now = new Date();
+  const sweeps = await Promise.all(
+    DEMO_WORKSPACES.map(async (workspace) => ({
+      workspace,
+      outcome: await reconcileLevers(client, poller, {
+        scopeId: workspace.id,
+        now,
+        timeoutDays,
+      }),
+    })),
+  );
+  const failed = sweeps.find((sweep) => !sweep.outcome.ok);
+  if (failed && !failed.outcome.ok) {
+    return NextResponse.json(
+      { error: "workspace reconciliation failed", workspace: failed.workspace.key },
+      { status: 500 },
+    );
+  }
+  const results = sweeps.flatMap((sweep) =>
+    sweep.outcome.ok
+      ? [{
+          workspace: sweep.workspace.key,
+          scanned: sweep.outcome.result.scanned,
+          detected: sweep.outcome.result.detected,
+          timedOut: sweep.outcome.result.timedOut,
+        }]
+      : [],
+  );
   return NextResponse.json(
-    { ...out.result, live_poll: Boolean(token), poller: token ? "live" : "disabled" },
+    {
+      scanned: results.reduce((total, result) => total + result.scanned, 0),
+      detected: results.flatMap((result) => result.detected),
+      timedOut: results.flatMap((result) => result.timedOut),
+      workspaces: results,
+      live_poll: Boolean(token),
+      poller: token ? "live" : "disabled",
+    },
     { status: 200 },
   );
 }

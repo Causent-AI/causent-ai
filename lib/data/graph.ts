@@ -9,7 +9,6 @@
 
 import { cache } from "react";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { DEMO_SCOPE_ID } from "@/lib/data/config";
 
 /** One materialized ACTION -> METRIC readout, already joined to its ITS lift. */
 export type EdgeReadout = {
@@ -69,7 +68,7 @@ export function edgeKey(actionId: string, metricId: string): string {
  * CLUSTER edges are intentionally dropped here — the UI reads per action, and clusters
  * are an overlay (see engine/persistence/bridge.py). Read-only; never mutates the graph.
  */
-export const loadEdgeReadouts = cache(async function loadEdgeReadouts(): Promise<
+export const loadEdgeReadouts = cache(async function loadEdgeReadouts(scopeId: string): Promise<
   Map<string, EdgeReadout>
 > {
   const sb = await getServerSupabase();
@@ -78,15 +77,15 @@ export const loadEdgeReadouts = cache(async function loadEdgeReadouts(): Promise
     sb
       .from("nodes")
       .select("node_id, type, semantic_ref")
-      .eq("scope_id", DEMO_SCOPE_ID),
+      .eq("scope_id", scopeId),
     sb
       .from("causal_edges")
       .select("edge_id, source_node_id, target_node_id, direction, belief_score, belief_reason")
-      .eq("scope_id", DEMO_SCOPE_ID),
+      .eq("scope_id", scopeId),
     sb
       .from("evidence_objects")
       .select("edge_id, methodology, lift, ci_low, ci_high, clustered, n_pre, n_post, created_at, evidence_id")
-      .eq("scope_id", DEMO_SCOPE_ID)
+      .eq("scope_id", scopeId)
       .in("methodology", ["ITS", "BEFORE_AFTER_14D"]),
   ]);
 

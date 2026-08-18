@@ -1,15 +1,13 @@
 import "server-only";
 
-import { getSession } from "@/lib/auth/session";
 import {
   loadCurrentCausalRecomputeStatus,
   type CausalRecomputeStatus,
 } from "@/lib/data/causal-recompute-status";
 import { getServerSupabase } from "@/lib/supabase-server";
 
-export async function getCurrentCausalRecomputeStatus(): Promise<
+export async function getCurrentCausalRecomputeStatus(scopeId: string): Promise<
   CausalRecomputeStatus | null
 > {
-  const [sb, session] = await Promise.all([getServerSupabase(), getSession()]);
-  return loadCurrentCausalRecomputeStatus(sb, session.workspaceId);
+  return loadCurrentCausalRecomputeStatus(await getServerSupabase(), scopeId);
 }

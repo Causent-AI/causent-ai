@@ -10,8 +10,9 @@ function directionOf(value: number): "up" | "down" | "neutral" {
 
 /**
  * Derive the report-level causal rollup from the already-isolated action list.
- * Only the pre-registered primary lever can enter the causal aggregate.
- * Descriptive and support-action cells remain outside the rollup, and
+ * A legacy report uses its pre-registered primary lever. A completed v2 plan
+ * uses its audited latest-effective action only as the package timing marker.
+ * Descriptive and other action cells remain outside the rollup, and
  * workspace-wide aggregates are intentionally ignored here.
  */
 export function deriveCurrentReportImpact(
@@ -19,8 +20,14 @@ export function deriveCurrentReportImpact(
   metrics: Metric[],
   primaryActionId: string | null,
 ): Pick<ReportProjectView, "aggregatedImpact" | "impactByMetric"> {
+  const packageInterventionActionId = actions.find(
+    (action) =>
+      action.reportContext?.causalObject === "decision_package" &&
+      action.reportContext.isPackageIntervention,
+  )?.id ?? null;
+  const causalActionId = packageInterventionActionId ?? primaryActionId;
   const causalCells = actions
-    .filter((action) => action.id === primaryActionId)
+    .filter((action) => action.id === causalActionId)
     .flatMap((action) =>
       action.impact.filter(
         (cell) => cell.evidence === "causal" && cell.value !== null,
@@ -73,7 +80,7 @@ export type ReportProjectView = {
 
 /**
  * An activated report is a project boundary inside the legacy shared demo workspace.
- * Only its canonical decision, selected actions, and confirmed metric may cross it.
+ * Only its canonical decision, selected actions, and their registered metrics may cross it.
  */
 export function selectReportProjectView(input: {
   reports: DashboardDecisionReport[];
@@ -113,15 +120,23 @@ export function selectReportProjectView(input: {
   );
   const actionIds = new Set(decisions.flatMap((decision) => decision.actionIds));
   const actions = input.actions.filter((action) => actionIds.has(action.id));
-  const metricUiId = activeReport.metricId
+  const primaryMetricUiId = activeReport.metricId
     ? input.metricUiIdByDbId.get(activeReport.metricId) ?? null
     : null;
-  const metrics = metricUiId
-    ? input.metrics.filter((metric) => metric.id === metricUiId)
-    : [];
+  const actionMetricIds = new Set(actions.map((action) => action.primaryMetricId));
+  if (primaryMetricUiId) actionMetricIds.add(primaryMetricUiId);
+  const primaryMetric = primaryMetricUiId
+    ? input.metrics.find((metric) => metric.id === primaryMetricUiId) ?? null
+    : null;
+  const metrics = [
+    ...(primaryMetric ? [primaryMetric] : []),
+    ...input.metrics.filter(
+      (metric) => metric.id !== primaryMetricUiId && actionMetricIds.has(metric.id),
+    ),
+  ];
   const reportImpact = deriveCurrentReportImpact(
     actions,
-    metrics,
+    primaryMetric ? [primaryMetric] : [],
     decisions[0]?.leverActionId ?? null,
   );
 

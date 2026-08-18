@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { METRIC_CSV_MAX_BYTES, parseMetricCsv } from "./csv.ts";
+import { METRIC_CSV_MAX_BYTES, METRIC_CSV_MAX_ROWS, parseMetricCsv } from "./csv.ts";
 
 const bytes = (value: string) => new TextEncoder().encode(value);
 
@@ -54,7 +54,7 @@ test("rejects binary, invalid UTF-8, empty, oversized, and over-row-limit files"
   const oversized = parseMetricCsv(new Uint8Array(METRIC_CSV_MAX_BYTES + 1));
   assert.equal(oversized.ok, false);
   if (!oversized.ok) assert.equal(oversized.code, "too_large");
-  const tooMany = parseMetricCsv(bytes(`date,value\n${Array.from({ length: 10_001 }, (_, i) => `2026-01-01,${i}`).join("\n")}`));
+  const tooMany = parseMetricCsv(bytes(`date,value\n${Array.from({ length: METRIC_CSV_MAX_ROWS + 1 }, (_, i) => `2026-01-01,${i}`).join("\n")}`));
   assert.equal(tooMany.ok, false);
   if (!tooMany.ok) assert.equal(tooMany.code, "row_limit");
 });

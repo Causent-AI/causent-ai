@@ -88,6 +88,16 @@ export type Action = {
   shippedAt: string | null;
   /** The metric this action primarily targeted. */
   primaryMetricId: string;
+  /** Normalized immutable Decision Report activation context, when applicable. */
+  reportContext?: {
+    activationId: string;
+    role: "registered-primary" | "supporting";
+    causalObject: "registered_primary_action" | "decision_package";
+    isPackageIntervention: boolean;
+    packageCompletedAt: string | null;
+    monitoringExpectedDirection: "INCREASE" | "DECREASE" | null;
+    monitoringCheckDate: string | null;
+  };
   /** Per-metric authoritative impact cells (ITS row). */
   impact: ImpactCell[];
   /** Rich-text-ish rationale ("Why did we build this?"). Plain paragraphs for v1. */
@@ -123,6 +133,15 @@ export type PredictionVerdict =
  *  Written by engine/persistence/resolve.py; all fields optional because a
  *  GATHERING / UNMEASURABLE_NO_METRIC tuple carries no measured side. */
 export type ResolutionTuple = {
+  causal_object?: "decision_package" | null;
+  intervention_rule?: "latest_effective_included_action" | null;
+  individual_attribution?: false | null;
+  registered_primary_action_id?: string | null;
+  intervention_action_id?: string | null;
+  intervention_date?: string | null;
+  included_action_ids?: string[];
+  package_hash?: string | null;
+  package_completed_at?: string | null;
   predicted_direction?: string | null;
   predicted_magnitude_pct?: number | null;
   predicted_native?: number | null;
@@ -149,11 +168,31 @@ export type PredictionRevision = {
 /** Detector status for baseline drift (mirrors engine causal.types.DriftStatus). */
 export type DriftStatus = "FIRED" | "NOT_FIRED" | "NO_BASELINE_YET";
 
+/** Freshness of the asynchronous workspace drift projection. Non-current rows
+ * never carry a detector claim to the dashboard. */
+export type DriftRefreshStatus =
+  | "current"
+  | "queued"
+  | "processing"
+  | "retrying"
+  | "failed"
+  | "missing";
+
+export type DriftRefreshMetadata = {
+  status: DriftRefreshStatus;
+  requestedGeneration: number | null;
+  processedGeneration: number | null;
+  requestedAt: string | null;
+  computedAt: string | null;
+  lastProcessedAt: string | null;
+  nextAttemptAt: string | null;
+};
+
 /**
- * Baseline-drift readout for a prediction, computed ON READ by the engine
- * (persistence/drift_read.py) — never persisted. A baseline move is a FACT, not a
- * verdict: `direction` is the metric's movement only. Levels are the plainly-shown
- * before/after segment means; the fire decision rests on the fitted step CI.
+ * Current baseline-drift readout for a prediction, asynchronously materialized
+ * by the engine. A baseline move is a FACT, not a verdict: `direction` is the
+ * metric's movement only. Levels are the plainly-shown before/after segment
+ * means; the fire decision rests on the fitted step CI.
  */
 export type DriftReadout = {
   status: DriftStatus;
@@ -199,11 +238,13 @@ export type Prediction = {
   resolutionTuple?: ResolutionTuple;
   revisions: PredictionRevision[];
   /**
-   * Baseline drift on the predicted metric, computed on read (null = not computed:
-   * a resolved prediction, or the engine read was unavailable). The notice renders
-   * from this — FIRED shows the calm assert-fact card.
+   * Current baseline drift on the predicted metric. Null means no current
+   * materialized fact; queued, processing, retrying, failed, and missing
+   * generations fail closed instead of serving an older result.
    */
   drift?: DriftReadout | null;
+  /** Queue/materialization freshness, even when `drift` is null. */
+  driftRefresh?: DriftRefreshMetadata | null;
 };
 
 /**

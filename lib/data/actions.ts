@@ -5,12 +5,13 @@
 
 import type { Action, ImpactCell } from "@/lib/types";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { DEMO_SCOPE_ID, METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
+import { METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
 import { getMetricRecords } from "@/lib/data/metrics";
 import { edgeKey, loadEdgeReadouts } from "@/lib/data/graph";
 import { toImpactCell } from "@/lib/data/readout";
 import { toActionIdentity } from "@/lib/data/action-identifiers";
 import { metricUiIdForExpectedName } from "@/lib/data/action-metric";
+import { loadCurrentDecisionReportActivationContract } from "@/lib/data/decision-report-activation-contract";
 
 type ActionRow = {
   action_id: string;
@@ -56,22 +57,29 @@ function paragraphs(doc: RationaleDoc | null): string[] {
  * a number only where the engine made a confident causal claim; everything else is a
  * neutral "—" ("gathering data" / inconclusive).
  */
-export async function getActions(): Promise<Action[]> {
+export async function getActions(scopeId: string): Promise<Action[]> {
   const sb = await getServerSupabase();
 
-  const [actionsRes, records, edges] = await Promise.all([
+  const [actionsRes, records, edges, activationContract] = await Promise.all([
     sb
       .from("actions")
       .select("action_id, source, external_ref, ship_ts, effective_date, status, rationale_richtext")
-      .eq("scope_id", DEMO_SCOPE_ID)
+      .eq("scope_id", scopeId)
       .order("effective_date", { ascending: false }),
-    getMetricRecords(),
-    loadEdgeReadouts(),
+    getMetricRecords(scopeId),
+    loadEdgeReadouts(scopeId),
+    loadCurrentDecisionReportActivationContract(scopeId),
   ]);
   if (actionsRes.error) throw actionsRes.error;
   const actionRows = (actionsRes.data ?? []) as ActionRow[];
 
   const firstMetricSlug = records[0]?.metric.id ?? "arr";
+  const metricUiIdByDbId = new Map(
+    records.map((record) => [record.metricId, record.metric.id]),
+  );
+  const bindingByActionId = new Map(
+    (activationContract?.actionBindings ?? []).map((binding) => [binding.actionId, binding]),
+  );
 
   return actionRows.map((row) => {
     const identity = toActionIdentity(row);
@@ -79,22 +87,43 @@ export async function getActions(): Promise<Action[]> {
     const body = paragraphs(doc);
 
     // Impact cells in canonical metric order; look up this action's edge per metric.
-    const impact: ImpactCell[] = records.map((rec) =>
-      toImpactCell(rec.metric, edges.get(edgeKey(row.action_id, rec.metricId))),
-    );
+    const reportBinding = bindingByActionId.get(row.action_id) ?? null;
+    const reportCreated = doc?.meta?.source_item_id !== undefined;
+    const causalTargetActionId = activationContract?.interventionActionId ?? null;
+    const impact: ImpactCell[] = records.map((rec) => {
+      const edge = edges.get(edgeKey(row.action_id, rec.metricId));
+      if (
+        reportCreated &&
+        (
+          !activationContract ||
+          !reportBinding ||
+          row.action_id !== causalTargetActionId ||
+          rec.metricId !== activationContract.primaryMetricId
+        )
+      ) {
+        // Normalized report bindings are authoritative. Historical or support
+        // action edges cannot leak through as individual causal attribution.
+        return toImpactCell(rec.metric, undefined);
+      }
+      return toImpactCell(rec.metric, edge);
+    });
 
     // Primary metric = the action's hypothesized target (rationale meta). Join
     // report-created names to their generated UI ids before the legacy slug
     // fallback so every current-report action can find the displayed metric.
     const expectedName = doc?.meta?.expected_metric;
-    const primaryMetricId = expectedName
-      ? (
+    const primaryMetricId = reportCreated
+      ? reportBinding
+        ? metricUiIdByDbId.get(reportBinding.metricId) ?? "metric-unavailable"
+        : "metric-unavailable"
+      : expectedName
+        ? (
           metricUiIdForExpectedName(
             records.map((record) => record.metric),
             expectedName,
           ) ?? METRIC_CONFIG_BY_NAME[expectedName]?.id ?? expectedName
         )
-      : firstMetricSlug;
+        : firstMetricSlug;
 
     const action: Action = {
       id: identity.uiId,
@@ -108,6 +137,20 @@ export async function getActions(): Promise<Action[]> {
       primaryMetricId,
       impact,
     };
+
+    if (activationContract && reportBinding) {
+      action.reportContext = {
+        activationId: activationContract.activationId,
+        role: row.action_id === activationContract.registeredPrimaryActionId
+          ? "registered-primary"
+          : "supporting",
+        causalObject: activationContract.causalObject,
+        isPackageIntervention: row.action_id === activationContract.interventionActionId,
+        packageCompletedAt: activationContract.packageCompletedAt,
+        monitoringExpectedDirection: reportBinding.monitoringExpectedDirection,
+        monitoringCheckDate: reportBinding.monitoringCheckDate,
+      };
+    }
 
     if (body.length > 0) {
       action.rationale = {

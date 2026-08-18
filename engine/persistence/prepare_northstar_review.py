@@ -1,8 +1,8 @@
 """Prepare the bounded Northstar completed-loop data in local Supabase.
 
 This helper imports one synthetic daily series through the checked workspace
-metric RPC and selects four populated context metrics through the checked core
-metric RPC. It refuses non-loopback databases and never changes report, series,
+metric RPC and selects the two populated Northstar metrics through the checked
+core metric RPC. It refuses non-loopback databases and never changes report, series,
 activation, prediction, or current-pointer rows.
 """
 
@@ -20,13 +20,11 @@ from urllib.parse import urlparse
 import psycopg
 
 DEFAULT_DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-DEFAULT_SCOPE = "ca5e0000-0000-0000-0000-0000000000d3"
+DEFAULT_SCOPE = "ca5e0000-0000-0000-0000-0000000000d5"
 METRIC_NAME = "First-week Setup Completion"
 CORE_METRIC_NAMES = (
-    "Activation Rate",
-    "ARR",
-    "Churn Rate",
-    "Support Tickets",
+    "First-week Setup Completion",
+    "Setup Support Tickets",
 )
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 

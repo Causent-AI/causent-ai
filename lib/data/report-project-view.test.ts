@@ -5,8 +5,12 @@ import type { DashboardDecisionReport } from "./decision-reports.ts";
 import { selectReportProjectView } from "./report-project-view.ts";
 import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "../decision-reports/fixtures/gummy-alpha.ts";
 
-const action = (id: string, impact: Action["impact"] = []): Action => ({
-  id, pr: 0, title: id, shippedAt: null, primaryMetricId: "completion", impact,
+const action = (
+  id: string,
+  impact: Action["impact"] = [],
+  primaryMetricId = "completion",
+): Action => ({
+  id, pr: 0, title: id, shippedAt: null, primaryMetricId, impact,
 });
 const decision = (
   id: string,
@@ -46,11 +50,16 @@ test("explicit current pointer wins over report order and timestamps", () => {
 });
 
 test("an active report isolates every dashboard dataset to its project", () => {
+  const reportAction = action("report-action");
+  const reportSupport = action("report-support", [], "support");
   const view = selectReportProjectView({
     reports: [report()],
-    actions: [action("report-action"), action("legacy-action")],
-    decisions: [decision("report-decision", ["report-action"]), decision("legacy", ["legacy-action"])],
-    metrics: [metric("completion"), metric("arr")],
+    actions: [reportAction, reportSupport, action("legacy-action")],
+    decisions: [
+      decision("report-decision", [reportAction.id, reportSupport.id]),
+      decision("legacy", ["legacy-action"]),
+    ],
+    metrics: [metric("completion"), metric("support"), metric("arr")],
     metricUiIdByDbId: new Map([["metric-uuid", "completion"]]),
     aggregatedImpact: [{ label: "Improvement Rate", value: "50%", comparison: "legacy", tone: "positive" }],
     impactByMetric: [
@@ -61,8 +70,8 @@ test("an active report isolates every dashboard dataset to its project", () => {
 
   assert.equal(view.activeReport?.id, "report");
   assert.deepEqual(view.decisions.map((item) => item.id), ["report-decision"]);
-  assert.deepEqual(view.actions.map((item) => item.id), ["report-action"]);
-  assert.deepEqual(view.metrics.map((item) => item.id), ["completion"]);
+  assert.deepEqual(view.actions.map((item) => item.id), ["report-action", "report-support"]);
+  assert.deepEqual(view.metrics.map((item) => item.id), ["completion", "support"]);
   assert.deepEqual(view.impactByMetric.map((item) => item.metricId), ["completion"]);
   assert.equal(view.aggregatedImpact[0].value, "—");
 });
@@ -85,7 +94,7 @@ test("current report impact uses only the primary lever's causal cell", () => {
       metricId: "completion", direction: "up", value: 40,
       label: "+40.0pp", good: true, evidence: "causal",
     },
-  ]);
+  ], "support");
   const unrelated = action("legacy-action", [
     {
       metricId: "completion", direction: "down", value: -100,
@@ -103,7 +112,7 @@ test("current report impact uses only the primary lever's causal cell", () => {
       ),
       decision("legacy", [unrelated.id]),
     ],
-    metrics: [metric("completion")],
+    metrics: [metric("completion"), metric("support")],
     metricUiIdByDbId: new Map([["metric-uuid", "completion"]]),
     aggregatedImpact: [{ label: "Improvement Rate", value: "0%", comparison: "workspace", tone: "negative" }],
     impactByMetric: [{ metricId: "completion", value: -147, label: "-147.0pp", direction: "down", good: false }],
@@ -116,10 +125,54 @@ test("current report impact uses only the primary lever's causal cell", () => {
   assert.deepEqual(view.impactByMetric, [{
     metricId: "completion", value: 3, label: "+3.0pp", direction: "up", good: true,
   }]);
+  assert.deepEqual(view.metrics.map((item) => item.id), ["completion", "support"]);
   assert.deepEqual(view.aggregatedImpact, [{
     label: "Improvement Rate", value: "100%",
     comparison: "1 / 1 confident readouts for this report", tone: "positive",
   }]);
+});
+
+test("a completed package rolls up only the latest-effective action on the primary outcome", () => {
+  const registered = action("registered", [{
+    metricId: "completion", direction: "up", value: 99,
+    label: "+99.0pp", good: true, evidence: "causal",
+  }]);
+  registered.reportContext = {
+    activationId: "activation",
+    role: "registered-primary",
+    causalObject: "decision_package",
+    isPackageIntervention: false,
+    packageCompletedAt: "2026-08-16T00:00:00Z",
+    monitoringExpectedDirection: null,
+    monitoringCheckDate: null,
+  };
+  const finalAction = action("final", [{
+    metricId: "completion", direction: "up", value: 4,
+    label: "+4.0pp", good: true, evidence: "causal",
+  }], "support");
+  finalAction.reportContext = {
+    activationId: "activation",
+    role: "supporting",
+    causalObject: "decision_package",
+    isPackageIntervention: true,
+    packageCompletedAt: "2026-08-16T00:00:00Z",
+    monitoringExpectedDirection: "DECREASE",
+    monitoringCheckDate: "2026-09-30",
+  };
+  const view = selectReportProjectView({
+    reports: [report()],
+    actions: [registered, finalAction],
+    decisions: [decision("report-decision", [registered.id, finalAction.id], registered.id)],
+    metrics: [metric("completion"), metric("support")],
+    metricUiIdByDbId: new Map([["metric-uuid", "completion"]]),
+    aggregatedImpact: [],
+    impactByMetric: [],
+  });
+
+  assert.deepEqual(view.impactByMetric, [{
+    metricId: "completion", value: 4, label: "+4.0pp", direction: "up", good: true,
+  }]);
+  assert.equal(view.aggregatedImpact[0].comparison, "1 / 1 confident readouts for this report");
 });
 
 test("legacy workspaces retain their complete dashboard payload", () => {

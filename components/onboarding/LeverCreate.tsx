@@ -62,7 +62,9 @@ export function LeverCreate(props: Props) {
   const [pending, startTransition] = useTransition();
 
   const targetReady =
-    tracker === "github" ? repo.trim().length > 0 : jiraProjectKey.trim().length > 0;
+    tracker === "github"
+      ? repo.trim().length > 0
+      : jiraBaseUrl.trim().length > 0 && jiraProjectKey.trim().length > 0;
 
   function targetPayload() {
     return tracker === "github"
@@ -71,7 +73,7 @@ export function LeverCreate(props: Props) {
           targetSource: "jira" as const,
           jira: {
             projectKey: jiraProjectKey.trim(),
-            baseUrl: jiraBaseUrl.trim() || undefined,
+            baseUrl: jiraBaseUrl.trim(),
             projectId: jiraProjectId.trim() || undefined,
             issueTypeId: jiraIssueTypeId.trim() || undefined,
           },
@@ -193,6 +195,17 @@ export function LeverCreate(props: Props) {
             <div className="flex flex-col gap-2">
               <label className="flex flex-col gap-1">
                 <span className="text-[12px] font-medium text-[var(--text-muted)]">
+                  Jira site URL
+                </span>
+                <input
+                  className={field}
+                  placeholder="https://acme.atlassian.net"
+                  value={jiraBaseUrl}
+                  onChange={(e) => setJiraBaseUrl(e.target.value)}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[12px] font-medium text-[var(--text-muted)]">
                   Jira project key (watch target)
                 </span>
                 <input
@@ -204,15 +217,9 @@ export function LeverCreate(props: Props) {
               </label>
               <details className="text-[12px] text-[var(--text-muted)]">
                 <summary className="cursor-pointer select-none">
-                  Site + type ids (for the one-click create link)
+                  Type ids (for the one-click create link)
                 </summary>
                 <div className="mt-2 flex flex-col gap-2">
-                  <input
-                    className={field}
-                    placeholder="https://acme.atlassian.net"
-                    value={jiraBaseUrl}
-                    onChange={(e) => setJiraBaseUrl(e.target.value)}
-                  />
                   <div className="flex gap-2">
                     <input
                       className={`${field} flex-1`}

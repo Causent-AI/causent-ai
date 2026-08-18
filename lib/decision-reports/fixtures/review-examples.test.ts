@@ -32,7 +32,11 @@ test("review examples resolve only through their explicit allowlisted IDs", () =
   assert.equal(findDecisionReportReviewExampleById("gummy-alpha")?.project, "Gummy Alpha");
   assert.equal(
     findDecisionReportReviewExampleById("northstar-support")?.project,
-    "Northstar Support",
+    "Support Operations",
+  );
+  assert.equal(
+    findDecisionReportReviewExampleById("northstar-support")?.label,
+    "Northstar",
   );
   assert.equal(findDecisionReportReviewExampleById("unknown-example"), null);
   assert.equal(findDecisionReportReviewExampleById(null), null);

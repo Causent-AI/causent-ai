@@ -7,6 +7,7 @@ import {
   type DecisionReportV1,
   type DraftAction,
   type MetricProjection,
+  type PortableRichTextDocument,
 } from "@/lib/decision-reports/schema";
 
 export type ActionExecutionPatch = Partial<
@@ -98,9 +99,11 @@ function AudienceClaimEditor({
 
 export function ImplementationSection({
   implementation,
+  claimDocuments,
   projection,
   readOnly = false,
   onClaimChange,
+  onClaimDocumentChange,
   onActionTitleChange,
   onActionSummaryChange,
   onActionOwnerChange,
@@ -117,9 +120,14 @@ export function ImplementationSection({
   onStakeholderAdd,
 }: {
   implementation: DecisionReportV1["implementation"];
+  claimDocuments?: Record<string, PortableRichTextDocument>;
   projection: MetricProjection;
   readOnly?: boolean;
   onClaimChange: (claimId: string, text: string) => void;
+  onClaimDocumentChange: (
+    claimId: string,
+    document: PortableRichTextDocument,
+  ) => void;
   onActionTitleChange: (sourceItemId: string, title: string) => void;
   onActionSummaryChange: (sourceItemId: string, text: string) => void;
   onActionOwnerChange: (sourceItemId: string, text: string) => void;
@@ -161,6 +169,15 @@ export function ImplementationSection({
           rows={3}
           variant="document"
           readOnly={readOnly}
+          richTextDocument={
+            claimDocuments?.[implementation.actionPlanSummary[0].id]
+          }
+          onDocumentChange={(document) =>
+            onClaimDocumentChange(
+              implementation.actionPlanSummary[0].id,
+              document,
+            )
+          }
           onChange={(text) => onClaimChange(implementation.actionPlanSummary[0].id, text)}
         />
       </div>
@@ -271,16 +288,36 @@ export function ImplementationSection({
                 <details className="mt-3 border-t border-[var(--border)] pt-3" open={index === 0}>
                   <summary className="cursor-pointer text-[11px] font-semibold text-[var(--brand-blue)]">Action details</summary>
                   <div className="mt-4 grid gap-4">
-                    <label className="text-[11px] font-semibold text-[var(--text-muted)]" htmlFor={`action-summary-${action.sourceItemId}`}>
-                      Description
-                      <AutoGrowingTextarea
-                        id={`action-summary-${action.sourceItemId}`}
-                        className="mt-1 block min-h-20 w-full rounded-lg border border-[var(--border)] bg-slate-50/60 px-3 py-2 text-[13px] leading-5 text-[var(--text)] outline-none focus:border-[var(--brand-blue)]"
-                        value={action.summary[0]?.text ?? ""}
+                    {action.summary[0] ? (
+                      <ClaimEditor
+                        claim={action.summary[0]}
+                        label="Description"
+                        placeholder="Describe the intended work and outcome…"
+                        optional
+                        variant="document"
                         readOnly={readOnly}
-                        onChange={(event) => onActionSummaryChange(action.sourceItemId, event.target.value)}
+                        richTextDocument={
+                          claimDocuments?.[action.summary[0].id]
+                        }
+                        onDocumentChange={(document) =>
+                          onClaimDocumentChange(action.summary[0].id, document)
+                        }
+                        onChange={(text) =>
+                          onActionSummaryChange(action.sourceItemId, text)
+                        }
                       />
-                    </label>
+                    ) : (
+                      <label className="text-[11px] font-semibold text-[var(--text-muted)]" htmlFor={`action-summary-${action.sourceItemId}`}>
+                        Description
+                        <AutoGrowingTextarea
+                          id={`action-summary-${action.sourceItemId}`}
+                          className="mt-1 block min-h-20 w-full rounded-lg border border-[var(--border)] bg-slate-50/60 px-3 py-2 text-[13px] leading-5 text-[var(--text)] outline-none focus:border-[var(--brand-blue)]"
+                          value=""
+                          readOnly={readOnly}
+                          onChange={(event) => onActionSummaryChange(action.sourceItemId, event.target.value)}
+                        />
+                      </label>
+                    )}
                     <div className="grid gap-3 sm:grid-cols-3">
                       <label className="text-[11px] font-semibold text-[var(--text-muted)]" htmlFor={`action-owner-${action.sourceItemId}`}>
                         Owner

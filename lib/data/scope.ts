@@ -3,7 +3,6 @@
 
 import type { Scope } from "@/lib/types";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { DEMO_SCOPE_ID } from "@/lib/data/config";
 
 type WorkspaceRow = {
   name: string;
@@ -11,12 +10,12 @@ type WorkspaceRow = {
 };
 
 /** The demo scope's display names (org / project / workspace). */
-export async function getScope(): Promise<Scope> {
+export async function getScope(scopeId: string): Promise<Scope> {
   const sb = await getServerSupabase();
   const res = await sb
     .from("workspaces")
     .select("name, projects(name, orgs(name))")
-    .eq("workspace_id", DEMO_SCOPE_ID)
+    .eq("workspace_id", scopeId)
     .single();
   if (res.error) throw res.error;
 

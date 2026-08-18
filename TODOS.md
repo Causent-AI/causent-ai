@@ -1,14 +1,16 @@
 # Causent active backlog
 
-Last reconciled: 2026-08-12. Active and deliberately deferred work appears first; the dated
+Last reconciled: 2026-08-17. Active and deliberately deferred work appears first; the dated
 completed-slice checklists below are retained as point-in-time implementation history.
 
 PR #29 merged Slice 10 and the bounded MVP expansions into `main` as `690e196` on 2026-08-03 local
-time with the hosted app/engine/RLS/bridge gate green. Review rounds 1 and 2 plus the completed-loop
-Northstar review example are implemented locally on `codex/decision-report-review-round-1`. The
-founder has now requested production release, but the release candidate remains a dirty working
-tree and no deployment is claimed. Founder sign-off, partner evidence, production configuration,
-deployment, and canary work remain open below.
+time with the hosted app/engine/RLS/bridge gate green. Review rounds 1 and 2, the completed-loop
+Northstar example, and the founder-selected UX follow-up have a recorded passing checkpoint. The
+current working tree adds a later product/science/engineering hardening round that materially changes
+the application, engine, and database. Its exact local reset, full application/engine tests,
+production build, deterministic query-plan/scale checks, and desktop/mobile browser acceptance now
+pass on the combined source. Staging load, production-clone rehearsal, hosted worker configuration,
+deployment, canaries, founder sign-off, and partner evidence remain open below.
 
 ## P0 — AI-assisted Decision Report partner wedge
 
@@ -29,10 +31,10 @@ Approved design: `docs/designs/ai-assisted-decision-report.md`.
 
 - [x] Reframe onboarding around the casual challenge-first prompt **What's the biggest business challenge on your mind today?** Causent fills the Decision Report from the user's own words and clearly highlights any core details that still need input.
 - [x] Present one concise decision document with **Decision**, **Supporting Evidence**, and **Implementation** sections. Preserve structured Background, Problem, and Decision claims behind one readable prose block; make evidence an editable paragraph with one optional private chart/graph; remove the report-level metric-rationale and governance prompts.
-- [x] Allow up to 25 draft actions while retaining the existing one-to-three-action activation boundary and one explicit primary lever. Move activation selection into each action row instead of repeating it in a bottom step.
+- [x] Allow up to 25 draft actions and one explicit primary action. The later two-canvas follow-up supersedes the interim one-to-three activation limit by including all remaining actions and binding each to one selected metric.
 - [x] Replace explicit Save Report gating with debounced, serialized autosave. Flush the exact latest revision before asset mutation or activation; preserve local edits and stop on a stale conflict rather than silently rebasing.
 - [x] Add a forward database readiness predicate requiring Background, Problem, Decision, the Action Plan summary, and at least one titled action. Supporting evidence and metric rationale remain optional; focused integration coverage proves both the permissive and rejecting cases. Align the repository scanner and browser state in the interaction implementation.
-- [x] Replace the manually resizable narrative fields with one labeled, auto-growing Decision document canvas. Keep every paragraph bound to its existing claim ID, provenance, gap target, validated edit command, and serialized autosave path rather than flattening the report into an ambiguous freeform string.
+- [x] Replace the manually resizable narrative fields with document-like canvases while keeping every paragraph bound to its existing claim ID, provenance, gap target, validated edit command, and serialized autosave path. The later follow-up locks the final structure to exactly two rich canvases.
 - [x] Use the same responsive global header and full-size logo in onboarding and the dashboard. Keep the funnel tab-free, collapse only the New Project label at narrow widths, and remove the development-only Next.js badge that covered the logo during local review.
 
 ### Review round 2 follow-up — visual context and manual agent launchers
@@ -66,6 +68,102 @@ durable attribution remain deferred until after partner review.
 
 - [ ] Continue the founder review after this operator-directed release and record any additional
   workflow corrections before declaring the MVP interaction complete.
+
+### Review round 2 follow-up — two-canvas Decision Report
+
+- [x] Replace the separate narrative fields with exactly two Tiptap/ProseMirror canvases under one shared document toolbar: Decision contains Background, Problem, Decision, and optional Evidence; Action Plan contains the plan summary, Core Metrics, and every action.
+- [x] Support paragraphs, restrained headings, emphasis, lists, block quotes, safe links, undo, redo, and normalized rich paste without turning typed report controls into arbitrary editor blocks.
+- [x] Keep `Claim.text` authoritative and persist optional versioned portable rich-text JSON in a report-level claim map so legacy readers, activation, Actions & Decisions, and causal workflows remain compatible.
+- [x] Preserve sourced provenance for formatting-only changes; retain the existing `user_confirmed` and source-clearing transition for semantic text changes.
+- [x] Reject orphaned/divergent/oversized editor JSON, unsupported nodes or marks, unsafe links, and library-only attributes. Never store or render pasted HTML.
+- [x] Include every suggested action by default, retain the 25-action ceiling, and allow users to add or remove actions while keeping one explicit primary action.
+- [x] Select up to five report metrics, keep one explicit primary outcome, bind exactly one selected monitoring metric to every action, and require the primary action to use the primary outcome.
+- [x] Persist selected metrics and action bindings in append-only activation audit tables through checked, atomic, order-independent V2/v3 activation while retaining one prediction, one primary lever, and primary-only causal recomputation.
+- [x] Keep active reports read-only, preserve serialized autosave/conflict behavior and exact gap focus, and lazy-load the editor runtime after the onboarding challenge step.
+- [x] Remove redundant product help text and inert controls across the current report, Actions, Data Workshop, Impact, Core Metrics, and shell while retaining errors, authorization disclosures, uncertainty, methodology, and destructive-action warnings.
+- [x] Record independent product-manager and data-scientist reviews with code evidence and multiple remediation options per major issue.
+- [x] Resolve the UX review's high-priority continuity issues with one lifecycle footer, a live commitment chart, persistent post-activation commitment context in Actions, and a compact complete action/metric review.
+- [x] Preserve every activated action's metric assignment through Actions and Impact; label support assignments as monitoring metrics and keep causal aggregation primary-only.
+- [x] Replace the dashboard's compatibility-metadata metric mapping with a fail-closed normalized activation-contract reader over the activation metric/action child tables.
+- [ ] Complete the 10k-users/hour production-hardening sequence: real tenant resolution, bounded aggregate reads, deployed/instrumented async recompute, standardized lock order, mutable draft compaction, async staged ingestion, index/retention work, and representative load/soak/restore tests.
+- [ ] Complete the founder's hands-on editor review. Google Docs-class collaboration, comments, suggestion mode, pagination, offline sync, and Markdown source editing remain post-review product decisions.
+
+### Founder-selected UX follow-up — 2026-08-16
+
+- [x] Replace the sample-name illusion with two genuine local project/workspace scopes and a compact
+  server-resolved workspace selector. Carry the selected scope through report generation, saves,
+  assets, Actions, Data, Impact, recomputation, and scheduled reconciliation/resolution.
+- [x] Give each of the two canvases its own contextual desktop formatting bubble and a single-row,
+  horizontally scrolling mobile toolbar. Use an auto-growing report title and 44 px minimum mobile
+  controls without changing the typed report schema.
+- [x] Make each action one editor block with one editable heading, its rich summary, compact
+  primary/metric state, and a details sheet for execution metadata. Put the report-wide commitment
+  and complete action-to-metric mapping before the action list.
+- [x] Remove the separate activation acceptance step. The first deliberate **Start** on any included
+  action activates the exact autosaved report-wide plan atomically and opens that action; passive
+  editing, blur, navigation, metric selection, and opening details never activate.
+- [x] Preserve the preselected primary action and primary metric regardless of which support action
+  is started. Exact retries remain duplicate-free, changed/stale inputs conflict, and the action-start
+  Server Action binds report and revision to the selected session workspace before materialization.
+- [x] Reorder primary navigation to **Data -> Reports -> Actions -> Impact**.
+- [x] Complete the integrated desktop full-loop browser pass across both real local workspaces.
+- [x] Complete the mobile responsive browser pass and clean-console review. Recheck
+  workspace-switch draft reset, direct-link isolation, and clicked-action anchoring at the mobile
+  breakpoint before closing this acceptance item. At 390 x 844, the title wraps without horizontal
+  overflow, the two editors retain one horizontally scrolling 44 px toolbar, visible controls and the
+  action-details sheet meet the 44 px target, explicit workspace switching clears the mounted draft,
+  cross-workspace direct links fail generically, and the clicked support action opens at its exact
+  anchored row with no browser warning or error.
+
+The two review workspaces share one synthetic local organization so the demo owner is intentionally
+authorized for both. The workspace selector is an explicit current-operating-scope boundary, not a
+claim that the fixture models separate customer tenants. Production tenant scale and isolation remain
+part of the existing hardening work below.
+
+### Founder-selected product, science, and engineering hardening — 2026-08-16
+
+- [x] Unify report readiness and commitment wayfinding in one sticky lifecycle footer; make the
+  prediction chart reflect the current primary metric and commitment; keep the same commitment in a
+  compact report-native Actions header; and show the complete default-included action/metric plan
+  before any action is started.
+- [x] Load the current report's selected metrics and action bindings from normalized activation audit
+  rows and fail closed on inconsistent state. Preserve one primary outcome and registered primary
+  action while treating the included action with the latest effective completion date as the
+  intervention event for a completed multi-action **Decision package**. Same-day ties follow the
+  immutable report-plan order, never completion-entry order.
+- [x] Keep percent-of-mean as the immutable prediction unit while displaying its connected native
+  baseline and implied native target. Expose descriptive metric readiness without weakening the
+  45-day-per-side ITS confidence floor.
+- [x] Store optional expected direction and check date only for supporting-action monitoring context;
+  never promote those bindings into extra predictions or action-level causal estimates.
+- [x] Replace request-path Python drift computation with a coalesced async workspace job and bounded
+  materialized current-drift projection. The separate hosted drift worker and its production secrets
+  remain an operator gate.
+- [x] Lower one CSV import to 2,000 rows and process it through resumable, digest-bound 250-row
+  chunks with durable progress/final receipts and bounded transient-transaction retries.
+- [x] Move verified GitHub/Jira events through a service-only transactional inbox with exact payload
+  identity, attempt state, retry/dead-letter handling, and atomic canonical mutation/processed state.
+- [x] Deliver an authorized private report image through a short-lived signed Storage URL for the
+  exact content-hashed server path rather than proxying the object bytes through Next.js.
+- [x] Add workload-shaped indexes plus authenticated plan scripts, and split the multi-metric rollout
+  into expand, bounded backfill, validation, and contract phases with an online-index runbook.
+- [x] Add a guarded k6 staging matrix, deterministic scale-fixture planner, protected manual workflow,
+  and initial p95/p99/error budgets. These are test instruments, not capacity evidence.
+- [x] Run the exact combined clean reset, schema lint, RLS/Storage/integration suite, full Node/Python
+  suites, Next.js 16 webpack build, desktop/mobile browser and console acceptance, and final diff audit.
+  Final local evidence: 641/660 Node tests passed with 19 intentional live-model skips; 1,251/1,251
+  Python tests passed; warning-level schema lint reported only four pre-existing advisories; the
+  supported Node 24 webpack build and request-bound dashboard guard passed. Browser QA at desktop and
+  390 x 844 exercised two editors, multi-metric assignment, support-action Start, current-workspace
+  isolation, Data/Reports/Actions/Impact continuity, and zero warning/error console entries. It also
+  caught and fixed a flex-collapsed Actions commitment card and the remaining sub-44 px mobile links.
+- [ ] Configure and run the protected staging steady, burst, hot-workspace, mixed-write, soak, and
+  adversarial profiles against representative data; retain artifacts and authenticated query plans.
+- [ ] Rehearse the split migration and online indexes on a production-sized clone before any remote
+  apply. Then deploy/configure/canary the app, drift/recompute workers, connector retry cron, and
+  Storage redirect path deliberately.
+- [ ] Replace the remaining unbounded dashboard/history contract and provision/instrument the bounded
+  causal worker pool. Both were deliberately deferred from this hardening round.
 
 ### Completed Slice 10 — explicit report iteration series and current-report boundary
 
@@ -143,9 +241,11 @@ prop for testing whether that future loop is understandable and useful; it is no
   `CAUSENT_RESOLVE_URL`/`CAUSENT_RESOLVE_SECRET` configuration.
 - [x] **Exact release revision and Preview:** commit `5a67a6f`, push
   `codex/decision-report-review-round-1`, and obtain a Ready Vercel Preview for that exact branch.
-- [ ] **PR CI and merge:** create the PR from the pushed branch, require the expanded hosted CI and
-  Vercel checks to pass for `5a67a6f`, then merge deliberately. The installed GitHub integration
-  denied PR creation, and PR #29's historical green gate does not cover this candidate.
+- [x] **PR merge:** founder-created PR #30 merged the two review commits into `main` as `b2bb98c`.
+- [ ] **Production re-release:** the automatic Vercel production build was Ready but returned HTTP
+  503 because `SUPABASE_SERVICE_ROLE_KEY` was absent and stale `CAUSENT_DEMO_TODAY` was present.
+  Production is healthy after rollback to `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`; configure and verify
+  every database/app/worker prerequisite above before redeploying `main`.
 - [ ] **Authenticated canaries:** after database/configuration/deployment, run a clean-account live
   pass across one URL, one text PDF, save/activate, three successors, direct history links, private
   image reattachment, observation import, all three manual action completions, recompute/resolution,
@@ -153,10 +253,10 @@ prop for testing whether that future loop is understandable and useful; it is no
 - [ ] Complete one final deep review of the end-to-end UI experience and workflow, including the manual handoff preview, before declaring the MVP interaction complete.
 - [ ] Run at least three initially unassisted partner sessions; require at least two to pass four of five checks: decision accurate, problem accurate, evidence traceable, selected core metric plausible, next action usable.
 
-The 2026-08-12 release pass published the exact candidate branch and produced a Ready Vercel
-Preview. It made no production migration, environment, worker-project, merge, promotion, or canary
-change. The operator release request does not satisfy founder acceptance or the unassisted
-partner-session gate.
+The 2026-08-12 release pass published and merged PR #30. Its automatic production deployment failed
+the public runtime canary and was rolled back to the newest verified pre-guard artifact. No database,
+environment-value, or worker-project change was made. The operator release request does not satisfy
+founder acceptance or the unassisted partner-session gate.
 
 ### Completed Slice 1 — interaction prototype
 
@@ -364,8 +464,17 @@ Already complete and not Slice 9 work: schema/provenance/gap/edit unit coverage,
 
 - Arm `causent-resolve`: set the Supabase session-pooler `DATABASE_URL` on the `causent-resolve` Vercel project, then redeploy `causent-resolve` and `causent-ai`.
 - Deploy and arm the causal recompute worker with the Supabase session-pooler `DATABASE_URL` and `CAUSENT_RECOMPUTE_SECRET`; set `CAUSENT_RECOMPUTE_URL`, the matching `CAUSENT_RECOMPUTE_SECRET`, and `CRON_SECRET` on `causent-ai`, then verify the five-minute cron and immediate wake-up paths.
+- Deploy and arm the separate drift materialization worker with its session-pooler `DATABASE_URL`
+  and `CAUSENT_DRIFT_SECRET`; set the matching `CAUSENT_DRIFT_URL`/secret on `causent-ai`, then
+  canary source enqueue, bounded drain, stale-generation suppression, terminal failure, and the
+  five-minute recovery cron.
 - Configure `SUPABASE_SERVICE_ROLE_KEY` as a server-only production app secret before releasing provenance-v2 generation; the source-receipt mint RPC requires it and ordinary authenticated clients cannot call that RPC. Never expose the key to the browser.
-- Decide separately whether to enable automated connector reconciliation and canary its webhook/cron consumers after the service-role key is present. Paste attribution remains available without connector write automation.
+- Decide separately whether to enable automated connector reconciliation and the connector-inbox
+  retry cron after the service-role key is present. Canary exact redelivery, payload conflict,
+  failure/retry, dead-letter, and provider mutation before enabling it. Paste attribution remains
+  available without connector write automation.
+- Configure the protected `staging-load` environment, including an isolated write probe, then retain
+  the selected k6 profile artifacts and database/worker telemetry before any capacity statement.
 - If Jira automation is needed, configure `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_WEBHOOK_SECRET`, and the Jira webhook.
 - If GitHub issue auto-create is needed, configure a write-scoped `GITHUB_WRITE_TOKEN`; the existing token is read-only.
 - Add `app/robots.ts` and the appropriate proxy behavior if `/login` should not be indexed.

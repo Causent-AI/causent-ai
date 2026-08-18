@@ -17,12 +17,14 @@ from __future__ import annotations
 import contextlib
 import json
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import numpy as np
 import psycopg
 import pytest
 
+import persistence.drift_read as drift_read
 from persistence.drift_read import read_prediction_drift, read_scope_drift
 
 DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -56,6 +58,39 @@ SHIFT_AT = 60      # baseline slide index (M_DRIFT)
 SHIP_AT = 80       # lever ship index (M_LEVER: the only step is here)
 
 
+class _SingleRow:
+    def __init__(self, row):
+        self._row = row
+
+    def fetchone(self):
+        return self._row
+
+
+class _CurrentPackageConnection:
+    """Minimal read seam with an earlier registered-primary lever date."""
+
+    def __init__(self, package_date: date | None):
+        self.package_date = package_date
+        self.legacy_lever_read = False
+
+    def execute(self, sql, _params=None):
+        if "from public.predictions as prediction" in sql:
+            return _SingleRow((
+                WS,
+                D_LEVER,
+                M_LEVER,
+                datetime(2025, 1, 1, 12, tzinfo=timezone.utc),
+            ))
+        if "from public.workspaces as workspace" in sql:
+            # A row with NULL means this is the current v2 package, but it is
+            # incomplete and therefore has no causal cutoff yet.
+            return _SingleRow((self.package_date,))
+        if "select min(action.effective_date)" in sql:
+            self.legacy_lever_read = True
+            return _SingleRow((date(2025, 2, 1),))
+        raise AssertionError(f"unexpected SQL: {sql}")
+
+
 def _dates():
     return [SERIES_START + timedelta(days=i) for i in range(SERIES_DAYS)]
 
@@ -72,6 +107,49 @@ def _lever_effect_values():
     v = 20.0 + rng.normal(0.0, 0.3, SERIES_DAYS)
     v[SHIP_AT:] += 6.0    # the lever WORKED — a step at its ship date, nothing else
     return v
+
+
+@pytest.mark.parametrize(
+    ("package_date", "expected_ordinal"),
+    [
+        (date(2025, 3, 14), date(2025, 3, 14).toordinal()),
+        (None, None),
+    ],
+)
+def test_current_v2_package_uses_package_cutoff_without_primary_fallback(
+    monkeypatch,
+    package_date,
+    expected_ordinal,
+):
+    """A reverse-recorded plan may complete on an earlier RPC while a support
+    action has the latest effective date. Drift must use the audited package
+    date, and an incomplete current v2 package must not fall back to its already
+    shipped registered-primary action.
+    """
+    conn = _CurrentPackageConnection(package_date)
+    captured = {}
+    sentinel = object()
+    monkeypatch.setattr(
+        drift_read,
+        "_load_metric",
+        lambda *_args: SimpleNamespace(series="metric-series"),
+    )
+
+    def capture(_series, commit_ordinal, ship_ordinal):
+        captured.update(
+            commit_ordinal=commit_ordinal,
+            ship_ordinal=ship_ordinal,
+        )
+        return sentinel
+
+    monkeypatch.setattr(drift_read, "detect_baseline_drift", capture)
+
+    assert read_prediction_drift(conn, P_LEVER) is sentinel
+    assert captured == {
+        "commit_ordinal": date(2025, 1, 1).toordinal(),
+        "ship_ordinal": expected_ordinal,
+    }
+    assert conn.legacy_lever_read is False
 
 
 def _superuser_conn():

@@ -8,6 +8,7 @@ import type {
   MetricProjection,
 } from "./schema.ts";
 import {
+  emptyDecisionReportActivationDraft,
   MAX_DECISION_REPORT_ACTIONS,
   validateDecisionReport,
 } from "./schema.ts";
@@ -499,6 +500,7 @@ function mapAction(
     title: title || "Define the next implementation step",
     summary: [mapClaimOrMissing(draft.summary, corpus, `${actionId}-summary`)],
     owner: owner.status === "missing" ? null : owner,
+    metricId: null,
     priority: index === 0 ? 3 : index === 1 ? 2 : 1,
     tags: [],
     skills: [],
@@ -593,6 +595,13 @@ export function materializeModelDecisionReport(
       },
     },
   };
+  const activationDraft = emptyDecisionReportActivationDraft();
+  activationDraft.selectedActionSourceItemIds = report.implementation.actions.map(
+    (action) => action.sourceItemId,
+  );
+  activationDraft.primaryLeverActionSourceItemId =
+    activationDraft.selectedActionSourceItemIds[0] ?? null;
+  report.activationDraft = activationDraft;
 
   const validation = validateDecisionReport(report);
   if (!validation.success) {
@@ -647,6 +656,7 @@ export function createSafeFallbackReport(
   const report: DecisionReportV1 = {
     schemaVersion: 2,
     title: "Decision Report draft",
+    activationDraft: emptyDecisionReportActivationDraft(),
     sourceSummaries,
     decision: {
       decision: [missing("decision")],

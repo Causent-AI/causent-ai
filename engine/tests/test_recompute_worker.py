@@ -28,6 +28,7 @@ PREDICTION = uuid.UUID("a1000000-0000-0000-0000-000000000011")
 ACTION = uuid.UUID("a1000000-0000-0000-0000-000000000012")
 UNRELATED_ACTION = uuid.UUID("a1000000-0000-0000-0000-000000000013")
 ACTIVATION = uuid.UUID("a1000000-0000-0000-0000-000000000014")
+FINAL_ACTION = uuid.UUID("a1000000-0000-0000-0000-000000000015")
 
 
 def _connect() -> psycopg.Connection:
@@ -84,8 +85,15 @@ def _seed(conn: psycopg.Connection) -> None:
         "insert into public.decision_report_revisions "
         "(revision_id, report_id, scope_id, revision_number, schema_version, snapshot, "
         "metric_projection, content_hash, authored_by) "
-        "values (%s, %s, %s, 1, 1, '{}'::jsonb, '{}'::jsonb, %s, %s)",
-        (REVISION, REPORT, SCOPE, "a" * 32, ACTOR),
+        "values (%s, %s, %s, 1, 1, %s::jsonb, '{}'::jsonb, %s, %s)",
+        (
+            REVISION,
+            REPORT,
+            SCOPE,
+            '{"implementation":{"actions":[{"sourceItemId":"a"},{"sourceItemId":"b"}]}}',
+            "a" * 32,
+            ACTOR,
+        ),
     )
     conn.execute(
         "update public.decision_reports set current_revision_id = %s, reviewed_revision_id = %s "
@@ -103,15 +111,18 @@ def _seed(conn: psycopg.Connection) -> None:
             "(action_id, scope_id, source, external_ref, effective_date, status, rationale_richtext) "
             "values (%s, %s, 'manual', %s, %s, 'complete', %s::jsonb)",
             [
-                (ACTION, SCOPE, "current", start + timedelta(days=50),
+                (ACTION, SCOPE, "registered-primary", start + timedelta(days=45),
                  '{"meta":{"source":"decision_report","source_item_id":"a"}}'),
+                (FINAL_ACTION, SCOPE, "final-package-marker", start + timedelta(days=50),
+                 '{"meta":{"source":"decision_report","source_item_id":"b"}}'),
                 (UNRELATED_ACTION, SCOPE, "historical", start + timedelta(days=55),
                  '{"meta":{"source":"decision_report","source_item_id":"old"}}'),
             ],
         )
     conn.execute(
-        "insert into public.decision_actions (decision_id, action_id) values (%s, %s)",
-        (DECISION, ACTION),
+        "insert into public.decision_actions (decision_id, action_id) "
+        "values (%s, %s), (%s, %s)",
+        (DECISION, ACTION, DECISION, FINAL_ACTION),
     )
     conn.execute(
         "insert into public.predictions "
@@ -121,15 +132,47 @@ def _seed(conn: psycopg.Connection) -> None:
     )
     conn.execute(
         "insert into public.decision_report_activations "
-        "(activation_id, report_id, revision_id, scope_id, input_hash, metric_id, "
+        "(activation_id, report_id, revision_id, scope_id, contract_version, input_hash, metric_id, "
         "prediction_direction, prediction_magnitude_pct_mean, prediction_resolution_date, "
         "selected_action_source_ids, decision_id, prediction_id, action_ids, "
         "primary_lever_source_id, primary_lever_action_id, activated_by) "
-        "values (%s, %s, %s, %s, %s, %s, 'POSITIVE', 10, %s, array['a'], %s, %s, "
-        "array[%s]::uuid[], 'a', %s, %s)",
+        "values (%s, %s, %s, %s, 2, %s, %s, 'POSITIVE', 10, %s, array['a','b'], %s, %s, "
+        "array[%s,%s]::uuid[], 'a', %s, %s)",
         (
-            ACTIVATION, REPORT, REVISION, SCOPE, "b" * 32, METRIC,
-            date(2099, 1, 1), DECISION, PREDICTION, ACTION, ACTION, ACTOR,
+            ACTIVATION, REPORT, REVISION, SCOPE, "b" * 64, METRIC,
+            date(2099, 1, 1), DECISION, PREDICTION, ACTION, FINAL_ACTION,
+            ACTION, ACTOR,
+        ),
+    )
+    conn.execute(
+        "insert into public.decision_report_activation_metrics "
+        "(activation_id, scope_id, metric_id) values (%s, %s, %s)",
+        (ACTIVATION, SCOPE, METRIC),
+    )
+    conn.execute(
+        "insert into public.decision_report_activation_action_metrics "
+        "(activation_id, scope_id, action_id, action_source_item_id, "
+        "action_source_item_hash, metric_id) "
+        "values "
+        "(%s, %s, %s, 'a', encode(extensions.digest(convert_to('a', 'UTF8'), "
+        "'sha256'), 'hex'), %s), "
+        "(%s, %s, %s, 'b', encode(extensions.digest(convert_to('b', 'UTF8'), "
+        "'sha256'), 'hex'), %s)",
+        (ACTIVATION, SCOPE, ACTION, METRIC, ACTIVATION, SCOPE, FINAL_ACTION, METRIC),
+    )
+    conn.execute(
+        "insert into public.decision_report_package_interventions "
+        "(activation_id, scope_id, report_id, decision_id, metric_id, "
+        "registered_primary_action_id, intervention_action_id, intervention_date, "
+        "included_action_ids, package_hash) "
+        "values (%s, %s, %s, %s, %s, %s, %s, %s, array[%s,%s]::uuid[], "
+        "private.decision_report_package_hash(%s, %s, %s, %s, %s, %s, %s, "
+        "array[%s,%s]::uuid[]))",
+        (
+            ACTIVATION, SCOPE, REPORT, DECISION, METRIC, ACTION, FINAL_ACTION,
+            start + timedelta(days=50), ACTION, FINAL_ACTION, ACTIVATION, REPORT,
+            DECISION, METRIC, ACTION, FINAL_ACTION, start + timedelta(days=50),
+            ACTION, FINAL_ACTION,
         ),
     )
     conn.execute(
@@ -170,21 +213,25 @@ def seeded():
         conn.close()
 
 
-def _evidence_counts(conn: psycopg.Connection) -> tuple[int, int]:
-    current = conn.execute(
+def _evidence_counts(conn: psycopg.Connection) -> tuple[int, int, int]:
+    registered_primary = conn.execute(
         "select count(*) from public.evidence_objects where action_id = %s", (ACTION,)
+    ).fetchone()[0]
+    package_marker = conn.execute(
+        "select count(*) from public.evidence_objects where action_id = %s",
+        (FINAL_ACTION,),
     ).fetchone()[0]
     unrelated = conn.execute(
         "select count(*) from public.evidence_objects where action_id = %s",
         (UNRELATED_ACTION,),
     ).fetchone()[0]
-    return current, unrelated
+    return registered_primary, package_marker, unrelated
 
 
 def test_worker_is_exact_retry_safe_current_action_only_and_supersedes_stale_pointer(seeded):
     first = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert first is not None and first.status == "PROCESSED"
-    assert _evidence_counts(seeded) == (2, 0)
+    assert _evidence_counts(seeded) == (0, 2, 0)
 
     seeded.execute(
         "select private.enqueue_current_causal_recompute(%s, %s, 'exact_retry', %s)",
@@ -193,7 +240,7 @@ def test_worker_is_exact_retry_safe_current_action_only_and_supersedes_stale_poi
     seeded.commit()
     retry = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert retry is not None and retry.status == "UNCHANGED"
-    assert _evidence_counts(seeded) == (2, 0)
+    assert _evidence_counts(seeded) == (0, 2, 0)
 
     seeded.execute(
         "update public.metric_observations set value = value + 1 "
@@ -203,7 +250,7 @@ def test_worker_is_exact_retry_safe_current_action_only_and_supersedes_stale_poi
     seeded.commit()
     changed = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert changed is not None and changed.status == "PROCESSED"
-    assert _evidence_counts(seeded) == (4, 0)
+    assert _evidence_counts(seeded) == (0, 4, 0)
 
     seeded.execute(
         "select private.enqueue_current_causal_recompute(%s, %s, 'stale_pointer', %s)",
@@ -217,7 +264,7 @@ def test_worker_is_exact_retry_safe_current_action_only_and_supersedes_stale_poi
     seeded.commit()
     stale = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert stale is not None and stale.status == "SUPERSEDED"
-    assert _evidence_counts(seeded) == (4, 0)
+    assert _evidence_counts(seeded) == (0, 4, 0)
 
 
 def test_worker_runs_graph_io_as_stored_actor_and_fails_closed_for_forgery(seeded):
@@ -235,7 +282,7 @@ def test_worker_runs_graph_io_as_stored_actor_and_fails_closed_for_forgery(seede
     seeded.commit()
     result = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert result is not None and result.status == "RETRY_SCHEDULED"
-    assert _evidence_counts(seeded) == (0, 0)
+    assert _evidence_counts(seeded) == (0, 0, 0)
 
 
 def test_worker_locks_current_pointer_spine_until_graph_receipt_commits(
@@ -256,7 +303,7 @@ def test_worker_locks_current_pointer_spine_until_graph_receipt_commits(
     failures = []
 
     def blocking_bridge(*_args, **kwargs):
-        assert kwargs == {"action_ids": [ACTION], "commit": False}
+        assert kwargs == {"action_ids": [FINAL_ACTION], "commit": False}
         bridge_entered.set()
         assert release_bridge.wait(5), "test did not release the bridge"
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { DecisionReportEditor } from "@/components/decision-report/DecisionReportEditor";
 import {
   generateDecisionReportAction,
   type GenerateDecisionReportActionResult,
@@ -21,6 +21,29 @@ import {
   REPORT_SOURCE_MAX_PDF_BYTES,
   type ReportSourceSummary,
 } from "@/lib/decision-reports/sources/types";
+import {
+  ACTIVE_WORKSPACE_CHANGED_EVENT,
+  type ActiveWorkspaceChangedDetail,
+} from "@/lib/auth/workspace-events";
+import { reconcileWorkspaceDraft } from "@/lib/decision-reports/workspace-draft";
+
+const DecisionReportEditor = dynamic(
+  () =>
+    import("@/components/decision-report/DecisionReportEditor").then(
+      (module) => module.DecisionReportEditor,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="mx-auto mt-6 w-full max-w-5xl rounded-2xl border border-[var(--border)] bg-white px-6 py-12 text-center text-[13px] text-[var(--text-muted)] shadow-sm"
+        role="status"
+      >
+        Loading Decision Report editor…
+      </div>
+    ),
+  },
+);
 
 type GeneratedReport = Extract<
   GenerateDecisionReportActionResult,
@@ -28,6 +51,7 @@ type GeneratedReport = Extract<
 >["generation"];
 
 export type InitialSavedDecisionReport = {
+  workspaceId: string;
   report: DecisionReportV1;
   metricProjection: MetricProjection;
   workspaceName: string;
@@ -45,6 +69,7 @@ export type InitialSavedDecisionReport = {
 };
 
 type ReportDraft = {
+  workspaceId: string;
   report: DecisionReportV1;
   metricProjection: MetricProjection;
   workspaceName: string;
@@ -68,12 +93,14 @@ export function DecisionReportOnboarding({
   activationMetrics = [],
   activationDateBounds,
   initialTelemetrySessionKey,
+  activeWorkspaceName,
 }: {
   initialSavedReport?: InitialSavedDecisionReport | null;
   initialLoadError?: string | null;
   activationMetrics?: ReportActivationMetric[];
   activationDateBounds: { today: string; minimum: string };
   initialTelemetrySessionKey: string;
+  activeWorkspaceName: string;
 }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
@@ -100,6 +127,25 @@ export function DecisionReportOnboarding({
       msSinceStart: 0,
     });
   }, [telemetryRun.sessionKey, trackLanding]);
+
+  useEffect(() => {
+    const handleWorkspaceChange = (event: Event) => {
+      const nextWorkspaceId = (
+        event as CustomEvent<ActiveWorkspaceChangedDetail>
+      ).detail?.workspaceId;
+      if (!nextWorkspaceId) return;
+      setDraft((current) => reconcileWorkspaceDraft(current, nextWorkspaceId));
+      setPrompt("");
+      setSelectedExampleId(null);
+      setSourceUrl("");
+      setPdfFile(null);
+      setError(null);
+    };
+    window.addEventListener(ACTIVE_WORKSPACE_CHANGED_EVENT, handleWorkspaceChange);
+    return () => {
+      window.removeEventListener(ACTIVE_WORKSPACE_CHANGED_EVENT, handleWorkspaceChange);
+    };
+  }, []);
 
   function generateReport() {
     if (pdfFile && (pdfFile.size === 0 || pdfFile.size > REPORT_SOURCE_MAX_PDF_BYTES)) {
@@ -131,6 +177,7 @@ export function DecisionReportOnboarding({
       }
       const generated: GeneratedReport = result.generation;
       setDraft({
+        workspaceId: generated.workspaceId,
         report: generated.report,
         metricProjection: generated.metricProjection,
         workspaceName: generated.workspaceName,
@@ -161,12 +208,12 @@ export function DecisionReportOnboarding({
                   : source.label,
               )
               .join(", ")}
-            . Source text was inspected for this draft; uploaded files are not retained.
+            . Source text used for this draft. Uploaded files were not retained.
           </div>
         ) : null}
         {draft.persistence?.lineage && draft.persistence.lineage.iterationNumber > 1 ? (
           <div className="mx-auto mt-4 max-w-5xl rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-[12px] text-blue-950">
-            <strong>Iteration {draft.persistence.lineage.iterationNumber}</strong> · {draft.persistence.lineage.iterationReason}. The prior active report remains live until this report is activated. Its private image was not copied; attach a new sanitized image if needed.
+            <strong>Version {draft.persistence.lineage.iterationNumber}</strong> · {draft.persistence.lineage.iterationReason}. The current report stays active until this version is activated. Images are not copied.
           </div>
         ) : null}
         <DecisionReportEditor
@@ -206,33 +253,26 @@ export function DecisionReportOnboarding({
     <section className="mx-auto flex w-full max-w-3xl flex-col py-6 sm:py-12">
       <div className="mb-8">
         <div className="mb-4 flex items-center gap-2 text-[11px] font-medium text-[var(--text-muted)]">
-          <span className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1">Orbit</span>
+          <span className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1">{activeWorkspaceName}</span>
           <span aria-hidden>→</span>
           <span>New Decision Report</span>
         </div>
         <h1 className="max-w-2xl text-[30px] font-semibold leading-[1.15] tracking-[-0.02em] text-[var(--text)] sm:text-[38px]">
-          What&apos;s the biggest business challenge on your mind today?
+          What&apos;s the biggest business challenge you&apos;re tackling today?
         </h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-6 text-[var(--text-muted)] sm:text-[16px]">
-          Causent helps you refine, measure, and track the business decisions behind it. Tell us what&apos;s going on, and we&apos;ll fill in what we can.
-        </p>
-        <p className="mt-2 max-w-2xl text-[12px] leading-5 text-[var(--text-muted)]">
-          Causent works best with supporting evidence and resources, but you can add those later.
+          Causent helps you refine, measure, and track the decision behind it.
         </p>
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg shadow-slate-200/50 sm:p-5">
         <div className="mb-4">
           <label className="text-[14px] font-semibold text-[var(--text)]" htmlFor="project-brief">
-            Tell us what&apos;s going on
+            Business challenge
           </label>
-          <p id="project-brief-help" className="mt-1 text-[12px] leading-5 text-[var(--text-muted)]">
-            A few sentences is plenty. You don&apos;t need to have the decision figured out yet.
-          </p>
         </div>
         <textarea
           id="project-brief"
-          aria-describedby="project-brief-help"
           disabled={isPending}
           className="min-h-44 w-full resize-y rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-[14px] leading-6 text-[var(--text)] outline-none placeholder:text-[var(--text-subtle)] focus:border-slate-400"
           value={prompt}
@@ -244,12 +284,7 @@ export function DecisionReportOnboarding({
           placeholder="For example: Customers are dropping out of our setup flow, and we&apos;re not sure whether to simplify it or add in-product guidance."
         />
         <div className="mt-4 border-t border-[var(--border)] py-4">
-          <p className="text-[12px] font-semibold text-[var(--text)]">
-            Need a starting point?
-          </p>
-          <p className="mt-0.5 text-[11px] leading-5 text-[var(--text-muted)]">
-            Load an example brief, then change it to match your decision.
-          </p>
+          <p className="text-[12px] font-semibold text-[var(--text)]">Examples</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {DECISION_REPORT_REVIEW_EXAMPLES.map((example) => (
               <button
@@ -265,19 +300,16 @@ export function DecisionReportOnboarding({
                 }}
                 className="min-h-20 rounded-xl border border-[var(--border)] bg-slate-50/70 px-3 py-3 text-left transition-colors hover:border-[var(--brand-blue)] hover:bg-blue-50/40 disabled:opacity-50"
               >
-                <span className="block text-[12px] font-semibold text-[var(--text)]">{example.project}</span>
+                <span className="block text-[12px] font-semibold text-[var(--text)]">{example.label ?? example.project}</span>
                 <span className="mt-1 block text-[11px] leading-5 text-[var(--text-muted)]">{example.decision}</span>
                 <span className="mt-2 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-800">{example.badge}</span>
-                <span className="mt-2 block text-[11px] font-semibold text-[var(--brand-blue)]">Load example brief →</span>
+                <span className="mt-2 block text-[11px] font-semibold text-[var(--brand-blue)]">Use example</span>
               </button>
             ))}
           </div>
         </div>
         <div className="border-t border-[var(--border)] py-4">
-          <p className="text-[12px] font-semibold text-[var(--text)]">Optional supporting evidence</p>
-          <p className="mt-0.5 text-[11px] leading-5 text-[var(--text-muted)]">
-            Have something useful? Add one public page or text PDF now, or skip this and come back later.
-          </p>
+          <p className="text-[12px] font-semibold text-[var(--text)]">Evidence (optional)</p>
         </div>
         <div className="grid gap-3 pb-4 sm:grid-cols-2">
           <div>
@@ -324,19 +356,16 @@ export function DecisionReportOnboarding({
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 border-t border-[var(--border)] pt-4">
-          <p className="text-right text-[11px] font-medium leading-4 text-[var(--text)]">
-            We&apos;ll fill in what we can. You&apos;ll review the draft and complete any highlighted fields before activation.
-          </p>
           <button
             type="button"
             className="rounded-lg bg-[var(--text)] px-5 py-2.5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
             disabled={prompt.trim().length < 20 || isPending}
             onClick={generateReport}
           >
-            {isPending ? "Building your draft…" : "Turn this into a Decision Report"}
+            {isPending ? "Building report…" : "Build Decision Report"}
           </button>
           <p className="max-w-xl text-right text-[10px] leading-4 text-[var(--text-muted)]">
-            By clicking Turn this into a Decision Report, you authorize Causent to send your challenge description and extracted URL/PDF text to the configured AI provider.
+            Causent sends your description and extracted source text to the configured AI provider.
           </p>
         </div>
         {error ? (

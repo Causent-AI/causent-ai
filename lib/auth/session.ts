@@ -2,36 +2,48 @@
 // here and which workspace do they act in". Both funnel and dashboard writes
 // scope to session.workspaceId — unchanged callers.
 //
-// Design-partner demo model: ONE shared tenant. Invited partners are provisioned
-// onto the seeded org (handle_new_user → org-level membership on ca5e…d1), so
-// every authenticated partner acts in the same seeded workspace (DEMO_SCOPE_ID).
-// RLS still gates them: a stranger with no membership reads/writes zero rows.
-// (Per-partner tenants are SEC2, deferred — see the #5 Out of Scope.)
-//
-//   - Local demo (CAUSENT_LOCAL_DEMO=1): no real login → { DEMO_SCOPE_ID, null }.
-//   - Production: reads the authenticated Supabase user for committed_by; the
-//     workspace stays the shared demo scope.
+// Design-partner demo model: one shared synthetic org with two genuine
+// project/workspace boundaries. The active workspace comes from an HttpOnly
+// cookie, but that untrusted value is intersected with the server-owned fixture
+// registry and the workspaces visible through the request client before use.
 
 import "server-only";
 
-import { DEMO_SCOPE_ID } from "@/lib/data/config";
+import { DEMO_SCOPE_ID, type DemoWorkspaceId } from "@/lib/data/config";
+import {
+  listAccessibleDemoWorkspaces,
+  readRequestedWorkspaceId,
+} from "@/lib/auth/workspace-context";
+import { selectDemoWorkspaceId } from "@/lib/auth/workspace-selection";
 import { getServerSupabase, isLocalDemo } from "@/lib/supabase-server";
 
 export type CausentSession = {
-  /** The workspace every write is scoped to (shared demo tenant in v1). */
-  workspaceId: string;
+  /** The verified workspace every read and write is scoped to. */
+  workspaceId: DemoWorkspaceId;
   /** The authenticated user id (populates committed_by); null in local demo. */
   userId: string | null;
 };
 
 /** The current session. */
 export async function getSession(): Promise<CausentSession> {
-  if (isLocalDemo()) {
+  if (process.env.CAUSENT_USE_SEED === "1") {
     return { workspaceId: DEMO_SCOPE_ID, userId: null };
   }
   const sb = await getServerSupabase();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-  return { workspaceId: DEMO_SCOPE_ID, userId: user?.id ?? null };
+  const [requestedWorkspaceId, accessibleWorkspaces, authResult] = await Promise.all([
+    readRequestedWorkspaceId(),
+    listAccessibleDemoWorkspaces(sb),
+    isLocalDemo() ? Promise.resolve(null) : sb.auth.getUser(),
+  ]);
+  const workspaceId = selectDemoWorkspaceId(
+    requestedWorkspaceId,
+    accessibleWorkspaces.map((workspace) => workspace.id),
+  );
+  if (!workspaceId) {
+    throw new Error("No accessible Causent workspace is available for this session.");
+  }
+  return {
+    workspaceId,
+    userId: authResult?.data.user?.id ?? null,
+  };
 }

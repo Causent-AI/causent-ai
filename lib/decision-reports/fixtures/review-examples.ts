@@ -1,9 +1,12 @@
 import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "./gummy-alpha.ts";
 import { NORTHSTAR_SUPPORT_GOLDEN_EXAMPLE } from "./northstar-support.ts";
+import { DEMO_SCOPE_ID, NORTHSTAR_SCOPE_ID } from "../../data/config.ts";
 
 export type DecisionReportReviewExample = {
   id: DecisionReportReviewExampleId;
+  workspaceId: typeof DEMO_SCOPE_ID | typeof NORTHSTAR_SCOPE_ID;
   project: string;
+  label?: string;
   decision: string;
   badge: string;
   prompt: string;
@@ -16,6 +19,7 @@ export type DecisionReportReviewExampleId =
 export const DECISION_REPORT_REVIEW_EXAMPLES: DecisionReportReviewExample[] = [
   {
     id: "gummy-alpha",
+    workspaceId: DEMO_SCOPE_ID,
     project: "Gummy Alpha",
     decision: "Add contextual AI guidance to the product mixer",
     badge: "Editable example",
@@ -23,7 +27,9 @@ export const DECISION_REPORT_REVIEW_EXAMPLES: DecisionReportReviewExample[] = [
   },
   {
     id: "northstar-support",
-    project: "Northstar Support",
+    workspaceId: NORTHSTAR_SCOPE_ID,
+    project: "Support Operations",
+    label: "Northstar",
     decision: "Launch an in-product support assistant for setup questions",
     badge: "Full-plan example",
     prompt: NORTHSTAR_SUPPORT_GOLDEN_EXAMPLE.initialPrompt,

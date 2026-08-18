@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
 import { processIssueWebhook } from "@/lib/levers/webhook";
+import { MAX_CONNECTOR_WEBHOOK_BYTES } from "@/lib/levers/webhook-inbox";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!secret) {
     // Not configured — refuse rather than accept unverifiable payloads.
     return NextResponse.json({ result: "not_configured" }, { status: 503 });
+  }
+
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_CONNECTOR_WEBHOOK_BYTES) {
+    return NextResponse.json({ result: "bad_request" }, { status: 413 });
   }
 
   const rawBody = await request.text();

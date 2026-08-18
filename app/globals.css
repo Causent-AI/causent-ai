@@ -80,3 +80,23 @@ body {
   background: var(--border-strong);
   border-radius: 8px;
 }
+
+/* Tiptap keeps placeholder text out of the saved document model. */
+.rich-text-editor .tiptap p.is-editor-empty:first-child::before,
+.report-canvas-editor .tiptap p.is-empty::before {
+  color: var(--text-subtle);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.rich-text-editor .tiptap.ProseMirror-focused,
+.report-canvas-editor .tiptap.ProseMirror-focused {
+  outline: none;
+}
+
+.rich-text-editor .tiptap[contenteditable="false"],
+.report-canvas-editor .tiptap[contenteditable="false"] {
+  cursor: default;
+}

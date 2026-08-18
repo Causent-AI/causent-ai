@@ -10,6 +10,7 @@ import {
   importWorkspaceMetricCsv,
   loadActiveReportMetricIdentity,
   setWorkspaceCoreMetric,
+  type MetricImportErrorCode,
   type MetricImportSummary,
   type WorkspaceMetricImportSummary,
 } from "@/lib/metrics/import";
@@ -18,10 +19,12 @@ export type MetricCsvImportActionState =
   | { status: "idle" }
   | {
       status: "error";
+      code: MetricImportErrorCode;
       error: string;
       acceptedRows: number;
       rejectedRows: number;
       details: string[];
+      progress?: { importId: string; processedRows: number; totalRows: number };
     }
   | { status: "success"; summary: MetricImportSummary };
 
@@ -29,10 +32,12 @@ export type WorkspaceMetricCsvImportActionState =
   | { status: "idle" }
   | {
       status: "error";
+      code: MetricImportErrorCode;
       error: string;
       acceptedRows: number;
       rejectedRows: number;
       details: string[];
+      progress?: { importId: string; processedRows: number; totalRows: number };
     }
   | { status: "success"; summary: WorkspaceMetricImportSummary };
 
@@ -46,14 +51,18 @@ const errorState = (
   acceptedRows = 0,
   rejectedRows = 0,
   details: string[] = [],
-): MetricCsvImportActionState => ({ status: "error", error, acceptedRows, rejectedRows, details });
+  progress?: { importId: string; processedRows: number; totalRows: number },
+  code: MetricImportErrorCode = "validation",
+): MetricCsvImportActionState => ({ status: "error", code, error, acceptedRows, rejectedRows, details, ...(progress ? { progress } : {}) });
 
 const catalogErrorState = (
   error: string,
   acceptedRows = 0,
   rejectedRows = 0,
   details: string[] = [],
-): WorkspaceMetricCsvImportActionState => ({ status: "error", error, acceptedRows, rejectedRows, details });
+  progress?: { importId: string; processedRows: number; totalRows: number },
+  code: MetricImportErrorCode = "validation",
+): WorkspaceMetricCsvImportActionState => ({ status: "error", code, error, acceptedRows, rejectedRows, details, ...(progress ? { progress } : {}) });
 
 const selectionErrorState = (error: string): CoreMetricSelectionActionState => ({
   status: "error",
@@ -108,7 +117,7 @@ export async function importWorkspaceMetricCsvAction(
 ): Promise<WorkspaceMetricCsvImportActionState> {
   const session = await getSession();
   if (!isLocalDemo() && !session.userId) {
-    return catalogErrorState("Sign in before importing a core metric.");
+    return catalogErrorState("Sign in before importing a core metric.", 0, 0, [], undefined, "forbidden");
   }
 
   const rawName = formData.get("metricName");
@@ -141,7 +150,7 @@ export async function importWorkspaceMetricCsvAction(
     observations: parsed.observations,
     authoredBy: session.userId,
   });
-  if (!result.ok) return catalogErrorState(result.error);
+  if (!result.ok) return catalogErrorState(result.error, 0, 0, [], result.progress, result.code);
 
   logDeferredCausalRecompute(await kickCausalRecompute({
     scopeId: session.workspaceId,
@@ -161,7 +170,7 @@ export async function importActiveReportMetricCsvAction(
 ): Promise<MetricCsvImportActionState> {
   const session = await getSession();
   if (!isLocalDemo() && !session.userId) {
-    return errorState("Sign in before importing metric observations.");
+    return errorState("Sign in before importing metric observations.", 0, 0, [], undefined, "forbidden");
   }
   const entry = formData.get("csv");
   if (!(entry instanceof File) || !entry.name) return errorState("Choose one CSV file to import.");
@@ -177,7 +186,7 @@ export async function importActiveReportMetricCsvAction(
 
   const sb = await getServerSupabase();
   const target = await loadActiveReportMetricIdentity(sb, session.workspaceId);
-  if (!target) return errorState("Activate a Decision Report before importing its confirmed metric.");
+  if (!target) return errorState("Activate a Decision Report before importing its confirmed metric.", 0, 0, [], undefined, "not_active");
   const result = await importReportMetricObservations(sb, {
     scopeId: session.workspaceId,
     reportId: target.reportId,
@@ -185,7 +194,7 @@ export async function importActiveReportMetricCsvAction(
     observations: parsed.observations,
     authoredBy: session.userId,
   });
-  if (!result.ok) return errorState(result.error);
+  if (!result.ok) return errorState(result.error, 0, 0, [], result.progress, result.code);
 
   logDeferredCausalRecompute(await kickCausalRecompute({
     scopeId: session.workspaceId,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
 import { activateDecisionReportAction } from "@/app/(onboarding)/onboarding/decision-report-activation-actions";
+import type { ReportActivationActionMetricAssignment } from "@/lib/decision-reports/activation";
 import type {
   DecisionReportActivationPointer,
   DecisionReportPersistenceStatus,
@@ -22,7 +23,9 @@ export function ReportActivationPanel({
   hasUnsavedChanges,
   metricId,
   metricAvailable,
+  selectedMetricIds,
   selectedActionIds,
+  actionMetricAssignments,
   primaryActionId,
   direction,
   magnitudePctMean,
@@ -38,7 +41,9 @@ export function ReportActivationPanel({
   hasUnsavedChanges: boolean;
   metricId: string;
   metricAvailable: boolean;
+  selectedMetricIds: string[];
   selectedActionIds: string[];
+  actionMetricAssignments: ReportActivationActionMetricAssignment[];
   primaryActionId: string;
   direction: "POSITIVE" | "NEGATIVE";
   magnitudePctMean: number | null;
@@ -95,13 +100,33 @@ export function ReportActivationPanel({
   const actionsMissing = selectedActionIds.length === 0;
   const primaryMissing =
     selectedActionIds.length > 0 && !selectedActionIds.includes(primaryActionId);
+  const metricsMissing =
+    selectedMetricIds.length < 1 ||
+    selectedMetricIds.length > 5 ||
+    !selectedMetricIds.includes(metricId);
+  const assignedActionIds = new Set(
+    actionMetricAssignments.map((assignment) => assignment.actionSourceItemId),
+  );
+  const assignmentsMissing =
+    actionMetricAssignments.length !== selectedActionIds.length ||
+    assignedActionIds.size !== actionMetricAssignments.length ||
+    selectedActionIds.some((actionId) => !assignedActionIds.has(actionId)) ||
+    actionMetricAssignments.some(
+      (assignment) => !selectedMetricIds.includes(assignment.metricId),
+    );
+  const primaryAssignmentMissing = actionMetricAssignments.find(
+    (assignment) => assignment.actionSourceItemId === primaryActionId,
+  )?.metricId !== metricId;
   const inputComplete =
     metricId !== "" &&
     metricAvailable &&
+    !metricsMissing &&
+    !assignmentsMissing &&
+    !primaryAssignmentMissing &&
     !magnitudeMissing &&
     !resolutionDateMissing &&
     selectedActionIds.length >= 1 &&
-    selectedActionIds.length <= 3 &&
+    selectedActionIds.length <= 25 &&
     selectedActionIds.includes(primaryActionId);
 
   function activate(event: FormEvent<HTMLFormElement>) {
@@ -111,16 +136,18 @@ export function ReportActivationPanel({
     startTransition(async () => {
       try {
         const result = await activateDecisionReportAction({
-          schemaVersion: 1,
+          schemaVersion: 2,
           reportId: persistence.reportId,
           revisionId: persistence.revisionId,
           confirmedMetricId: metricId,
+          selectedMetricIds,
           prediction: {
             direction,
             magnitudePctMean: magnitudePctMean!,
             resolutionDate,
           },
           selectedActionSourceItemIds: selectedActionIds,
+          actionMetricAssignments,
           primaryLeverActionSourceItemId: primaryActionId,
         }, {
           sessionKey: telemetrySessionKey,
@@ -222,12 +249,18 @@ export function ReportActivationPanel({
           </label>
         </fieldset>
         <div className="flex flex-col items-stretch gap-2 lg:min-w-44">
-          <p className={`text-[10px] ${actionsMissing || primaryMissing ? "font-semibold text-amber-800" : "text-[var(--text-muted)]"}`}>
+          <p className={`text-[10px] ${actionsMissing || primaryMissing || metricsMissing || assignmentsMissing || primaryAssignmentMissing ? "font-semibold text-amber-800" : "text-[var(--text-muted)]"}`}>
             {actionsMissing
-              ? "Confirm at least one action above"
+              ? "Add an action"
               : primaryMissing
-                ? "Choose one primary lever above"
-                : `${selectedActionIds.length}/3 actions confirmed`}
+                ? "Choose a primary action"
+                : metricsMissing
+                  ? "Choose a core metric"
+                  : assignmentsMissing
+                    ? "Assign a metric to every action"
+                    : primaryAssignmentMissing
+                      ? "Match the primary action to the outcome metric"
+                      : `${selectedActionIds.length} ${selectedActionIds.length === 1 ? "action" : "actions"} ready`}
           </p>
           <button
             type="submit"

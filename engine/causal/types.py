@@ -205,10 +205,11 @@ DriftStatus = Literal["FIRED", "NOT_FIRED", "NO_BASELINE_YET"]
 
 @dataclass(frozen=True)
 class DriftResult:
-    """Output of detect_baseline_drift (C5/#18). Computed on read, never persisted
-    for the demo. Levels are the plainly-shown before/after segment means ("baseline
-    moved 20% -> 12%"); the fire decision is driven by the segmented_ols step CI +
-    a magnitude floor, so significance is rigorous while display stays legible.
+    """Output of detect_baseline_drift (C5/#18). The asynchronous persistence
+    worker may materialize this exact result; the detector itself remains pure.
+    Levels are the plainly-shown before/after segment means ("baseline moved
+    20% -> 12%"); the fire decision is driven by the segmented_ols step CI + a
+    magnitude floor, so significance is rigorous while display stays legible.
 
     reason carries WHY, for the UI copy and audit:
       fired · no_significant_shift · below_floor · no_observations · gathering_baseline

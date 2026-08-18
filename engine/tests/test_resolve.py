@@ -29,12 +29,14 @@ from __future__ import annotations
 import contextlib
 import json
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import numpy as np
 import psycopg
 import pytest
 
+import persistence.resolve as resolve_module
 from causal.its_readout import its_readout
 from causal.types import Series
 from persistence.bridge import CLUSTER_POST_WINDOW, _load_metric
@@ -42,6 +44,7 @@ from persistence.resolve import (
     GATHERING_EXTENSION_DAYS,
     MAX_CLUSTER_SPAN_DAYS,
     EdgeState,
+    DecisionPackageContract,
     Lever,
     ResolutionResult,
     pre_verdict,
@@ -168,6 +171,168 @@ def test_predicted_native_signs_by_direction():
 def test_predicted_native_uses_abs_denominator():
     # a negative pre-mean must not flip the predicted sign
     assert predicted_native_value(5.0, POS, -200.0) == pytest.approx(10.0)
+
+
+class _SingleRow:
+    def __init__(self, row):
+        self._row = row
+
+    def fetchone(self):
+        return self._row
+
+
+class _PackageResolutionConnection:
+    def __init__(self, prediction_row):
+        self.prediction_row = prediction_row
+        self.commits = 0
+        self.updates = []
+
+    def execute(self, sql, _params=None):
+        if "from public.predictions where prediction_id" in sql:
+            return _SingleRow(self.prediction_row)
+        if "select m.source" in sql:
+            return _SingleRow(("csv", True))
+        if "update public.predictions set resolved_verdict = 'GATHERING'" in sql:
+            self.updates.append(_params)
+            return _SingleRow(None)
+        raise AssertionError(f"unexpected SQL: {sql}")
+
+    def commit(self):
+        self.commits += 1
+
+
+def test_complete_decision_package_uses_latest_effective_action_as_timing_marker(monkeypatch):
+    prediction_id = uuid.uuid4()
+    scope_id = uuid.uuid4()
+    decision_id = uuid.uuid4()
+    metric_id = uuid.uuid4()
+    registered_primary_id = uuid.uuid4()
+    final_action_id = uuid.uuid4()
+    intervention_date = date(2026, 2, 20)
+    completed_at = datetime(2026, 2, 20, 18, 0, tzinfo=timezone.utc)
+    package = DecisionPackageContract(
+        registered_primary_action_id=registered_primary_id,
+        intervention_action=Lever(
+            final_action_id,
+            "Final included action",
+            intervention_date,
+            "SHIPPED",
+        ),
+        included_action_ids=[registered_primary_id, final_action_id],
+        package_hash="a" * 64,
+        completed_at=completed_at,
+    )
+    conn = _PackageResolutionConnection((
+        scope_id,
+        decision_id,
+        metric_id,
+        "POSITIVE",
+        10.0,
+        TODAY,
+        None,
+    ))
+    persisted_actions = []
+    terminal = {}
+    monkeypatch.setattr(
+        resolve_module,
+        "_decision_package_for_prediction",
+        lambda *_args: package,
+    )
+    monkeypatch.setattr(resolve_module, "_reference_class_features", lambda *_args: {})
+    monkeypatch.setattr(
+        resolve_module,
+        "persist_metric_readouts",
+        lambda *_args, **kwargs: persisted_actions.extend(kwargs["action_ids"]),
+    )
+    monkeypatch.setattr(
+        resolve_module,
+        "_load_edge_state",
+        lambda *_args: EdgeState(
+            direction="POSITIVE",
+            belief_score=1.0,
+            belief_reason=None,
+            lift=10.0,
+            ci_low=8.0,
+            ci_high=12.0,
+            edge_id=uuid.uuid4(),
+        ),
+    )
+    start = date(2026, 1, 1)
+    monkeypatch.setattr(
+        resolve_module,
+        "_load_metric",
+        lambda *_args: SimpleNamespace(
+            ordinals=[(start + timedelta(days=index)).toordinal() for index in range(100)],
+            series=SimpleNamespace(values=np.full(100, 100.0)),
+        ),
+    )
+
+    def capture_terminal(_conn, _prediction_id, edge_id, verdict, memory_tuple):
+        terminal.update(edge_id=edge_id, verdict=verdict, tuple=memory_tuple)
+
+    monkeypatch.setattr(resolve_module, "_write_terminal", capture_terminal)
+
+    result = resolve_prediction(conn, prediction_id, TODAY, force=True)
+
+    assert result.status == "RESOLVED"
+    assert persisted_actions == [final_action_id]
+    assert terminal["verdict"] == "CONFIRMED"
+    assert terminal["tuple"]["causal_object"] == "decision_package"
+    assert terminal["tuple"]["intervention_rule"] == "latest_effective_included_action"
+    assert terminal["tuple"]["registered_primary_action_id"] == str(registered_primary_id)
+    assert terminal["tuple"]["intervention_action_id"] == str(final_action_id)
+    assert terminal["tuple"]["included_action_ids"] == [
+        str(registered_primary_id),
+        str(final_action_id),
+    ]
+    assert terminal["tuple"]["individual_attribution"] is False
+    assert "lever_action_id" not in terminal["tuple"]
+    assert conn.commits == 1
+
+
+def test_incomplete_decision_package_preserves_registration_without_measuring(monkeypatch):
+    prediction_id = uuid.uuid4()
+    registered_primary_id = uuid.uuid4()
+    support_action_id = uuid.uuid4()
+    package = DecisionPackageContract(
+        registered_primary_action_id=registered_primary_id,
+        included_action_ids=[registered_primary_id, support_action_id],
+    )
+    conn = _PackageResolutionConnection((
+        uuid.uuid4(),
+        uuid.uuid4(),
+        uuid.uuid4(),
+        "POSITIVE",
+        10.0,
+        TODAY,
+        None,
+    ))
+    monkeypatch.setattr(
+        resolve_module,
+        "_decision_package_for_prediction",
+        lambda *_args: package,
+    )
+    monkeypatch.setattr(resolve_module, "_reference_class_features", lambda *_args: {})
+    monkeypatch.setattr(
+        resolve_module,
+        "persist_metric_readouts",
+        lambda *_args, **_kwargs: pytest.fail("incomplete package must not run ITS"),
+    )
+
+    result = resolve_prediction(conn, prediction_id, TODAY, force=True)
+
+    assert result.status == "GATHERING"
+    assert len(conn.updates) == 1
+    resolution_tuple = json.loads(conn.updates[0][1])
+    assert resolution_tuple["causal_object"] == "decision_package"
+    assert resolution_tuple["registered_primary_action_id"] == str(registered_primary_id)
+    assert resolution_tuple["included_action_ids"] == [
+        str(registered_primary_id),
+        str(support_action_id),
+    ]
+    assert resolution_tuple["intervention_action_id"] is None
+    assert resolution_tuple["individual_attribution"] is False
+    assert conn.commits == 1
 
 
 # --- multi-lever: cluster-window derivation + ship-span guard (C4/#17) --------

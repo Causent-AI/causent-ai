@@ -1,0 +1,108 @@
+name: Staging load gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Load profile or the complete release gate
+        required: true
+        default: release_gate
+        type: choice
+        options:
+          - release_gate
+          - smoke
+          - steady
+          - burst
+          - hot_workspace
+          - mixed_write
+          - soak
+          - adversarial
+  workflow_call:
+    inputs:
+      profile:
+        description: Load profile or the complete release gate
+        required: false
+        default: release_gate
+        type: string
+
+concurrency:
+  group: causent-staging-load
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  profiles:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - id: select
+        name: Select the bounded profile matrix
+        env:
+          REQUESTED_PROFILE: ${{ inputs.profile }}
+        run: |
+          case "$REQUESTED_PROFILE" in
+            release_gate)
+              matrix='{"profile":["steady","burst","hot_workspace","mixed_write","soak"]}'
+              ;;
+            smoke|steady|burst|hot_workspace|mixed_write|soak|adversarial)
+              matrix="{\"profile\":[\"$REQUESTED_PROFILE\"]}"
+              ;;
+            *)
+              echo "Unsupported profile: $REQUESTED_PROFILE" >&2
+              exit 1
+              ;;
+          esac
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  load:
+    needs: profiles
+    runs-on: ubuntu-latest
+    environment: staging-load
+    timeout-minutes: 180
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.profiles.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Require the protected staging target
+        env:
+          LOAD_URL: ${{ secrets.CAUSENT_STAGING_LOAD_URL }}
+          LOAD_COOKIE: ${{ secrets.CAUSENT_STAGING_SESSION_COOKIE }}
+        run: |
+          test -n "$LOAD_URL"
+          test -n "$LOAD_COOKIE"
+          case "$LOAD_URL" in
+            *localhost*|*127.0.0.1*) exit 1 ;;
+          esac
+      - name: Run ${{ matrix.profile }} profile
+        env:
+          CAUSENT_LOAD_ACK: I_UNDERSTAND_STAGING_LOAD
+          CAUSENT_LOAD_ENV: staging
+          CAUSENT_LOAD_PROFILE: ${{ matrix.profile }}
+          CAUSENT_LOAD_BASE_URL: ${{ secrets.CAUSENT_STAGING_LOAD_URL }}
+          CAUSENT_LOAD_SESSION_COOKIE: ${{ secrets.CAUSENT_STAGING_SESSION_COOKIE }}
+          CAUSENT_LOAD_WRITE_URL: ${{ secrets.CAUSENT_STAGING_WRITE_URL }}
+          CAUSENT_LOAD_WRITE_SECRET: ${{ secrets.CAUSENT_STAGING_WRITE_SECRET }}
+        run: k6 run load/causent-mvp.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-${{ matrix.profile }}-${{ github.run_id }}
+          path: load/results/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  staging-release-gate:
+    needs: load
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every selected profile to pass
+        env:
+          LOAD_RESULT: ${{ needs.load.result }}
+        run: test "$LOAD_RESULT" = success

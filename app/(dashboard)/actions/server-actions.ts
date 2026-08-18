@@ -2,9 +2,8 @@
 
 // Server actions for the Actions & Decisions tab (epic #6, #10).
 //
-// Trust model: writes run through the pinned demo-scope server client, exactly
-// like today's reads (see DEMO_SCOPE_ID's TODO(auth) — an RLS-scoped user
-// client replaces this when SEC2 lands). Validation is the PURE lib
+// Trust model: writes run through the session-selected workspace and the
+// request-scoped Supabase client. Validation is the PURE lib
 // (lib/predictions.ts); this file only maps ids and persists.
 //
 // Elicit-not-assert, structurally: no action here computes, suggests, or
@@ -19,7 +18,7 @@ import path from "node:path";
 import { getServerSupabase, isLocalDemo } from "@/lib/supabase-server";
 import { getSession } from "@/lib/auth/session";
 import { recordFunnelEvent } from "@/lib/data/funnel";
-import { DEMO_SCOPE_ID, METRIC_CONFIG_BY_SLUG } from "@/lib/data/config";
+import { METRIC_CONFIG_BY_SLUG } from "@/lib/data/config";
 import { getPriorsForReferenceClass } from "@/lib/data/priors";
 import type { ReferenceClassPriors } from "@/lib/priors";
 import {
@@ -81,6 +80,7 @@ export async function completeManualActionAction(
 
 /** UI "a-<pr>" id -> DB action row (via external_ref, as lib/data maps it). */
 async function actionRow(
+  scopeId: string,
   uiId: string,
 ): Promise<{ action_id: string; source: string; effective_date: string | null } | null> {
   const pr = uiId.match(/^a-(\d+)$/)?.[1];
@@ -89,7 +89,7 @@ async function actionRow(
   const res = await sb
     .from("actions")
     .select("action_id, source, effective_date")
-    .eq("scope_id", DEMO_SCOPE_ID)
+    .eq("scope_id", scopeId)
     .eq("external_ref", `PR #${pr}`)
     .maybeSingle();
   if (res.error) throw res.error;
@@ -103,14 +103,14 @@ async function actionRow(
 }
 
 /** UI metric slug -> DB metric uuid (via the canonical name mapping). */
-async function metricUuid(slug: string): Promise<string | null> {
+async function metricUuid(scopeId: string, slug: string): Promise<string | null> {
   const name = METRIC_CONFIG_BY_SLUG[slug]?.name;
   if (!name) return null;
   const sb = await getServerSupabase();
   const res = await sb
     .from("metrics")
     .select("metric_id")
-    .eq("scope_id", DEMO_SCOPE_ID)
+    .eq("scope_id", scopeId)
     .eq("name", name)
     .maybeSingle();
   if (res.error) throw res.error;
@@ -132,10 +132,15 @@ export async function createDecisionWithPrediction(input: {
   if (!input.title.trim()) errors.push("Give the decision a title.");
   if (errors.length > 0) return { ok: false, errors };
 
-  const metricId = await metricUuid(input.prediction.metricId);
+  const session = await getSession();
+  if (!isLocalDemo() && !session.userId) {
+    return { ok: false, errors: ["Sign in before creating a decision."] };
+  }
+
+  const metricId = await metricUuid(session.workspaceId, input.prediction.metricId);
   if (!metricId) return { ok: false, errors: ["Unknown metric."] };
   const lever = input.prediction.leverActionId
-    ? await actionRow(input.prediction.leverActionId)
+    ? await actionRow(session.workspaceId, input.prediction.leverActionId)
     : null;
   if (input.prediction.leverActionId && !lever) {
     return { ok: false, errors: ["The selected lever action was not found."] };
@@ -152,7 +157,7 @@ export async function createDecisionWithPrediction(input: {
 
   const decisionRes = await sb
     .from("decisions")
-    .insert({ scope_id: DEMO_SCOPE_ID, title: input.title.trim(), rationale })
+    .insert({ scope_id: session.workspaceId, title: input.title.trim(), rationale })
     .select("decision_id")
     .single();
   if (decisionRes.error) return { ok: false, errors: [decisionRes.error.message] };
@@ -168,7 +173,7 @@ export async function createDecisionWithPrediction(input: {
     // action, so the draft->detect lifecycle is already past detection:
     // SHIPPED when the action has an effective (ship) date, else DETECTED.
     const leverRes = await sb.from("levers").insert({
-      scope_id: DEMO_SCOPE_ID,
+      scope_id: session.workspaceId,
       decision_id: decisionId,
       action_id: lever.action_id,
       metric_id: metricId,
@@ -181,7 +186,7 @@ export async function createDecisionWithPrediction(input: {
   }
 
   const predRes = await sb.from("predictions").insert({
-    scope_id: DEMO_SCOPE_ID,
+    scope_id: session.workspaceId,
     decision_id: decisionId,
     metric_id: metricId,
     direction: input.prediction.direction,
@@ -210,11 +215,16 @@ export async function revisePrediction(input: {
   });
   if (errors.length > 0) return { ok: false, errors };
 
+  const session = await getSession();
+  if (!isLocalDemo() && !session.userId) {
+    return { ok: false, errors: ["Sign in before revising a prediction."] };
+  }
   const sb = await getServerSupabase();
   const current = await sb
     .from("predictions")
     .select("magnitude_pct_mean, direction, resolved_at")
     .eq("prediction_id", input.predictionId)
+    .eq("scope_id", session.workspaceId)
     .maybeSingle();
   if (current.error) return { ok: false, errors: [current.error.message] };
   const row = current.data as {
@@ -240,7 +250,8 @@ export async function revisePrediction(input: {
   const updRes = await sb
     .from("predictions")
     .update({ magnitude_pct_mean: input.newMagnitudePct })
-    .eq("prediction_id", input.predictionId);
+    .eq("prediction_id", input.predictionId)
+    .eq("scope_id", session.workspaceId);
   if (updRes.error) return { ok: false, errors: [updRes.error.message] };
 
   revalidatePath("/actions");
@@ -252,7 +263,8 @@ export async function fetchPriors(params: {
   metricSlug: string;
   mechanismCategory?: string | null;
 }): Promise<ReferenceClassPriors> {
-  const uuid = await metricUuid(params.metricSlug);
+  const session = await getSession();
+  const uuid = await metricUuid(session.workspaceId, params.metricSlug);
   if (!uuid) {
     return {
       hasPrecedent: false,
@@ -263,6 +275,7 @@ export async function fetchPriors(params: {
     };
   }
   return getPriorsForReferenceClass({
+    scopeId: session.workspaceId,
     metricId: uuid,
     mechanismCategory: params.mechanismCategory,
   });
@@ -297,8 +310,17 @@ export async function resolveNow(): Promise<ActionResult> {
   const python =
     process.env.CAUSENT_ENGINE_PYTHON ?? path.join(engineDir, ".venv", "bin", "python");
   const today = process.env.CAUSENT_DEMO_TODAY; // demo data lives in the past
+  const session = await getSession();
+  if (!isLocalDemo() && !session.userId) {
+    return { ok: false, errors: ["Sign in before resolving predictions."] };
+  }
 
-  const args = [path.join("persistence", "run_resolution.py")];
+  const args = [
+    path.join("persistence", "run_resolution.py"),
+    "--scope",
+    session.workspaceId,
+  ];
+  if (session.userId) args.push("--user", session.userId);
   if (today) args.push("--today", today);
 
   const result = await new Promise<{ code: number | null; out: string }>((resolve) => {

@@ -125,6 +125,7 @@ export function verifyWebhookSignature(
 /** The narrow subset of a GitHub `issues` webhook we read. */
 export interface IssueWebhookPayload {
   action?: string;
+  repository?: { full_name?: string } | null;
   issue?: {
     number?: number;
     html_url?: string;

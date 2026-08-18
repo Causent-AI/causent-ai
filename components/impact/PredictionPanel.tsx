@@ -3,11 +3,18 @@
 import { useState } from "react";
 
 import { PredictionOutcomeChart } from "@/components/charts/PredictionOutcomeChart";
-import { PredictedImpactChart } from "@/components/decision-report/PredictedImpactChart";
+import {
+  PredictedImpactChart,
+  type LivePredictionCommitment,
+} from "@/components/decision-report/PredictedImpactChart";
 import { Panel } from "@/components/ui/Panel";
 import { buildPredictionOutcomeViewModel, type PredictionOutcomeViewModel } from "@/lib/scorecard-chart";
 import type { Decision, Metric } from "@/lib/types";
 import type { MetricProjection } from "@/lib/decision-reports/schema";
+import {
+  inferMetricPercentScale,
+  latestMetricObservationAt,
+} from "@/lib/decision-reports/product-continuity";
 
 type PredictionView = "plan" | "outcome";
 
@@ -15,10 +22,12 @@ function PredictionPanelView({
   defaultView,
   outcome,
   projection,
+  liveCommitment,
 }: {
   defaultView: PredictionView;
   outcome: PredictionOutcomeViewModel;
   projection: MetricProjection;
+  liveCommitment?: LivePredictionCommitment;
 }) {
   const [view, setView] = useState<PredictionView>(defaultView);
 
@@ -51,9 +60,13 @@ function PredictionPanelView({
 
       {view === "plan" ? (
         <>
-          <PredictedImpactChart projection={projection} statusLabel="Activated plan context" />
+          <PredictedImpactChart
+            projection={projection}
+            statusLabel="Activated commitment"
+            liveCommitment={liveCommitment}
+          />
           <p className="mt-3 text-[11px] leading-5 text-[var(--text-muted)]">
-            This preserves the report&apos;s planning scenario. The tracked percentage is the activation-time human commitment, not a measured result.
+            Activation-time commitment, not a measured outcome.
           </p>
         </>
       ) : (
@@ -75,6 +88,22 @@ export function PredictionPanel({
   metric: Metric | null;
 }) {
   const prediction = decision?.predictions.find((candidate) => candidate.id === predictionId) ?? null;
+  const baselineObservation = prediction && metric
+    ? latestMetricObservationAt(metric.series, prediction.committedAt)
+    : null;
+  const liveCommitment: LivePredictionCommitment | undefined = prediction && metric
+    ? {
+        metricSelected: true,
+        metricName: metric.name,
+        baselineNative: baselineObservation?.value ?? null,
+        baselineDate: baselineObservation?.date ?? null,
+        baselineUnavailableLabel: "Commitment baseline unavailable",
+        format: metric.format,
+        percentScale: inferMetricPercentScale(metric.format, metric.series),
+        direction: prediction.direction,
+        magnitudePctMean: prediction.magnitudePctMean,
+      }
+    : undefined;
   const outcome = buildPredictionOutcomeViewModel({
     prediction,
     metricName: metric?.name ?? projection.metricName,
@@ -85,12 +114,7 @@ export function PredictionPanel({
   return (
     <Panel>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-[15px] font-semibold text-[var(--text)]">Prediction</h2>
-          <p className="mt-1 text-[12px] text-[var(--text-muted)]">
-            The pre-registered expectation that will be compared with measured impact.
-          </p>
-        </div>
+        <h2 className="text-[15px] font-semibold text-[var(--text)]">Prediction</h2>
         {prediction ? (
           <div className="text-right text-[11px] text-[var(--text-muted)]">
             <p className="font-semibold text-[var(--text)]">
@@ -105,6 +129,7 @@ export function PredictionPanel({
         defaultView={defaultView}
         outcome={outcome}
         projection={projection}
+        liveCommitment={liveCommitment}
       />
     </Panel>
   );

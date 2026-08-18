@@ -1,20 +1,31 @@
-# Decision Report review release preflight — 2026-08-12
+# Decision Report review release and rollback — 2026-08-12
+
+## Release outcome
+
+The founder opened and merged PR #30. The review branch landed on `main` as squash commit
+`b2bb98c`, and Vercel automatically produced Ready production deployment
+`dpl_58Ds3d71VdvKFTBcdUkgamd182ip`. A successful platform build was not a healthy release: public
+requests to `/` and `/onboarding?flow=decision-report` returned no-store HTTP 503 responses.
+
+Runtime logs reported two explicit configuration failures: `SUPABASE_SERVICE_ROLE_KEY` was missing
+and stale local-only `CAUSENT_DEMO_TODAY` was still present. The first rollback target,
+`dpl_4RT4T3k46VhCog1xvtmHRVJsBhnj`, still required the missing service-role key and remained 503.
+The production pointer was therefore restored to the newest separately probed pre-guard deployment,
+`dpl_FCGWhLDt7oZsMp1preohuNt1gTww`. Final public canaries returned 200 for `/login` and the expected
+307 login redirect for `/` and Decision Report onboarding.
+
+PR #30 remains merged in source, but its application artifact is not live. No Supabase migration,
+environment value, or worker project was changed. Re-release remains gated on the ordered database,
+app-environment, recompute-worker, resolver, and authenticated-canary work below.
 
 ## Request and release posture
 
 The founder requested that the current Decision Report review changes be pushed to production and
-that progress be documented while review continues. The reviewed candidate is committed as
-`5a67a6f` and pushed on `codex/decision-report-review-round-1`. Vercel created Ready Preview
-deployment `dpl_GdYnCg7FoUpFevfTPPbeWVowuXRB` at
-**https://causent-oq0hqe1gm-adamdavidowens-1984s-projects.vercel.app**. The installed GitHub
-integration denied PR creation, so no PR or hosted PR CI result is claimed. This report does not
-claim a merge, production migration, environment mutation, production promotion, or authenticated
-canary.
+that progress be documented while review continues. The reviewed candidate was committed on
+`codex/decision-report-review-round-1`, previewed successfully, and later merged through PR #30.
 
 The production web app is Vercel project `causent-ai`, served at
-**https://app.causent.ai**. The existing production app remains the prior deployed baseline until
-the exact review candidate passes hosted CI, is merged, deploys, and passes live verification. The
-branch Preview is reviewable but is not production.
+**https://app.causent.ai**. It currently serves the verified rollback artifact rather than PR #30.
 
 ## Release-candidate hardening completed locally
 
@@ -77,16 +88,12 @@ as a real customer outcome, or counted as a production canary or partner session
 
 ## Ordered release gates
 
-1. Create the PR from pushed commit `5a67a6f`; obtain green hosted CI and Vercel checks for that
-   exact revision; merge through the reviewed path. Branch publication and its Ready Preview are
-   complete, but PR creation remains an operator step because the installed integration lacks
-   permission.
-2. Authenticate/link Supabase, verify history, dry-run, apply the exact pending migrations, and run
+1. Authenticate/link Supabase, verify history, dry-run, apply the exact pending migrations, and run
    authenticated schema/RLS/Storage/provenance/recompute-status probes.
-3. Complete `causent-ai` production configuration and remove stale/local-only values.
-4. Create, configure, deploy, and canary `causent-recompute`; arm/redeploy/canary
+2. Complete `causent-ai` production configuration and remove stale/local-only values.
+3. Create, configure, deploy, and canary `causent-recompute`; arm/redeploy/canary
    `causent-resolve`.
-5. Confirm the git-connected `causent-ai` deployment, then run an authenticated clean-account live
+4. Redeploy merged `main`, confirm the git-connected `causent-ai` artifact, then run an authenticated clean-account live
    canary across URL/PDF generation, save/activation, three successor iterations, direct historical
    links, private-image reattachment, metric import, three action completions, recomputation,
    resolution, deletion rollback, feature-flag rollback, and production log review.

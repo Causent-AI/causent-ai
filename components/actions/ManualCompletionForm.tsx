@@ -25,9 +25,6 @@ export function ManualCompletionForm({ actionId }: { actionId: string }) {
     <form action={action} className="rounded-lg border border-[var(--border)] bg-[var(--bg)]/60 p-3">
       <input type="hidden" name="actionId" value={actionId} />
       <p className="text-[11px] font-semibold text-[var(--text)]">Complete manually</p>
-      <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">
-        Use this when the work shipped outside GitHub or Jira. The date and explanation are retained on the action.
-      </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-[170px_1fr_auto] sm:items-end">
         <label className="text-[10px] font-medium text-[var(--text-muted)]">
           Completion date

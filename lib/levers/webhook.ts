@@ -3,9 +3,9 @@
 // route (app/api/webhooks/github/route.ts) only reads the raw body + headers and
 // hands them here.
 //
-// Order matters: the (source, provider_event_id) dedup insert is the FIRST write,
-// so a redelivered event conflicts and returns early WITHOUT re-detecting — the
-// unique index is the idempotency authority, not the detector.
+// The durable inbox RPC owns deduplication and applies the canonical transition,
+// lever attribution, and processed marker atomically. A partial failure remains
+// retryable instead of being hidden by transition_events' unique key.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -13,10 +13,10 @@ import {
   verifyWebhookSignature,
   type IssueWebhookPayload,
 } from "../connectors/github.ts";
-import { detectLever } from "./detect.ts";
-
-/** Postgres unique-violation SQLSTATE (the dedup backstop). */
-const UNIQUE_VIOLATION = "23505";
+import {
+  connectorWebhookBodyIsBounded,
+  processVerifiedConnectorEvent,
+} from "./webhook-inbox.ts";
 
 export type WebhookParams = {
   rawBody: string;
@@ -36,10 +36,29 @@ export type WebhookOutcome = {
     | "ignored_no_provenance"
     | "ignored_no_lever"
     | "ignored_untracked_action"
+    | "queued_retry"
+    | "quarantined"
+    | "dead_letter"
+    | "payload_conflict"
     | "invalid_signature"
     | "bad_request";
   leverId?: string;
 };
+
+function githubTargetRef(payload: IssueWebhookPayload): string | null {
+  const declared = payload.repository?.full_name?.trim();
+  if (declared && /^[^/\s]+\/[^/\s]+$/.test(declared)) return declared.toLowerCase();
+  const issueUrl = payload.issue?.html_url;
+  if (!issueUrl) return null;
+  try {
+    const parsed = new URL(issueUrl);
+    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== "github.com") return null;
+    const [owner, repo] = parsed.pathname.split("/").filter(Boolean);
+    return owner && repo ? `${owner}/${repo}`.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Verify a GitHub `issues` webhook, dedup it on (github, delivery_id), and — for
@@ -54,6 +73,9 @@ export async function processIssueWebhook(
     return { status: 401, result: "invalid_signature" };
   }
   if (!params.deliveryId) return { status: 400, result: "bad_request" };
+  if (!connectorWebhookBodyIsBounded(params.rawBody)) {
+    return { status: 413, result: "bad_request" };
+  }
 
   let payload: IssueWebhookPayload;
   try {
@@ -66,47 +88,22 @@ export async function processIssueWebhook(
   if (!event.token || !event.canonical || !event.externalRef) {
     return { status: 200, result: "ignored_no_provenance" };
   }
-
-  // Resolve the lever (→ action_id) the transition + detection attach to.
-  const leverRes = await sb
-    .from("levers")
-    .select("lever_id, action_id")
-    .eq("provenance_token", event.token)
-    .maybeSingle();
-  if (leverRes.error) return { status: 500, result: "bad_request" };
-  if (!leverRes.data) return { status: 200, result: "ignored_no_lever" };
-  const lever = leverRes.data as { lever_id: string; action_id: string };
+  const targetRef = githubTargetRef(payload);
+  if (!targetRef) return { status: 400, result: "bad_request" };
 
   const nowIso = params.nowIso ?? new Date().toISOString();
-
-  // Dedup FIRST: the unique(source, provider_event_id) index makes a redelivery
-  // a no-op. A conflict means we already processed this delivery.
-  const txn = await sb.from("transition_events").insert({
-    action_id: lever.action_id,
+  return processVerifiedConnectorEvent(sb, {
+    provider: "github",
+    providerEventId: params.deliveryId,
+    rawBody: params.rawBody,
+    rawPayload: payload as unknown as Record<string, unknown>,
+    provenanceToken: event.token,
+    targetRef,
+    targetOrigin: "https://github.com",
     canonical: event.canonical,
-    source: "github",
-    provider_event_id: params.deliveryId,
-    transition_ts: nowIso,
-    to_status: payload.action ?? null,
-    raw_payload: payload as unknown as Record<string, unknown>,
+    externalRef: event.externalRef,
+    externalUrl: event.htmlUrl,
+    providerStatus: payload.action ?? null,
+    transitionTs: nowIso,
   });
-  if (txn.error) {
-    if (txn.error.code === UNIQUE_VIOLATION) return { status: 200, result: "duplicate" };
-    return { status: 500, result: "bad_request" };
-  }
-
-  // Attribute on the issue coming to life (opened/reopened). SHIPPED/DROPPED
-  // transitions are recorded above but their lifecycle handling is C5, not #16.
-  if (event.canonical === "LEVER_ACTIVE") {
-    const det = await detectLever(sb, {
-      token: event.token,
-      externalRef: event.externalRef,
-      htmlUrl: event.htmlUrl,
-      detectedAt: nowIso,
-    });
-    if (!det.ok) return { status: 200, result: "ignored_no_lever" };
-    return { status: 200, result: "detected", leverId: det.leverId };
-  }
-
-  return { status: 200, result: "ignored_untracked_action", leverId: lever.lever_id };
 }

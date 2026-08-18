@@ -20,20 +20,9 @@ import { revisePrediction } from "@/app/(dashboard)/actions/server-actions";
 //     baseline" line second, the choice last.
 //   - The baseline-move delta is NEUTRAL/slate — a baseline move is neither win nor
 //     loss. Glyph + label carry the direction; color stays neutral (colorblind-safe).
-//   - "Restate prediction?" is a QUIET outlined action, not a loud CTA. The
-//     "Jira: no change flagged" chip is muted, de-emphasized (proof of the moat,
-//     not a competing element).
+//   - "Restate prediction" is a quiet outlined action, not a loud CTA.
 //   - Four states: fired (this notice) · not-fired (nothing) · no-baseline-yet
 //     ("gathering baseline") · restate-clicked (the stub modal).
-
-/** Muted diamond, evoking a Jira issue glyph — supporting proof, de-emphasized. */
-function DiamondIcon({ size = 12 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2 22 12 12 22 2 12z" />
-    </svg>
-  );
-}
 
 /** Circular restate arrow — a quiet secondary action, not a filled CTA. */
 function RestateIcon({ size = 14 }: { size?: number }) {
@@ -102,8 +91,7 @@ function RestateModal({
       >
         <h4 className="text-[14px] font-semibold text-[var(--text)]">Restate prediction</h4>
         <p className="mt-1 text-[12px] leading-snug text-[var(--text-muted)]">
-          A restatement is data, not a failure — it is logged with a reason and the
-          original stands in the record.
+          The original prediction remains in history.
         </p>
         <div className="mt-3 flex items-center gap-2">
           <label
@@ -120,11 +108,18 @@ function RestateModal({
             className="w-24 rounded border border-[var(--border)] px-2 py-1 text-[12px] tabular-nums"
           />
         </div>
+        <label
+          htmlFor={`restate-reason-${prediction.id}`}
+          className="mt-2 block text-[12px] text-[var(--text-muted)]"
+        >
+          Reason
+        </label>
         <textarea
+          id={`restate-reason-${prediction.id}`}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={2}
-          className="mt-2 w-full rounded border border-[var(--border)] px-2 py-1 text-[12px]"
+          className="mt-1 w-full rounded border border-[var(--border)] px-2 py-1 text-[12px]"
         />
         {errors.map((e, i) => (
           <p key={i} className="mt-1 text-[11px] text-[var(--neg)]">
@@ -222,22 +217,15 @@ export function DriftNotice({
           </p>
 
           {/* The choice, last: a quiet action + the muted moat chip. */}
-          <div className="mt-2.5 flex items-center justify-between gap-3">
+          <div className="mt-2.5 flex items-center gap-3">
             <button
               type="button"
               onClick={() => setRestating(true)}
               className="inline-flex items-center gap-1.5 rounded-md border border-[var(--brand-blue)]/40 px-2.5 py-1 text-[12px] font-medium text-[var(--brand-blue)] hover:bg-[var(--brand-blue)]/[0.08]"
             >
               <RestateIcon />
-              Restate prediction?
+              Restate prediction
             </button>
-            <span
-              title="Jira and Linear track ticket state, not the metric's own baseline — they flag nothing here."
-              className="inline-flex items-center gap-1.5 rounded-md bg-[var(--neutral)]/[0.08] px-2 py-1 text-[11px] text-[var(--text-subtle)]"
-            >
-              <DiamondIcon />
-              Jira: no change flagged
-            </span>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 export const METRIC_CSV_MAX_BYTES = 256 * 1024;
-export const METRIC_CSV_MAX_ROWS = 10_000;
+export const METRIC_CSV_MAX_ROWS = 2_000;
 
 export type MetricCsvObservation = { date: string; value: number };
 

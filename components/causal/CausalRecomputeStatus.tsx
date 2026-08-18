@@ -1,9 +1,9 @@
 import type { CausalRecomputeStatus as Status } from "@/lib/data/causal-recompute-status";
 
-const COPY: Record<Status["state"], { label: string; detail: string; tone: string }> = {
+const COPY: Record<Status["state"], { label: string; detail: string | null; tone: string }> = {
   idle: {
     label: "No causal update queued",
-    detail: "A new activation or metric observation will request the next automatic update.",
+    detail: null,
     tone: "border-slate-200 bg-slate-50 text-slate-800",
   },
   queued: {
@@ -18,7 +18,7 @@ const COPY: Record<Status["state"], { label: string; detail: string; tone: strin
   },
   current: {
     label: "Causal analysis current",
-    detail: "The latest queued inputs for this report have been processed.",
+    detail: null,
     tone: "border-emerald-200 bg-emerald-50 text-emerald-950",
   },
   failed: {
@@ -40,6 +40,7 @@ function formattedTimestamp(value: string | null): string | null {
 }
 
 export function CausalRecomputeStatus({ status }: { status: Status }) {
+  if (status.state === "idle") return null;
   const copy = COPY[status.state];
   const timestamp = status.state === "current" || status.state === "failed"
     ? formattedTimestamp(status.lastProcessedAt)
@@ -50,7 +51,9 @@ export function CausalRecomputeStatus({ status }: { status: Status }) {
         <p className="text-[12px] font-semibold">{copy.label}</p>
         {timestamp ? <p className="text-[10px] opacity-70">{timestamp}</p> : null}
       </div>
-      <p className="mt-0.5 text-[11px] leading-5 opacity-80">{copy.detail}</p>
+      {copy.detail ? (
+        <p className="mt-0.5 text-[11px] leading-5 opacity-80">{copy.detail}</p>
+      ) : null}
     </aside>
   );
 }

@@ -52,6 +52,8 @@ const WS = "c3c30000-0000-0000-0000-0000000000a2";
 const METRIC = "c3c30000-0000-0000-0000-0000000000a3";
 const DECISION = "c3c30000-0000-0000-0000-0000000000a4";
 const PREDICTION = "c3c30000-0000-0000-0000-0000000000a5";
+const PROJ_OTHER = "c3c30000-0000-0000-0000-0000000000a6";
+const WS_OTHER = "c3c30000-0000-0000-0000-0000000000a7";
 
 let sb: SupabaseClient | null = null;
 let available = false;
@@ -68,6 +70,18 @@ async function seedTenant(client: SupabaseClient) {
   assert.equal(project.error, null, project.error?.message);
   const workspace = await client.from("workspaces").insert({ workspace_id: WS, project_id: PROJ, name: "w" });
   assert.equal(workspace.error, null, workspace.error?.message);
+  const otherProject = await client.from("projects").insert({
+    project_id: PROJ_OTHER,
+    org_id: ORG,
+    name: "other-p",
+  });
+  assert.equal(otherProject.error, null, otherProject.error?.message);
+  const otherWorkspace = await client.from("workspaces").insert({
+    workspace_id: WS_OTHER,
+    project_id: PROJ_OTHER,
+    name: "other-w",
+  });
+  assert.equal(otherWorkspace.error, null, otherWorkspace.error?.message);
   const metric = await client.from("metrics").insert({ metric_id: METRIC, scope_id: WS, name: "Activation", source: "declared" });
   assert.equal(metric.error, null, metric.error?.message);
   const decision = await client.from("decisions").insert({ decision_id: DECISION, scope_id: WS, title: "New onboarding checklist" });
@@ -183,6 +197,43 @@ test("draft → detect materializes actions + lever and attributes the predictio
   if (again.ok) assert.equal(again.alreadyDetected, true);
 });
 
+test("interactive paste attribution cannot cross a same-org workspace", async (t) => {
+  if (!available || !sb) return t.skip("local Supabase stack not reachable");
+  const client = sb;
+  const drafted = await draftLeverFromDecision(client, WS, draftInput());
+  assert.equal(drafted.ok, true);
+  if (!drafted.ok) return;
+
+  const wrongCreated = await markLeverCreated(client, drafted.token, WS_OTHER);
+  assert.deepEqual(wrongCreated, { ok: true, updated: false });
+  const wrongDetection = await detectLever(client, {
+    scopeId: WS_OTHER,
+    token: drafted.token,
+    externalRef: "github:issue:77",
+  });
+  assert.equal(wrongDetection.ok, false);
+
+  const untouched = await client
+    .from("levers")
+    .select("status, action:actions(external_ref)")
+    .eq("provenance_token", drafted.token)
+    .single();
+  assert.equal(untouched.error, null);
+  assert.deepEqual(untouched.data, {
+    status: "DRAFTED",
+    action: { external_ref: null },
+  });
+
+  const created = await markLeverCreated(client, drafted.token, WS);
+  assert.deepEqual(created, { ok: true, updated: true });
+  const detected = await detectLever(client, {
+    scopeId: WS,
+    token: drafted.token,
+    externalRef: "github:issue:77",
+  });
+  assert.equal(detected.ok, true);
+});
+
 // ============================================================================
 // 2. synthetic webhook detects; redelivery is a no-op (dedup)
 // ============================================================================
@@ -233,6 +284,100 @@ test("webhook receiver detects a signed payload; redelivery is a no-op", async (
   });
   assert.equal(forged.result, "invalid_signature");
   assert.equal(forged.status, 401);
+});
+
+test("a delivery received before its lever is durable and succeeds on exact retry", async (t) => {
+  if (!available || !sb) return t.skip("local Supabase stack not reachable");
+  const client = sb;
+  const payload = {
+    action: "opened",
+    issue: {
+      number: 89,
+      html_url: "https://github.com/acme/orbit/issues/89",
+      state: "open",
+      labels: [{ name: provenanceToken(DECISION) }],
+      body: "the work",
+    },
+  };
+  const rawBody = JSON.stringify(payload);
+  const signature = `sha256=${createHmac("sha256", SECRET).update(rawBody, "utf8").digest("hex")}`;
+  const deliveryId = "delivery-before-lever";
+
+  const queued = await processIssueWebhook(client, {
+    rawBody,
+    signature,
+    deliveryId,
+    secret: SECRET,
+  });
+  assert.equal(queued.result, "queued_retry");
+  assert.equal(queued.status, 202);
+  assert.equal((await client.from("transition_events").select("event_id", { count: "exact", head: true })
+    .eq("source", "github").eq("provider_event_id", deliveryId)).count, 0);
+
+  const drafted = await draftLeverFromDecision(client, WS, draftInput());
+  assert.equal(drafted.ok, true);
+  const retried = await processIssueWebhook(client, {
+    rawBody,
+    signature,
+    deliveryId,
+    secret: SECRET,
+  });
+  assert.equal(retried.result, "detected");
+  assert.equal(await isAttributed(client), true);
+
+  const inbox = await client.from("connector_webhook_inbox")
+    .select("status, attempts, payload_digest")
+    .eq("provider", "github")
+    .eq("provider_event_id", deliveryId)
+    .single();
+  assert.equal(inbox.error, null, inbox.error?.message);
+  assert.equal(inbox.data?.status, "processed");
+  assert.equal(inbox.data?.attempts, 2);
+  assert.match(String(inbox.data?.payload_digest), /^[0-9a-f]{64}$/);
+  assert.equal((await client.from("transition_events").select("event_id", { count: "exact", head: true })
+    .eq("source", "github").eq("provider_event_id", deliveryId)).count, 1);
+
+  const changedBody = JSON.stringify({ ...payload, action: "reopened" });
+  const changedSignature = `sha256=${createHmac("sha256", SECRET).update(changedBody, "utf8").digest("hex")}`;
+  const changed = await processIssueWebhook(client, {
+    rawBody: changedBody,
+    signature: changedSignature,
+    deliveryId,
+    secret: SECRET,
+  });
+  assert.equal(changed.result, "payload_conflict");
+  assert.equal(changed.status, 409);
+});
+
+test("a signed GitHub delivery cannot attribute a token from another repository", async (t) => {
+  if (!available || !sb) return t.skip("local Supabase stack not reachable");
+  const client = sb;
+  const drafted = await draftLeverFromDecision(client, WS, draftInput());
+  assert.equal(drafted.ok, true);
+
+  const payload = {
+    action: "opened",
+    repository: { full_name: "other/private-repo" },
+    issue: {
+      number: 90,
+      html_url: "https://github.com/other/private-repo/issues/90",
+      state: "open",
+      labels: [{ name: provenanceToken(DECISION) }],
+      body: "the work",
+    },
+  };
+  const rawBody = JSON.stringify(payload);
+  const signature = `sha256=${createHmac("sha256", SECRET).update(rawBody, "utf8").digest("hex")}`;
+  const outcome = await processIssueWebhook(client, {
+    rawBody,
+    signature,
+    deliveryId: "delivery-wrong-repository",
+    secret: SECRET,
+  });
+  assert.equal(outcome.result, "queued_retry");
+  assert.equal(await isAttributed(client), false);
+  assert.equal((await client.from("transition_events").select("event_id", { count: "exact", head: true })
+    .eq("source", "github").eq("provider_event_id", "delivery-wrong-repository")).count, 0);
 });
 
 // ============================================================================

@@ -54,7 +54,7 @@ export function DecisionList({
                   </span>
                 ))}
                 {d.leverActionId === null && (
-                  <span className="text-[11px] text-[var(--neg)]">no lever</span>
+                  <span className="text-[11px] text-[var(--neg)]">no primary action</span>
                 )}
               </div>
             </button>

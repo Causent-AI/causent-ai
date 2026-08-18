@@ -17,11 +17,20 @@
     "check:release-config": "node scripts/check-release-config.mjs app",
     "check:recompute-config": "node scripts/check-release-config.mjs worker",
     "check:resolve-config": "node scripts/check-release-config.mjs resolver",
-    "check:dashboard-build": "node scripts/check-dashboard-build.mjs"
+    "check:dashboard-build": "node scripts/check-dashboard-build.mjs",
+    "check:query-plans": "bash scripts/check-hot-query-plans.sh",
+    "load:smoke": "CAUSENT_LOAD_ACK=I_UNDERSTAND_STAGING_LOAD CAUSENT_LOAD_ENV=local CAUSENT_LOAD_PROFILE=smoke k6 run load/causent-mvp.js",
+    "load:inspect": "k6 inspect load/causent-mvp.js",
+    "scale:plan": "python3 engine/persistence/scale_fixture.py --profile gigabyte"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.1",
+    "@tiptap/core": "^3.30.1",
+    "@tiptap/extension-placeholder": "^3.30.1",
+    "@tiptap/pm": "^3.30.1",
+    "@tiptap/react": "^3.30.1",
+    "@tiptap/starter-kit": "^3.30.1",
     "ai": "^7.0.34",
     "htmlparser2": "12.0.0",
     "next": "^16.2.11",

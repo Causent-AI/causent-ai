@@ -3,9 +3,24 @@ from pathlib import Path
 import pytest
 
 from persistence.prepare_northstar_review import (
+    DEFAULT_SCOPE,
     load_observations,
     require_local_database,
 )
+from persistence.seed_demo import _northstar_metric_rows
+
+
+def test_northstar_review_defaults_to_its_real_workspace() -> None:
+    assert DEFAULT_SCOPE == "ca5e0000-0000-0000-0000-0000000000d5"
+
+
+def test_seed_contains_two_deterministic_northstar_metric_series() -> None:
+    rows = _northstar_metric_rows()
+    assert len(rows) == 122
+    assert rows[0][0].isoformat() == "2026-04-01"
+    assert rows[-1][0].isoformat() == "2026-07-31"
+    assert rows[-1][1] > rows[0][1]
+    assert rows[-1][2] < rows[0][2]
 
 
 @pytest.mark.parametrize(

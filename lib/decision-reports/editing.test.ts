@@ -10,9 +10,24 @@ import {
 } from "./editing.ts";
 import {
   cloneDecisionReport,
+  emptyDecisionReportActivationDraft,
   MAX_DECISION_REPORT_ACTIONS,
+  portableRichTextFromPlainText,
+  type PortableRichTextDocument,
   validateDecisionReport,
 } from "./schema.ts";
+
+function boldDocument(text: string): PortableRichTextDocument {
+  const document = portableRichTextFromPlainText(text);
+  const firstParagraph = document.content[0];
+  if (
+    firstParagraph?.type === "paragraph" &&
+    firstParagraph.content?.[0]?.type === "text"
+  ) {
+    firstParagraph.content[0].marks = [{ type: "bold" }];
+  }
+  return document;
+}
 
 function fallbackReport() {
   let index = 0;
@@ -89,6 +104,192 @@ test("claim edits confirm user text, clear provenance, and preserve IDs", () => 
     originalIds,
   );
   assert.equal(validateDecisionReport(result.report).success, true);
+});
+
+test("formatting-only rich edits preserve sourced claim provenance", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const before = structuredClone(report);
+  const claim = report.decision.decision[0];
+  assert.equal(claim.status, "sourced");
+  assert.ok(claim.sourceChunkIds.length > 0);
+
+  const document = boldDocument(claim.text);
+  const result = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: claim.id,
+    document,
+  });
+
+  assert.equal(result.ok, true, result.ok ? undefined : result.error);
+  if (!result.ok) return;
+  const editedClaim = result.report.decision.decision[0];
+  assert.equal(editedClaim.text, claim.text);
+  assert.equal(editedClaim.status, claim.status);
+  assert.deepEqual(editedClaim.sourceChunkIds, claim.sourceChunkIds);
+  assert.deepEqual(
+    result.report.presentation?.claimDocuments[claim.id],
+    document,
+  );
+  assert.equal(validateDecisionReport(result.report).success, true);
+  assert.deepEqual(report, before);
+
+  const undone = applyReportEditCommand(result.report, {
+    type: "replace_claim_document",
+    claimId: claim.id,
+    document: portableRichTextFromPlainText(claim.text),
+  });
+  assert.equal(undone.ok, true, undone.ok ? undefined : undone.error);
+  if (!undone.ok) return;
+  assert.equal(undone.report.presentation, undefined);
+  assert.equal(undone.report.decision.decision[0].status, claim.status);
+  assert.deepEqual(
+    undone.report.decision.decision[0].sourceChunkIds,
+    claim.sourceChunkIds,
+  );
+});
+
+test("text-changing rich edits confirm user text and clear provenance", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const claim = report.decision.decision[0];
+  const replacement = "Launch the assistant with a limited partner cohort.";
+  const document = boldDocument(replacement);
+  const result = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: claim.id,
+    document,
+  });
+
+  assert.equal(result.ok, true, result.ok ? undefined : result.error);
+  if (!result.ok) return;
+  const editedClaim = result.report.decision.decision[0];
+  assert.equal(editedClaim.id, claim.id);
+  assert.equal(editedClaim.text, replacement);
+  assert.equal(editedClaim.status, "user_confirmed");
+  assert.deepEqual(editedClaim.sourceChunkIds, []);
+  assert.deepEqual(
+    result.report.presentation?.claimDocuments[claim.id],
+    document,
+  );
+  assert.equal(validateDecisionReport(result.report).success, true);
+});
+
+test("rich edits use flattened missing semantics and reject invalid documents", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const claim = report.decision.problem[0];
+  const blank = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: claim.id,
+    document: portableRichTextFromPlainText(""),
+  });
+  assert.equal(blank.ok, true, blank.ok ? undefined : blank.error);
+  if (blank.ok) {
+    assert.equal(blank.report.decision.problem[0].status, "missing");
+    assert.equal(blank.report.decision.problem[0].text, "");
+    assert.deepEqual(blank.report.decision.problem[0].sourceChunkIds, []);
+  }
+
+  const before = structuredClone(report);
+  const invalid = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: claim.id,
+    document: {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Unsafe" }] }],
+      unsupported: true,
+    } as PortableRichTextDocument,
+  });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.match(invalid.error, /rich-text document is invalid/i);
+  assert.deepEqual(report, before);
+});
+
+test("plain claim replacement removes only that claim's stale rich document", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const decision = report.decision.decision[0];
+  const background = report.decision.background[0];
+  const decisionFormatted = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: decision.id,
+    document: boldDocument(decision.text),
+  });
+  assert.equal(decisionFormatted.ok, true);
+  if (!decisionFormatted.ok) return;
+  const backgroundFormatted = applyReportEditCommand(decisionFormatted.report, {
+    type: "replace_claim_document",
+    claimId: background.id,
+    document: boldDocument(background.text),
+  });
+  assert.equal(backgroundFormatted.ok, true);
+  if (!backgroundFormatted.ok) return;
+
+  const plain = applyReportEditCommand(backgroundFormatted.report, {
+    type: "replace_claim_text",
+    claimId: decision.id,
+    text: decision.text,
+  });
+  assert.equal(plain.ok, true, plain.ok ? undefined : plain.error);
+  if (!plain.ok) return;
+  assert.equal(plain.report.presentation?.claimDocuments[decision.id], undefined);
+  assert.deepEqual(
+    plain.report.presentation?.claimDocuments[background.id],
+    boldDocument(background.text),
+  );
+  assert.equal(validateDecisionReport(plain.report).success, true);
+});
+
+test("composite canvas replacement is atomic and clears only semantically edited provenance", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const before = structuredClone(report);
+  const background = report.decision.background[0];
+  const decision = report.decision.decision[0];
+  const problem = report.decision.problem[0];
+  const replacement = `${decision.text} Start with a controlled cohort.`;
+
+  const edited = applyReportEditCommand(report, {
+    type: "replace_canvas_documents",
+    canvasId: "decision",
+    documents: [
+      {
+        claimId: background.id,
+        document: boldDocument(background.text),
+      },
+      {
+        claimId: decision.id,
+        document: boldDocument(replacement),
+      },
+    ],
+  });
+
+  assert.equal(edited.ok, true, edited.ok ? undefined : edited.error);
+  if (!edited.ok) return;
+  assert.equal(edited.report.decision.background[0].status, background.status);
+  assert.deepEqual(
+    edited.report.decision.background[0].sourceChunkIds,
+    background.sourceChunkIds,
+  );
+  assert.equal(edited.report.decision.decision[0].text, replacement);
+  assert.equal(edited.report.decision.decision[0].status, "user_confirmed");
+  assert.deepEqual(edited.report.decision.decision[0].sourceChunkIds, []);
+  assert.deepEqual(edited.report.decision.problem[0], problem);
+  assert.deepEqual(report, before);
+
+  const invalidBatch = applyReportEditCommand(report, {
+    type: "replace_canvas_documents",
+    canvasId: "decision",
+    documents: [
+      {
+        claimId: background.id,
+        document: boldDocument("This update must not partially apply."),
+      },
+      {
+        claimId: report.implementation.actions[0].summary[0].id,
+        document: boldDocument("A cross-canvas update."),
+      },
+    ],
+  });
+  assert.equal(invalidBatch.ok, false);
+  if (!invalidBatch.ok) assert.match(invalidBatch.error, /invalid or duplicate claim/);
+  assert.deepEqual(report, before);
 });
 
 test("report title edits use the typed path and reject blank titles", () => {
@@ -196,6 +397,198 @@ test("supporting evidence can be added to a report with no factor claims", () =>
     "user-evidence-stable-1",
   );
   assert.equal(validateDecisionReport(edited.report).success, true);
+});
+
+test("supporting evidence can be safely removed with its presentation document", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const evidence = report.supportingEvidence.factors[0];
+  const decision = report.decision.decision[0];
+  const formattedEvidence = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: evidence.id,
+    document: boldDocument(evidence.text),
+  });
+  assert.equal(formattedEvidence.ok, true);
+  if (!formattedEvidence.ok) return;
+  const formattedDecision = applyReportEditCommand(formattedEvidence.report, {
+    type: "replace_claim_document",
+    claimId: decision.id,
+    document: boldDocument(decision.text),
+  });
+  assert.equal(formattedDecision.ok, true);
+  if (!formattedDecision.ok) return;
+
+  const removed = applyReportEditCommand(formattedDecision.report, {
+    type: "remove_supporting_evidence",
+    claimId: evidence.id,
+  });
+  assert.equal(removed.ok, true, removed.ok ? undefined : removed.error);
+  if (!removed.ok) return;
+  assert.equal(
+    removed.report.supportingEvidence.factors.some((claim) => claim.id === evidence.id),
+    false,
+  );
+  assert.equal(removed.report.presentation?.claimDocuments[evidence.id], undefined);
+  assert.deepEqual(
+    removed.report.presentation?.claimDocuments[decision.id],
+    boldDocument(decision.text),
+  );
+
+  const beforeUnknown = structuredClone(removed.report);
+  const unknown = applyReportEditCommand(removed.report, {
+    type: "remove_supporting_evidence",
+    claimId: evidence.id,
+  });
+  assert.equal(unknown.ok, false);
+  assert.deepEqual(removed.report, beforeUnknown);
+});
+
+test("action metric edits require selected metrics and prune stale assignments", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const primaryMetricId = "ca5e0000-0000-0000-0000-000000000073";
+  const secondaryMetricId = "ca5e0000-0000-0000-0000-000000000074";
+  const unselectedMetricId = "ca5e0000-0000-0000-0000-000000000075";
+  const actionId = report.implementation.actions[0].sourceItemId;
+  report.activationDraft = {
+    confirmedMetricId: primaryMetricId,
+    selectedMetricIds: [primaryMetricId, secondaryMetricId],
+    selectedActionSourceItemIds: report.implementation.actions.map(
+      (action) => action.sourceItemId,
+    ),
+    primaryLeverActionSourceItemId: actionId,
+    prediction: {
+      direction: "POSITIVE",
+      magnitudePctMean: null,
+      resolutionDate: null,
+    },
+  };
+
+  const assigned = applyReportEditCommand(report, {
+    type: "edit_action_metric",
+    sourceItemId: actionId,
+    metricId: secondaryMetricId,
+  });
+  assert.equal(assigned.ok, true, assigned.ok ? undefined : assigned.error);
+  if (!assigned.ok) return;
+  assert.equal(assigned.report.implementation.actions[0].metricId, secondaryMetricId);
+
+  const unselected = applyReportEditCommand(assigned.report, {
+    type: "edit_action_metric",
+    sourceItemId: actionId,
+    metricId: unselectedMetricId,
+  });
+  assert.equal(unselected.ok, false);
+  if (!unselected.ok) assert.match(unselected.error, /must be one of/);
+
+  const pruned = applyReportEditCommand(assigned.report, {
+    type: "edit_activation_draft",
+    activationDraft: {
+      ...assigned.report.activationDraft!,
+      selectedMetricIds: [primaryMetricId],
+    },
+  });
+  assert.equal(pruned.ok, true, pruned.ok ? undefined : pruned.error);
+  if (!pruned.ok) return;
+  assert.equal(pruned.report.implementation.actions[0].metricId, null);
+
+  const cleared = applyReportEditCommand(assigned.report, {
+    type: "edit_action_metric",
+    sourceItemId: actionId,
+    metricId: null,
+  });
+  assert.equal(cleared.ok, true, cleared.ok ? undefined : cleared.error);
+  if (cleared.ok) assert.equal(cleared.report.implementation.actions[0].metricId, null);
+});
+
+test("new actions join the plan and inherit the confirmed primary metric", () => {
+  const primaryMetricId = "ca5e0000-0000-0000-0000-000000000073";
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const existingActionId = report.implementation.actions[0].sourceItemId;
+  report.activationDraft = {
+    confirmedMetricId: primaryMetricId,
+    selectedMetricIds: [primaryMetricId],
+    selectedActionSourceItemIds: [existingActionId],
+    primaryLeverActionSourceItemId: existingActionId,
+    prediction: {
+      direction: "POSITIVE",
+      magnitudePctMean: null,
+      resolutionDate: null,
+    },
+  };
+
+  const added = applyReportEditCommand(report, {
+    type: "add_action",
+    sourceItemId: "user-action-selected",
+    title: "Measure the controlled launch",
+    summary: "Track the selected outcome during the launch.",
+  });
+  assert.equal(added.ok, true, added.ok ? undefined : added.error);
+  if (!added.ok) return;
+  assert.deepEqual(
+    added.report.activationDraft?.selectedActionSourceItemIds,
+    [existingActionId, "user-action-selected"],
+  );
+  assert.equal(
+    added.report.implementation.actions.at(-1)?.metricId,
+    primaryMetricId,
+  );
+
+  const legacy = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const legacyAdded = applyReportEditCommand(legacy, {
+    type: "add_action",
+    sourceItemId: "user-action-defaults",
+    title: "Add a default-selected action",
+    summary: "Keep every proposed action in the plan by default.",
+  });
+  assert.equal(legacyAdded.ok, true, legacyAdded.ok ? undefined : legacyAdded.error);
+  if (!legacyAdded.ok) return;
+  assert.deepEqual(
+    legacyAdded.report.activationDraft?.selectedActionSourceItemIds,
+    legacyAdded.report.implementation.actions.map((action) => action.sourceItemId),
+  );
+  assert.equal(legacyAdded.report.implementation.actions.at(-1)?.metricId, null);
+});
+
+test("adding claims and actions preserves existing presentation without creating orphan entries", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  report.supportingEvidence.factors = report.supportingEvidence.factors.slice(0, 2);
+  const decision = report.decision.decision[0];
+  const formatted = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: decision.id,
+    document: boldDocument(decision.text),
+  });
+  assert.equal(formatted.ok, true);
+  if (!formatted.ok) return;
+
+  const evidenceId = "user-evidence-rich-contract";
+  const withEvidence = applyReportEditCommand(formatted.report, {
+    type: "add_supporting_evidence",
+    claimId: evidenceId,
+    text: "New supporting evidence",
+  });
+  assert.equal(withEvidence.ok, true, withEvidence.ok ? undefined : withEvidence.error);
+  if (!withEvidence.ok) return;
+  assert.equal(withEvidence.report.presentation?.claimDocuments[evidenceId], undefined);
+
+  const actionId = "user-action-rich-contract";
+  const withAction = applyReportEditCommand(withEvidence.report, {
+    type: "add_action",
+    sourceItemId: actionId,
+    title: "Add a measured rollout",
+    summary: "Instrument the rollout before launch.",
+  });
+  assert.equal(withAction.ok, true, withAction.ok ? undefined : withAction.error);
+  if (!withAction.ok) return;
+  assert.deepEqual(
+    Object.keys(withAction.report.presentation?.claimDocuments ?? {}),
+    [decision.id],
+  );
+  assert.equal(
+    withAction.report.presentation?.claimDocuments[`${actionId}-summary`],
+    undefined,
+  );
+  assert.equal(validateDecisionReport(withAction.report).success, true);
 });
 
 test("supporting evidence additions reject duplicate IDs and the fourth factor", () => {
@@ -321,6 +714,100 @@ test("action commands preserve action and nested claim IDs", () => {
   assert.equal(revisedOwnerResult.report.implementation.actions[0].owner?.id, ownerId);
 });
 
+test("plain action summary and owner edits remove stale rich documents", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const action = report.implementation.actions[0];
+  const summary = action.summary[0];
+  const formattedSummary = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: summary.id,
+    document: boldDocument(summary.text),
+  });
+  assert.equal(formattedSummary.ok, true);
+  if (!formattedSummary.ok) return;
+
+  const plainSummary = applyReportEditCommand(formattedSummary.report, {
+    type: "edit_action_summary",
+    sourceItemId: action.sourceItemId,
+    text: "A revised plain-text action summary.",
+  });
+  assert.equal(plainSummary.ok, true, plainSummary.ok ? undefined : plainSummary.error);
+  if (!plainSummary.ok) return;
+  assert.equal(plainSummary.report.presentation, undefined);
+
+  const owned = applyReportEditCommand(plainSummary.report, {
+    type: "edit_action_owner",
+    sourceItemId: action.sourceItemId,
+    text: "Growth engineering",
+  });
+  assert.equal(owned.ok, true);
+  if (!owned.ok) return;
+  const owner = owned.report.implementation.actions[0].owner;
+  assert.ok(owner);
+  const formattedOwner = applyReportEditCommand(owned.report, {
+    type: "replace_claim_document",
+    claimId: owner.id,
+    document: boldDocument(owner.text),
+  });
+  assert.equal(formattedOwner.ok, true);
+  if (!formattedOwner.ok) return;
+  const clearedOwner = applyReportEditCommand(formattedOwner.report, {
+    type: "edit_action_owner",
+    sourceItemId: action.sourceItemId,
+    text: "",
+  });
+  assert.equal(clearedOwner.ok, true, clearedOwner.ok ? undefined : clearedOwner.error);
+  if (!clearedOwner.ok) return;
+  assert.equal(clearedOwner.report.implementation.actions[0].owner, null);
+  assert.equal(clearedOwner.report.presentation, undefined);
+  assert.equal(validateDecisionReport(clearedOwner.report).success, true);
+});
+
+test("removing an action prunes all nested rich documents and preserves unrelated ones", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const action = report.implementation.actions[0];
+  const decision = report.decision.decision[0];
+  const withOwner = applyReportEditCommand(report, {
+    type: "edit_action_owner",
+    sourceItemId: action.sourceItemId,
+    text: "Growth engineering",
+  });
+  assert.equal(withOwner.ok, true);
+  if (!withOwner.ok) return;
+  const owner = withOwner.report.implementation.actions[0].owner;
+  assert.ok(owner);
+
+  let current = withOwner.report;
+  for (const claim of [decision, action.summary[0], owner]) {
+    const formatted = applyReportEditCommand(current, {
+      type: "replace_claim_document",
+      claimId: claim.id,
+      document: boldDocument(claim.text),
+    });
+    assert.equal(formatted.ok, true, formatted.ok ? undefined : formatted.error);
+    if (!formatted.ok) return;
+    current = formatted.report;
+  }
+
+  const removed = applyReportEditCommand(current, {
+    type: "remove_action",
+    sourceItemId: action.sourceItemId,
+  });
+  assert.equal(removed.ok, true, removed.ok ? undefined : removed.error);
+  if (!removed.ok) return;
+  assert.equal(
+    removed.report.implementation.actions.some(
+      (candidate) => candidate.sourceItemId === action.sourceItemId,
+    ),
+    false,
+  );
+  assert.deepEqual(
+    Object.keys(removed.report.presentation?.claimDocuments ?? {}),
+    [decision.id],
+  );
+  assert.equal(validateDecisionReport(removed.report).success, true);
+});
+
 test("action titles and data classification use the typed edit path", () => {
   const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
   const actionId = report.implementation.actions[0].sourceItemId;
@@ -410,9 +897,15 @@ test("invalid commands are rejected without mutating the input", () => {
     sourceItemId: report.implementation.actions[0].sourceItemId,
     title: "  ",
   });
+  const unknownRichClaim = applyReportEditCommand(report, {
+    type: "replace_claim_document",
+    claimId: "unknown",
+    document: portableRichTextFromPlainText("New text"),
+  });
 
   assert.equal(unknownClaim.ok, false);
   assert.equal(blankTitle.ok, false);
+  assert.equal(unknownRichClaim.ok, false);
   assert.deepEqual(report, before);
 });
 
@@ -459,6 +952,66 @@ test("adding and removing actions respects the 25-action draft ceiling", () => {
   if (!removed.ok) return;
   assert.equal(removed.report.implementation.actions.length, 24);
   assert.equal(validateDecisionReport(removed.report).success, true);
+});
+
+test("supporting action monitoring context edits stay optional and non-causal", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const sourceItemId = report.implementation.actions[1].sourceItemId;
+  const monitored = applyReportEditCommand(report, {
+    type: "edit_action_monitoring",
+    sourceItemId,
+    expectedDirection: "DECREASE",
+    checkDate: "2099-06-30",
+  });
+  assert.equal(monitored.ok, true);
+  if (!monitored.ok) return;
+  const action = monitored.report.implementation.actions.find(
+    (item) => item.sourceItemId === sourceItemId,
+  );
+  assert.equal(action?.monitoringExpectedDirection, "DECREASE");
+  assert.equal(action?.monitoringCheckDate, "2099-06-30");
+  assert.equal(validateDecisionReport(monitored.report).success, true);
+
+  const cleared = applyReportEditCommand(monitored.report, {
+    type: "edit_action_monitoring",
+    sourceItemId,
+    expectedDirection: null,
+    checkDate: null,
+  });
+  assert.equal(cleared.ok, true);
+  if (!cleared.ok) return;
+  const clearedAction = cleared.report.implementation.actions.find(
+    (item) => item.sourceItemId === sourceItemId,
+  );
+  assert.equal(clearedAction?.monitoringExpectedDirection, null);
+  assert.equal(clearedAction?.monitoringCheckDate, null);
+});
+
+test("registered primary actions reject a second monitoring hypothesis", () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const sourceItemId = report.implementation.actions[0].sourceItemId;
+  report.activationDraft = emptyDecisionReportActivationDraft();
+  report.activationDraft.selectedActionSourceItemIds = report.implementation.actions.map(
+    (action) => action.sourceItemId,
+  );
+  report.activationDraft.primaryLeverActionSourceItemId = sourceItemId;
+
+  const rejected = applyReportEditCommand(report, {
+    type: "edit_action_monitoring",
+    sourceItemId,
+    expectedDirection: "INCREASE",
+    checkDate: "2099-06-30",
+  });
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.match(rejected.error, /supporting actions/);
+
+  const cleared = applyReportEditCommand(report, {
+    type: "edit_action_monitoring",
+    sourceItemId,
+    expectedDirection: null,
+    checkDate: null,
+  });
+  assert.equal(cleared.ok, true);
 });
 
 test("focused answers and direct edits produce the same validated report", () => {

@@ -33,14 +33,13 @@ export function ConnectedMetrics({
         Core Metrics
       </h3>
       <div className="overflow-x-auto">
-        <table className="min-w-[680px] w-full border-collapse text-[13px]">
+        <table className="min-w-[600px] w-full border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-[var(--border)] text-left text-[11px] font-medium uppercase tracking-wide text-[var(--text-subtle)]">
               <th className="py-2 pr-2 font-medium">Metric Name</th>
               <th className="px-2 py-2 font-medium">Unit</th>
               <th className="px-2 py-2 font-medium">Connection</th>
               <th className="px-2 py-2 font-medium">Last Updated</th>
-              <th className="px-2 py-2 text-right font-medium">Rows</th>
               <th className="px-2 py-2 text-right font-medium">Actions</th>
             </tr>
           </thead>
@@ -58,9 +57,6 @@ export function ConnectedMetrics({
                 </td>
                 <td className="whitespace-nowrap px-2 py-2.5 text-[var(--text-muted)]">
                   {updatedLabel(m.lastUpdated)}
-                </td>
-                <td className="px-2 py-2.5 text-right tabular-nums text-[var(--text)]">
-                  {m.rows.toLocaleString("en-US")}
                 </td>
                 <td className="px-2 py-2.5">
                   <div className="flex items-center justify-end gap-1">
@@ -80,14 +76,6 @@ export function ConnectedMetrics({
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* deferred connectors */}
-      <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[13px] text-[var(--text-muted)]">
-        <span>Connect a database or warehouse</span>
-        <span className="rounded-md border border-[var(--border)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-subtle)]">
-          Coming soon
-        </span>
       </div>
     </div>
   );

@@ -7,13 +7,43 @@
 import type { Direction, MetricFormat } from "@/lib/types";
 
 /**
- * The demo workspace the v1 UI reads. Every query in lib/data/* is pinned here so
- * the service-role client (lib/supabase-server.ts) can never read across tenants.
- *
- * TODO(auth): once reads run under an RLS-scoped user client, this pin goes away —
- * the scope comes from the caller's membership and RLS enforces isolation.
+ * Server-owned local demo workspace registry. Request input may select only an
+ * id in this registry that is also visible through the current Supabase client;
+ * every downstream read and write receives that verified id explicitly.
  */
 export const DEMO_SCOPE_ID = "ca5e0000-0000-0000-0000-0000000000d3";
+export const NORTHSTAR_PROJECT_ID = "ca5e0000-0000-0000-0000-0000000000d4";
+export const NORTHSTAR_SCOPE_ID = "ca5e0000-0000-0000-0000-0000000000d5";
+
+export const DEMO_WORKSPACES = [
+  {
+    id: DEMO_SCOPE_ID,
+    key: "gummy-alpha",
+    project: "Orbit",
+    workspace: "Gummy Alpha",
+  },
+  {
+    id: NORTHSTAR_SCOPE_ID,
+    key: "northstar-support",
+    project: "Northstar",
+    workspace: "Support Operations",
+  },
+] as const;
+
+export type DemoWorkspaceId = (typeof DEMO_WORKSPACES)[number]["id"];
+export type DemoWorkspaceKey = (typeof DEMO_WORKSPACES)[number]["key"];
+
+export function demoWorkspaceById(id: unknown) {
+  return typeof id === "string"
+    ? DEMO_WORKSPACES.find((workspace) => workspace.id === id) ?? null
+    : null;
+}
+
+export function demoWorkspaceByKey(key: unknown) {
+  return typeof key === "string"
+    ? DEMO_WORKSPACES.find((workspace) => workspace.key === key) ?? null
+    : null;
+}
 
 /** Per-metric UI config, keyed by the metric's DB `name`. Mirrors lib/seed.ts. */
 export type MetricConfig = {
@@ -38,12 +68,24 @@ export const METRIC_CONFIG_BY_NAME: Record<string, MetricConfig> = {
   // Drift beat (C5/#18): a New-User Activation metric whose baseline slides under
   // a committed prediction. Higher is better; blue keeps it activation-family.
   "New-User Activation": { id: "newActivation", color: "#377DED", higherIsBetter: true },
+  "First-week Setup Completion": {
+    id: "setupCompletion",
+    color: "#377DED",
+    higherIsBetter: true,
+  },
+  "Setup Support Tickets": {
+    id: "setupSupport",
+    color: "#8B5CF6",
+    higherIsBetter: false,
+  },
 };
 
-/** Canonical UI metric order (slugs), matching lib/seed.ts metrics[]. */
-export const METRIC_ORDER = [
+/** Canonical UI metric orders (slugs) for the checked-in demo workspaces. */
+export const GUMMY_METRIC_ORDER = [
   "arr", "activation", "churn", "grossProfit", "support", "newActivation",
 ];
+export const NORTHSTAR_METRIC_ORDER = ["setupCompletion", "setupSupport"];
+export const METRIC_ORDER = [...GUMMY_METRIC_ORDER, ...NORTHSTAR_METRIC_ORDER];
 
 /** Lookup config by slug (used when we only have the UI id in hand). */
 export const METRIC_CONFIG_BY_SLUG: Record<string, MetricConfig & { name: string }> =

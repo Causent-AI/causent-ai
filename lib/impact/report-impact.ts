@@ -1,11 +1,12 @@
 import type { MetricProjection } from "../decision-reports/schema.ts";
+import { calculateNativePredictionTarget } from "../decision-reports/prediction-calibration.ts";
 import { formatMetricValue } from "../format.ts";
 import {
   buildPredictionOutcomeViewModel,
   formatSignedPredictionPct,
   type PredictionOutcomeState,
 } from "../scorecard-chart.ts";
-import type { Action, Decision, ImpactCell, Metric } from "../types.ts";
+import type { Action, Decision, ImpactCell, Metric, Prediction } from "../types.ts";
 import { formatImpactMagnitude } from "../data/readout.ts";
 
 export type ReportImpactActionState =
@@ -21,6 +22,8 @@ export type ReportImpactActionTrace = {
   title: string;
   completedOn: string | null;
   isPrimary: boolean;
+  isPackageIntervention: boolean;
+  metricName: string;
   state: ReportImpactActionState;
   stateLabel: string;
   impactLabel: string;
@@ -56,6 +59,9 @@ export type ReportImpactViewModel = {
   plannedActions: number;
   completedActions: number;
   primaryActionId: string | null;
+  causalObject: "registered_primary_action" | "decision_package";
+  interventionActionId: string | null;
+  packageCompletedAt: string | null;
   timelineLevels: ReportImpactTimelineLevel[];
   actionTraces: ReportImpactActionTrace[];
 };
@@ -108,6 +114,35 @@ export function buildReportTimelineLevels(
   return levels;
 }
 
+/** Build active-report levels from the committed prediction, never the stale generation projection. */
+export function buildCommittedPredictionTimelineLevels(
+  metric: Metric,
+  prediction: Prediction,
+): ReportImpactTimelineLevel[] {
+  const baselineObservation = metric.series.filter(
+    (observation) => observation.date <= prediction.committedAt,
+  ).at(-1) ?? metric.series.at(-1) ?? null;
+  const calibration = calculateNativePredictionTarget({
+    baselineNative: baselineObservation?.value ?? null,
+    format: metric.format,
+    percentScale: usesRatioPercentScale(metric) ? "ratio" : "points",
+    direction: prediction.direction,
+    magnitudePctMean: prediction.magnitudePctMean,
+  });
+  if (!calibration.available) return [];
+  return [{
+    kind: "baseline",
+    value: calibration.baselineNative,
+    label: "Baseline at commitment",
+    displayLabel: calibration.baselineLabel,
+  }, {
+    kind: "target",
+    value: calibration.impliedTargetNative,
+    label: "Implied target",
+    displayLabel: calibration.impliedTargetLabel,
+  }];
+}
+
 function actionCode(action: Action): string {
   const code = action.displayCode?.trim();
   if (code) return code;
@@ -132,17 +167,28 @@ function sampleLabel(cell: ImpactCell | undefined): string | null {
 
 function traceForAction(
   action: Action,
-  metric: Metric,
+  primaryMetric: Metric,
+  metricById: Map<string, Metric>,
   primaryActionId: string | null,
 ): ReportImpactActionTrace {
   const isPrimary = action.id === primaryActionId;
-  const cell = action.impact.find((candidate) => candidate.metricId === metric.id);
+  const isDecisionPackage = action.reportContext?.causalObject === "decision_package";
+  const isPackageIntervention = action.reportContext?.isPackageIntervention === true;
+  const assignedMetric = isPrimary
+    ? primaryMetric
+    : metricById.get(action.primaryMetricId) ?? null;
+  const assignedMetricName = assignedMetric?.name ?? "Metric unavailable";
+  const cell = action.impact.find(
+    (candidate) => candidate.metricId === primaryMetric.id,
+  );
   const base = {
     actionId: action.id,
     displayCode: actionCode(action),
     title: action.title,
     completedOn: action.shippedAt,
     isPrimary,
+    isPackageIntervention,
+    metricName: assignedMetricName,
     href: `/actions?selected=${encodeURIComponent(action.id)}#${encodeURIComponent(action.id)}`,
   };
 
@@ -158,13 +204,25 @@ function traceForAction(
     };
   }
 
-  if (!isPrimary) {
+  if (isDecisionPackage && !isPackageIntervention) {
     return {
       ...base,
       state: "not-independently-estimated",
       stateLabel: "Not independently estimated",
       impactLabel: "—",
-      detail: `Completed support action connected to ${metric.name}. The action-level causal readout is reserved for the pre-registered primary lever.`,
+      detail: `Completed action connected to ${assignedMetricName}. It is retained as a decision-package marker and is not independently estimated.`,
+      ci95Label: null,
+      sampleLabel: null,
+    };
+  }
+
+  if (!isPrimary && !isPackageIntervention) {
+    return {
+      ...base,
+      state: "not-independently-estimated",
+      stateLabel: "Not independently estimated",
+      impactLabel: "—",
+      detail: `Completed support action connected to ${assignedMetricName}. The action-level causal readout is reserved for the pre-registered primary lever.`,
       ci95Label: null,
       sampleLabel: null,
     };
@@ -176,8 +234,10 @@ function traceForAction(
       state: "measured",
       stateLabel: "ITS estimate",
       impactLabel: cell.label,
-      detail: "Estimated impact—not proof. This is the confident causal readout for the pre-registered primary lever.",
-      ci95Label: intervalLabel(cell, metric),
+      detail: isDecisionPackage
+        ? "Estimated decision-package impact—not proof. The latest effective action defines timing; individual action attribution is unavailable."
+        : "Estimated impact—not proof. This is the confident causal readout for the pre-registered primary lever.",
+      ci95Label: intervalLabel(cell, primaryMetric),
       sampleLabel: sampleLabel(cell),
     };
   }
@@ -189,7 +249,7 @@ function traceForAction(
       stateLabel: "Preliminary only",
       impactLabel: cell.label,
       detail: cell.detail ?? "A descriptive comparison is available, but it is not a causal estimate.",
-      ci95Label: intervalLabel(cell, metric),
+      ci95Label: intervalLabel(cell, primaryMetric),
       sampleLabel: sampleLabel(cell),
     };
   }
@@ -199,7 +259,9 @@ function traceForAction(
     state: "gathering",
     stateLabel: "No confident estimate yet",
     impactLabel: "—",
-    detail: "The primary lever is complete, but the engine has not produced a confident causal estimate. No zero is substituted.",
+    detail: isDecisionPackage
+      ? "The decision package is complete, but the engine has not produced a confident causal estimate. No zero is substituted."
+      : "The primary lever is complete, but the engine has not produced a confident causal estimate. No zero is substituted.",
     ci95Label: null,
     sampleLabel: sampleLabel(cell),
   };
@@ -226,6 +288,7 @@ export function buildReportImpactViewModel(input: {
   predictionId: string | null;
   projection: MetricProjection;
   metric: Metric;
+  metrics: Metric[];
   actions: Action[];
 }): ReportImpactViewModel {
   const prediction = input.decision.predictions.find(
@@ -237,8 +300,13 @@ export function buildReportImpactViewModel(input: {
     observationCount: input.metric.series.length,
   });
   const primaryActionId = input.decision.leverActionId;
-  const primaryAction = input.actions.find((action) => action.id === primaryActionId);
-  const primaryCell = primaryAction?.impact.find(
+  const packageInterventionAction = input.actions.find(
+    (action) => action.reportContext?.causalObject === "decision_package" &&
+      action.reportContext.isPackageIntervention,
+  );
+  const causalAction = packageInterventionAction ??
+    input.actions.find((action) => action.id === primaryActionId);
+  const primaryCell = causalAction?.impact.find(
     (cell) => cell.metricId === input.metric.id,
   );
   const nPre = finiteNumber(primaryCell?.readout?.nPre);
@@ -249,6 +317,15 @@ export function buildReportImpactViewModel(input: {
   const variancePct = outcome.plannedPct !== null && outcome.measuredPct !== null
     ? outcome.measuredPct - outcome.plannedPct
     : null;
+  const metricById = new Map(
+    [...input.metrics, input.metric].map((candidate) => [candidate.id, candidate]),
+  );
+  const causalObject = input.actions.some(
+    (action) => action.reportContext?.causalObject === "decision_package",
+  ) ? "decision_package" as const : "registered_primary_action" as const;
+  const packageCompletedAt = input.actions.find(
+    (action) => action.reportContext?.packageCompletedAt,
+  )?.reportContext?.packageCompletedAt ?? null;
 
   return {
     reportTitle: input.reportTitle,
@@ -270,9 +347,15 @@ export function buildReportImpactViewModel(input: {
     plannedActions: input.actions.length,
     completedActions: input.actions.filter((action) => action.shippedAt !== null).length,
     primaryActionId,
-    timelineLevels: buildReportTimelineLevels(input.metric, input.projection),
+    causalObject,
+    interventionActionId: packageInterventionAction?.id ??
+      (causalObject === "registered_primary_action" ? primaryActionId : null),
+    packageCompletedAt,
+    timelineLevels: prediction
+      ? buildCommittedPredictionTimelineLevels(input.metric, prediction)
+      : [],
     actionTraces: orderActionTraces(input.actions).map((action) =>
-      traceForAction(action, input.metric, primaryActionId)
+      traceForAction(action, input.metric, metricById, primaryActionId)
     ),
   };
 }
