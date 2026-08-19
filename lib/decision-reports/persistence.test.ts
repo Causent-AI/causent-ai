@@ -4,7 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "./fixtures/gummy-alpha.ts";
 import { createSafeFallbackReport } from "./generation-contract.ts";
-import { cloneDecisionReport } from "./schema.ts";
+import {
+  cloneDecisionReport,
+  emptyDecisionReportActivationDraft,
+} from "./schema.ts";
 import {
   deleteDecisionReport,
   loadDecisionReport,
@@ -16,6 +19,12 @@ const SCOPE_ID = "ca5e0000-0000-0000-0000-0000000000d3";
 const REPORT_ID = "ca5e0000-0000-0000-0000-0000000000e1";
 const REVISION_ID = "ca5e0000-0000-0000-0000-0000000000e2";
 const SOURCE_RECEIPT_ID = "ca5e0000-0000-0000-0000-0000000000e3";
+const ACTIVATION_ID = "ca5e0000-0000-0000-0000-0000000000e4";
+const DECISION_ID = "ca5e0000-0000-0000-0000-0000000000e5";
+const PREDICTION_ID = "ca5e0000-0000-0000-0000-0000000000e6";
+const METRIC_ID = "ca5e0000-0000-0000-0000-000000000073";
+const SECONDARY_METRIC_ID = "ca5e0000-0000-0000-0000-000000000074";
+const PRIMARY_ACTION_ID = "ca5e0000-0000-0000-0000-0000000000e7";
 
 function rpcClient(calls: Array<{ name: string; args: Record<string, unknown> }>): SupabaseClient {
   return {
@@ -225,6 +234,129 @@ test("save maps an immediate PostgREST 409 to a revision conflict", async () => 
     assert.equal(result.code, "conflict");
     assert.equal(result.currentRevisionId, REVISION_ID);
   }
+});
+
+test("load preserves active action source-item identities for the report editor", async () => {
+  const report = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  report.activationDraft = emptyDecisionReportActivationDraft();
+  const selectedSourceIds = report.implementation.actions
+    .slice(0, 2)
+    .map((action) => action.sourceItemId);
+  const rows: Record<string, unknown> = {
+    decision_reports: {
+      report_id: REPORT_ID,
+      status: "active",
+      current_revision_id: REVISION_ID,
+      active_activation_id: ACTIVATION_ID,
+      active_decision_id: DECISION_ID,
+      active_prediction_id: PREDICTION_ID,
+      active_metric_id: METRIC_ID,
+      activated_at: "2026-08-18T12:00:00.000Z",
+      series_id: "ca5e0000-0000-0000-0000-0000000000e8",
+      iteration_number: 4,
+      predecessor_report_id: "ca5e0000-0000-0000-0000-0000000000e9",
+      iteration_reason: "Review the next iteration",
+    },
+    decision_report_revisions: {
+      revision_id: REVISION_ID,
+      base_revision_id: null,
+      snapshot: report,
+      metric_projection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+      content_hash: "a".repeat(32),
+      created_at: "2026-08-18T11:00:00.000Z",
+    },
+    decision_report_activations: {
+      activation_id: ACTIVATION_ID,
+      report_id: REPORT_ID,
+      revision_id: REVISION_ID,
+      scope_id: SCOPE_ID,
+      metric_id: METRIC_ID,
+      decision_id: DECISION_ID,
+      prediction_id: PREDICTION_ID,
+      action_ids: [
+        "ca5e0000-0000-0000-0000-0000000000ea",
+        PRIMARY_ACTION_ID,
+      ],
+      selected_action_source_ids: selectedSourceIds,
+      primary_lever_action_id: PRIMARY_ACTION_ID,
+      primary_lever_source_id: selectedSourceIds[1],
+      activated_at: "2026-08-18T12:00:00.000Z",
+    },
+    decision_report_activation_metrics: [
+      { metric_id: METRIC_ID },
+      { metric_id: SECONDARY_METRIC_ID },
+    ],
+    decision_report_activation_action_metrics: [
+      {
+        action_id: "ca5e0000-0000-0000-0000-0000000000ea",
+        action_source_item_id: selectedSourceIds[0],
+        metric_id: METRIC_ID,
+      },
+      {
+        action_id: PRIMARY_ACTION_ID,
+        action_source_item_id: selectedSourceIds[1],
+        metric_id: METRIC_ID,
+      },
+    ],
+  };
+  const selectedColumns: Record<string, string> = {};
+  const client = {
+    from(table: string) {
+      const query = {
+        select(columns: string) {
+          selectedColumns[table] = columns;
+          return query;
+        },
+        eq() {
+          return query;
+        },
+        is() {
+          return query;
+        },
+        async maybeSingle() {
+          return { data: rows[table], error: null };
+        },
+        then(resolve: (value: { data: unknown; error: null }) => void) {
+          resolve({ data: rows[table], error: null });
+        },
+      };
+      return query;
+    },
+  } as unknown as SupabaseClient;
+
+  const loaded = await loadDecisionReport(client, SCOPE_ID, REPORT_ID);
+
+  assert.equal(loaded.ok, true, loaded.ok ? undefined : loaded.error);
+  if (!loaded.ok) return;
+  assert.deepEqual(
+    loaded.saved.activation?.selectedActionSourceItemIds,
+    selectedSourceIds,
+  );
+  assert.equal(
+    loaded.saved.activation?.primaryLeverActionSourceItemId,
+    selectedSourceIds[1],
+  );
+  assert.deepEqual(loaded.saved.activation?.selectedMetricIds, [
+    METRIC_ID,
+    SECONDARY_METRIC_ID,
+  ]);
+  assert.deepEqual(loaded.saved.activation?.actionBindings, [
+    {
+      actionId: "ca5e0000-0000-0000-0000-0000000000ea",
+      actionSourceItemId: selectedSourceIds[0],
+      metricId: METRIC_ID,
+    },
+    {
+      actionId: PRIMARY_ACTION_ID,
+      actionSourceItemId: selectedSourceIds[1],
+      metricId: METRIC_ID,
+    },
+  ]);
+  assert.match(selectedColumns.decision_report_activations, /selected_action_source_ids/);
+  assert.match(
+    selectedColumns.decision_report_activation_action_metrics,
+    /action_source_item_id/,
+  );
 });
 
 test("delete calls the checked RPC and validates its receipt", async () => {

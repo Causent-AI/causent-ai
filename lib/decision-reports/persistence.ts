@@ -21,6 +21,14 @@ export type DecisionReportActivationPointer = {
   predictionId: string;
   metricId: string;
   primaryLeverActionId: string | null;
+  selectedMetricIds: string[];
+  selectedActionSourceItemIds: string[];
+  primaryLeverActionSourceItemId: string | null;
+  actionBindings: Array<{
+    actionId: string;
+    actionSourceItemId: string;
+    metricId: string;
+  }>;
   activatedAt: string;
 };
 
@@ -138,8 +146,20 @@ type ActivationRow = {
   metric_id: string;
   decision_id: string;
   prediction_id: string;
+  action_ids: string[];
+  selected_action_source_ids: string[];
   primary_lever_action_id: string | null;
   activated_at: string;
+};
+
+type ActivationActionMetricRow = {
+  action_id: string;
+  action_source_item_id: string;
+  metric_id: string;
+};
+
+type ActivationMetricRow = {
+  metric_id: string;
 };
 
 type RpcDeleteRow = {
@@ -563,7 +583,8 @@ export async function loadDecisionReport(
       .from("decision_report_activations")
       .select(
         "activation_id, report_id, revision_id, scope_id, metric_id, decision_id, " +
-          "prediction_id, primary_lever_action_id, activated_at",
+          "prediction_id, action_ids, selected_action_source_ids, " +
+          "primary_lever_action_id, activated_at",
       )
       .eq("scope_id", scopeId)
       .eq("report_id", reportId)
@@ -586,6 +607,18 @@ export async function loadDecisionReport(
       activationRow.metric_id !== reportRow.active_metric_id ||
       activationRow.decision_id !== reportRow.active_decision_id ||
       activationRow.prediction_id !== reportRow.active_prediction_id ||
+      !Array.isArray(activationRow.action_ids) ||
+      activationRow.action_ids.length < 1 ||
+      activationRow.action_ids.length > 25 ||
+      activationRow.action_ids.some((actionId) => !validUuid(actionId)) ||
+      new Set(activationRow.action_ids).size !== activationRow.action_ids.length ||
+      !Array.isArray(activationRow.selected_action_source_ids) ||
+      activationRow.selected_action_source_ids.length !== activationRow.action_ids.length ||
+      activationRow.selected_action_source_ids.some(
+        (sourceItemId) => typeof sourceItemId !== "string" || sourceItemId.trim() === "",
+      ) ||
+      new Set(activationRow.selected_action_source_ids).size !==
+        activationRow.selected_action_source_ids.length ||
       (activationRow.primary_lever_action_id !== null &&
         !validUuid(activationRow.primary_lever_action_id)) ||
       Date.parse(activationRow.activated_at) !== Date.parse(reportRow.activated_at)
@@ -596,12 +629,126 @@ export async function loadDecisionReport(
         error: "Active report pointers do not match the activation audit.",
       };
     }
+
+    const [metricResponse, bindingResponse] = await Promise.all([
+      sb
+        .from("decision_report_activation_metrics")
+        .select("metric_id")
+        .eq("scope_id", scopeId)
+        .eq("activation_id", activationRow.activation_id),
+      sb
+        .from("decision_report_activation_action_metrics")
+        .select("action_id, action_source_item_id, metric_id")
+        .eq("scope_id", scopeId)
+        .eq("activation_id", activationRow.activation_id),
+    ]);
+    if (metricResponse.error) {
+      return databaseFailure(
+        "load report metrics",
+        metricResponse.error,
+        "Causent could not load this saved report. Try again from Reports.",
+      );
+    }
+    if (bindingResponse.error) {
+      return databaseFailure(
+        "load report action bindings",
+        bindingResponse.error,
+        "Causent could not load this saved report. Try again from Reports.",
+      );
+    }
+    const metricRows = (metricResponse.data ?? []) as unknown as ActivationMetricRow[];
+    const selectedMetricIds = metricRows.map((row) => row.metric_id);
+    const selectedMetricIdSet = new Set(selectedMetricIds);
+    if (
+      selectedMetricIds.length < 1 ||
+      selectedMetricIds.length > 5 ||
+      selectedMetricIds.some((metricId) => !validUuid(metricId)) ||
+      selectedMetricIdSet.size !== selectedMetricIds.length ||
+      !selectedMetricIdSet.has(reportRow.active_metric_id)
+    ) {
+      return {
+        ok: false,
+        code: "database",
+        error: "Active report metrics do not match the activation audit.",
+      };
+    }
+    const bindingRows = (bindingResponse.data ?? []) as unknown as ActivationActionMetricRow[];
+    const reportActionSourceIds = new Set(
+      reportValidation.data.implementation.actions.map((action) => action.sourceItemId),
+    );
+    const bindingActionIds = new Set<string>();
+    const bindingSourceIds = new Set<string>();
+    const bindingBySourceId = new Map<string, ActivationActionMetricRow>();
+    let bindingInvalid = bindingRows.length !== activationRow.action_ids.length;
+    for (const binding of bindingRows) {
+      if (
+        !validUuid(binding.action_id) ||
+        typeof binding.action_source_item_id !== "string" ||
+        binding.action_source_item_id.trim() === "" ||
+        !validUuid(binding.metric_id) ||
+        bindingActionIds.has(binding.action_id) ||
+        bindingSourceIds.has(binding.action_source_item_id) ||
+        !activationRow.action_ids.includes(binding.action_id) ||
+        !activationRow.selected_action_source_ids.includes(binding.action_source_item_id) ||
+        !selectedMetricIdSet.has(binding.metric_id) ||
+        !reportActionSourceIds.has(binding.action_source_item_id)
+      ) {
+        bindingInvalid = true;
+        break;
+      }
+      bindingActionIds.add(binding.action_id);
+      bindingSourceIds.add(binding.action_source_item_id);
+      bindingBySourceId.set(binding.action_source_item_id, binding);
+    }
+    const primaryBinding = activationRow.primary_lever_action_id === null
+      ? null
+      : bindingRows.find(
+          (binding) => binding.action_id === activationRow.primary_lever_action_id,
+        ) ?? null;
+    if (
+      bindingInvalid ||
+      activationRow.action_ids.some((actionId) => !bindingActionIds.has(actionId)) ||
+      activationRow.selected_action_source_ids.some(
+        (sourceItemId) => !bindingSourceIds.has(sourceItemId),
+      ) ||
+      (
+        activationRow.primary_lever_action_id !== null &&
+        (!primaryBinding || primaryBinding.metric_id !== reportRow.active_metric_id)
+      )
+    ) {
+      return {
+        ok: false,
+        code: "database",
+        error: "Active report action bindings do not match the activation audit.",
+      };
+    }
+    const orderedBindings = reportValidation.data.implementation.actions.flatMap((action) => {
+      const binding = bindingBySourceId.get(action.sourceItemId);
+      return binding ? [binding] : [];
+    });
+    if (orderedBindings.length !== bindingRows.length) {
+      return {
+        ok: false,
+        code: "database",
+        error: "Active report action bindings do not match the saved revision.",
+      };
+    }
     activation = {
       activationId: reportRow.active_activation_id,
       decisionId: reportRow.active_decision_id,
       predictionId: reportRow.active_prediction_id,
       metricId: reportRow.active_metric_id,
       primaryLeverActionId: activationRow.primary_lever_action_id,
+      selectedMetricIds,
+      selectedActionSourceItemIds: orderedBindings.map(
+        (binding) => binding.action_source_item_id,
+      ),
+      primaryLeverActionSourceItemId: primaryBinding?.action_source_item_id ?? null,
+      actionBindings: orderedBindings.map((binding) => ({
+        actionId: binding.action_id,
+        actionSourceItemId: binding.action_source_item_id,
+        metricId: binding.metric_id,
+      })),
       activatedAt: reportRow.activated_at,
     };
   }

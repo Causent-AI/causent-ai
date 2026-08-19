@@ -22,7 +22,11 @@ import { DocumentEditorProvider } from "@/components/decision-report/rich-text/D
 import { DocumentEditorToolbar } from "@/components/decision-report/rich-text/DocumentEditorToolbar";
 import type { ReportCanvasDocumentChange } from "@/components/decision-report/rich-text/ReportCanvasEditor";
 import { AutoGrowingTextarea } from "@/components/ui/AutoGrowingTextarea";
-import { decisionReportActionDestination } from "@/lib/decision-reports/action-navigation";
+import {
+  activeDecisionReportActionDestination,
+  decisionReportActionDestination,
+} from "@/lib/decision-reports/action-navigation";
+import { resolveDecisionReportActionSelection } from "@/lib/decision-reports/action-plan-ui";
 import type { ReportAssetView } from "@/lib/decision-reports/assets";
 import {
   applyReportEditCommand,
@@ -142,11 +146,17 @@ export function DecisionReportEditor({
   const projectionMetricId = activationMetrics.find(
     (metric) => metric.name.trim().toLowerCase() === projection.metricName.trim().toLowerCase(),
   )?.metricId;
-  const metricId = activationDraft.confirmedMetricId ??
-    initialPersistence?.activation?.metricId ??
-    projectionMetricId ??
-    "";
+  const metricId = reportIsActive
+    ? persistence?.activation?.metricId ??
+      activationDraft.confirmedMetricId ??
+      projectionMetricId ??
+      ""
+    : activationDraft.confirmedMetricId ?? projectionMetricId ?? "";
   const selectedMetricIds = (() => {
+    const activatedMetricIds = persistence?.activation?.selectedMetricIds ?? [];
+    if (reportIsActive && activatedMetricIds.length > 0) {
+      return [...activatedMetricIds];
+    }
     const selected = resolveDecisionReportSelectedMetricIds(activationDraft);
     return selected.length > 0
       ? selected
@@ -157,28 +167,59 @@ export function DecisionReportEditor({
   const metricAvailable = activationMetrics.some(
     (metric) => metric.metricId === metricId,
   );
-  const selectedActionIds = reportIsActive
-    ? report.activationDraft?.selectedActionSourceItemIds ??
-      (initialPersistence?.activation?.primaryLeverActionId
-        ? [initialPersistence.activation.primaryLeverActionId]
-        : [])
-    : report.implementation.actions.map((action) => action.sourceItemId);
-  const primaryActionId = report.activationDraft?.primaryLeverActionSourceItemId ??
-    initialPersistence?.activation?.primaryLeverActionId ??
-    selectedActionIds[0] ??
-    "";
-  const actionMetricAssignments = selectedActionIds.flatMap((sourceItemId) => {
-    const action = report.implementation.actions.find(
-      (candidate) => candidate.sourceItemId === sourceItemId,
-    );
-    if (!action) return [];
-    const assignedMetricId = sourceItemId === primaryActionId
-      ? metricId
-      : action.metricId ?? metricId;
-    return assignedMetricId
-      ? [{ actionSourceItemId: sourceItemId, metricId: assignedMetricId }]
-      : [];
-  });
+  const { selectedActionIds, primaryActionId } =
+    resolveDecisionReportActionSelection({
+      active: reportIsActive,
+      reportActionSourceItemIds: report.implementation.actions.map(
+        (action) => action.sourceItemId,
+      ),
+      draftSelectedActionSourceItemIds:
+        report.activationDraft?.selectedActionSourceItemIds ?? [],
+      draftPrimaryActionSourceItemId:
+        report.activationDraft?.primaryLeverActionSourceItemId ?? null,
+      activationSelectedActionSourceItemIds:
+        persistence?.activation?.selectedActionSourceItemIds ?? [],
+      activationPrimaryActionSourceItemId:
+        persistence?.activation?.primaryLeverActionSourceItemId ?? null,
+    });
+  const actionMetricAssignments =
+    reportIsActive && persistence?.activation
+      ? persistence.activation.actionBindings.map((binding) => ({
+          actionSourceItemId: binding.actionSourceItemId,
+          metricId: binding.metricId,
+        }))
+      : selectedActionIds.flatMap((sourceItemId) => {
+          const action = report.implementation.actions.find(
+            (candidate) => candidate.sourceItemId === sourceItemId,
+          );
+          if (!action) return [];
+          const assignedMetricId = sourceItemId === primaryActionId
+            ? metricId
+            : action.metricId ?? metricId;
+          return assignedMetricId
+            ? [{ actionSourceItemId: sourceItemId, metricId: assignedMetricId }]
+            : [];
+        });
+  const canonicalMetricIdByActionSource = new Map(
+    actionMetricAssignments.map((assignment) => [
+      assignment.actionSourceItemId,
+      assignment.metricId,
+    ]),
+  );
+  const actionPlanReport = reportIsActive
+    ? {
+        ...report,
+        implementation: {
+          ...report.implementation,
+          actions: report.implementation.actions.map((action) => ({
+            ...action,
+            metricId:
+              canonicalMetricIdByActionSource.get(action.sourceItemId) ??
+              action.metricId,
+          })),
+        },
+      }
+    : report;
   const gaps = scanDecisionReportGaps(report);
   const titleBlocked = titleDraft.trim() === "";
   const invalidActionTitleIds = report.implementation.actions
@@ -781,6 +822,24 @@ export function DecisionReportEditor({
       return;
     }
 
+    if (alreadyActive && currentPersistence.activation) {
+      const destination = activeDecisionReportActionDestination({
+        actionSourceItemId: sourceItemId,
+        actionBindings: currentPersistence.activation.actionBindings,
+        decisionId: currentPersistence.activation.decisionId,
+      });
+      if (!destination) {
+        setStartError(
+          "This activated action could not be matched to its saved work item. Reload the report and try again.",
+        );
+        return;
+      }
+      setStartError(null);
+      setStartPendingActionId(sourceItemId);
+      startActionTransition(() => router.push(destination));
+      return;
+    }
+
     actionStartInFlightRef.current = true;
     setStartError(null);
     setStartPendingActionId(sourceItemId);
@@ -821,6 +880,13 @@ export function DecisionReportEditor({
             predictionId: result.activation.predictionId,
             metricId,
             primaryLeverActionId: result.activation.primaryLeverActionId,
+            selectedMetricIds: [...selectedMetricIds],
+            selectedActionSourceItemIds: [...selectedActionIds],
+            primaryLeverActionSourceItemId: primaryActionId,
+            actionBindings: actionMetricAssignments.map((assignment, index) => ({
+              actionId: result.activation.actionIds[index],
+              ...assignment,
+            })),
             activatedAt: result.activation.activatedAt,
           },
         };
@@ -1066,7 +1132,7 @@ export function DecisionReportEditor({
               onAssetRemove={removeAsset}
             />
             <ActionPlanCanvas
-              report={report}
+              report={actionPlanReport}
               projection={projection}
               metrics={activationMetrics}
               selectedMetricIds={selectedMetricIds}
