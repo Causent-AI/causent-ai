@@ -12,11 +12,13 @@ import {
   ResolutionScopeDiscoveryError,
 } from "./cron-scopes.ts";
 
-const ORG = "10000000-0000-4000-8000-000000000001";
-const PROJECT = "20000000-0000-4000-8000-000000000001";
-const WORKSPACE = "30000000-0000-4000-8000-000000000001";
-const MEMBER = "40000000-0000-4000-8000-000000000001";
-const ADMIN = "40000000-0000-4000-8000-000000000002";
+// Stable demo ids are valid PostgreSQL UUIDs but intentionally do not carry an
+// RFC version/variant nibble. Production discovery must accept this exact shape.
+const ORG = "ca5e0000-0000-0000-0000-0000000000d1";
+const PROJECT = "ca5e0000-0000-0000-0000-0000000000d2";
+const WORKSPACE = "ca5e0000-0000-0000-0000-0000000000d3";
+const MEMBER = "ca5e1111-0000-0000-0000-0000000000d9";
+const ADMIN = "ca5e1111-0000-0000-0000-0000000000da";
 
 test("worker payload carries the server-selected production actor and preserves demo omission", () => {
   assert.deepEqual(

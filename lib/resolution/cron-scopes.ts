@@ -10,7 +10,11 @@ export const RESOLUTION_WORKER_CONCURRENCY = 4;
 export const RESOLUTION_CUTOFF_HOUR_UTC = 15;
 
 const MAX_ACTOR_CANDIDATES_PER_WORKSPACE = 32;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// PostgreSQL's uuid input accepts the canonical 8-4-4-4-12 hex shape without
+// requiring an RFC version/variant nibble. Causent's stable seed identifiers
+// intentionally use zeroes in those positions, so validate the database type's
+// lexical contract here (still strict enough to make the PostgREST filter safe).
+const UUID_RE = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const WRITER_ROLES = new Set(["member", "admin", "owner"]);
 
 type ProjectRelation = { org_id: unknown } | Array<{ org_id: unknown }> | null;
