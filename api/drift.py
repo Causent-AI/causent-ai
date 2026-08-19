@@ -18,6 +18,10 @@ from persistence.drift_materialization import (  # noqa: E402
     DriftRefreshResult,
     drain_drift_refresh_jobs,
 )
+from persistence.worker_runtime import (  # noqa: E402
+    WorkerConfigurationError as _WorkerConfigurationError,
+    require_worker_database_url,
+)
 
 SECRET_HEADER = "x-causent-drift-secret"
 MAX_BODY_BYTES = 3_000
@@ -25,10 +29,6 @@ MAX_RESULT_ROWS = 20
 
 
 class _BadRequest(Exception):
-    pass
-
-
-class _WorkerConfigurationError(Exception):
     pass
 
 
@@ -67,10 +67,10 @@ def _parse_body(raw_body: bytes) -> tuple[int, str | None]:
 
 
 def _database_url() -> str:
-    dsn = os.environ.get("DATABASE_URL", "").strip()
-    if not dsn:
-        raise _WorkerConfigurationError("DATABASE_URL_MISSING")
-    return dsn
+    return require_worker_database_url(
+        os.environ.get("DATABASE_URL"),
+        expected_role="causent_drift_worker",
+    )
 
 
 def _structured_log(event: str, **fields: object) -> None:

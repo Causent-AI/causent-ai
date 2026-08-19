@@ -21,12 +21,16 @@ SECRET = "recompute-test-secret"
 SCOPE = "ca5e0000-0000-0000-0000-000000000071"
 METRIC = "ca5e0000-0000-0000-0000-000000000073"
 ACTIVATION = UUID("ca5e0000-0000-0000-0000-000000000075")
+DATABASE_URL = (
+    "postgresql://causent_recompute_worker.abcdefghijklmnopqrst:test-password@"
+    "aws-0-us-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
+)
 
 
 @pytest.fixture(autouse=True)
 def secret(monkeypatch):
     monkeypatch.setenv("CAUSENT_RECOMPUTE_SECRET", SECRET)
-    monkeypatch.setenv("DATABASE_URL", "postgresql://worker.example/postgres")
+    monkeypatch.setenv("DATABASE_URL", DATABASE_URL)
 
 
 def test_fails_closed_before_drain(monkeypatch):
@@ -66,6 +70,25 @@ def test_requires_explicit_database_url_after_auth(monkeypatch, capsys):
 
     with pytest.raises(api._WorkerConfigurationError):
         api._default_drain(1, None, None)
+
+
+def test_rejects_wrong_database_role_before_drain(monkeypatch, capsys):
+    called = False
+
+    def drain(*_):
+        nonlocal called
+        called = True
+        return []
+
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        DATABASE_URL.replace("causent_recompute_worker", "causent_resolve_worker"),
+    )
+    status, body = api.handle_request(b"{}", SECRET, drain=drain)
+    assert status == 503
+    assert body == {"error": "worker not configured", "detail": "DATABASE_URL_INVALID"}
+    assert called is False
+    assert "test-password" not in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

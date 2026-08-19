@@ -37,6 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
+      complete_gate: ${{ steps.select.outputs.complete_gate }}
     steps:
       - id: select
         name: Select the bounded profile matrix
@@ -45,10 +46,12 @@ jobs:
         run: |
           case "$REQUESTED_PROFILE" in
             release_gate)
-              matrix='{"profile":["steady","burst","hot_workspace","mixed_write","soak"]}'
+              matrix='{"profile":["steady","burst","hot_workspace","mixed_write","soak","adversarial"]}'
+              complete_gate=true
               ;;
             smoke|steady|burst|hot_workspace|mixed_write|soak|adversarial)
               matrix="{\"profile\":[\"$REQUESTED_PROFILE\"]}"
+              complete_gate=false
               ;;
             *)
               echo "Unsupported profile: $REQUESTED_PROFILE" >&2
@@ -56,6 +59,7 @@ jobs:
               ;;
           esac
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "complete_gate=$complete_gate" >> "$GITHUB_OUTPUT"
 
   load:
     needs: profiles
@@ -72,37 +76,96 @@ jobs:
       - name: Require the protected staging target
         env:
           LOAD_URL: ${{ secrets.CAUSENT_STAGING_LOAD_URL }}
-          LOAD_COOKIE: ${{ secrets.CAUSENT_STAGING_SESSION_COOKIE }}
+          LOAD_PROFILE: ${{ matrix.profile }}
+          CAUSENT_LOAD_SESSION_POOL_URL: ${{ secrets.CAUSENT_STAGING_SESSION_POOL_URL }}
+          CAUSENT_LOAD_SESSION_POOL_TOKEN: ${{ secrets.CAUSENT_STAGING_SESSION_POOL_TOKEN }}
+          CAUSENT_LOAD_FOREIGN_SESSION_COOKIE: ${{ secrets.CAUSENT_STAGING_FOREIGN_SESSION_COOKIE }}
+          CAUSENT_LOAD_FORBIDDEN_TENANT_MARKER: ${{ secrets.CAUSENT_STAGING_FORBIDDEN_TENANT_MARKER }}
+          CAUSENT_LOAD_FORBIDDEN_WORKSPACE_ID: ${{ secrets.CAUSENT_STAGING_FORBIDDEN_WORKSPACE_ID }}
+          WRITE_URL: ${{ secrets.CAUSENT_STAGING_WRITE_URL }}
+          WRITE_SECRET: ${{ secrets.CAUSENT_STAGING_WRITE_SECRET }}
         run: |
           test -n "$LOAD_URL"
-          test -n "$LOAD_COOKIE"
           case "$LOAD_URL" in
             *localhost*|*127.0.0.1*) exit 1 ;;
+            https://*) ;;
+            *) exit 1 ;;
           esac
+          if [ "$LOAD_PROFILE" = mixed_write ]; then
+            test -n "$WRITE_URL"
+            test -n "$WRITE_SECRET"
+            case "$WRITE_URL" in
+              *localhost*|*127.0.0.1*) exit 1 ;;
+              https://*) ;;
+              *) exit 1 ;;
+            esac
+          fi
+          node load/session-pool-preflight.mjs --broker
+
+          umask 077
+          pool_directory="$(mktemp -d "$RUNNER_TEMP/causent-session-pool-$LOAD_PROFILE.XXXXXX")"
+          pool_file="$pool_directory/pool.json"
+          pool_header_file="$pool_directory/authorization.headers"
+          pool_request_file="$pool_directory/request.json"
+          pool_set="github:$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT"
+          pool_lease="$pool_set:$LOAD_PROFILE"
+          printf 'Authorization: Bearer %s\n' "$CAUSENT_LOAD_SESSION_POOL_TOKEN" > "$pool_header_file"
+          printf '{"profile":"%s","allocationSetId":"%s","leaseId":"%s","allocationPolicy":"single-use-supabase-session-per-vu-profile-disjoint-v1"}\n' \
+            "$LOAD_PROFILE" "$pool_set" "$pool_lease" > "$pool_request_file"
+          chmod 600 "$pool_header_file" "$pool_request_file"
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "@$pool_header_file" \
+            --header "Accept: application/json" \
+            --header "Content-Type: application/json" \
+            --data-binary "@$pool_request_file" \
+            --output "$pool_file" \
+            "$CAUSENT_LOAD_SESSION_POOL_URL"
+          chmod 600 "$pool_file"
+          CAUSENT_LOAD_SESSION_COOKIE_POOL_FILE="$pool_file" \
+            CAUSENT_LOAD_SESSION_COOKIE_POOL_SET="$pool_set" \
+            CAUSENT_LOAD_SESSION_COOKIE_POOL_LEASE="$pool_lease" \
+            node load/session-pool-preflight.mjs "$LOAD_PROFILE"
+          echo "CAUSENT_LOAD_SESSION_COOKIE_POOL_FILE=$pool_file" >> "$GITHUB_ENV"
+          echo "CAUSENT_LOAD_SESSION_COOKIE_POOL_SET=$pool_set" >> "$GITHUB_ENV"
+          echo "CAUSENT_LOAD_SESSION_COOKIE_POOL_LEASE=$pool_lease" >> "$GITHUB_ENV"
       - name: Run ${{ matrix.profile }} profile
         env:
           CAUSENT_LOAD_ACK: I_UNDERSTAND_STAGING_LOAD
           CAUSENT_LOAD_ENV: staging
           CAUSENT_LOAD_PROFILE: ${{ matrix.profile }}
           CAUSENT_LOAD_BASE_URL: ${{ secrets.CAUSENT_STAGING_LOAD_URL }}
-          CAUSENT_LOAD_SESSION_COOKIE: ${{ secrets.CAUSENT_STAGING_SESSION_COOKIE }}
+          CAUSENT_LOAD_FOREIGN_SESSION_COOKIE: ${{ secrets.CAUSENT_STAGING_FOREIGN_SESSION_COOKIE }}
+          CAUSENT_LOAD_FORBIDDEN_TENANT_MARKER: ${{ secrets.CAUSENT_STAGING_FORBIDDEN_TENANT_MARKER }}
+          CAUSENT_LOAD_FORBIDDEN_WORKSPACE_ID: ${{ secrets.CAUSENT_STAGING_FORBIDDEN_WORKSPACE_ID }}
           CAUSENT_LOAD_WRITE_URL: ${{ secrets.CAUSENT_STAGING_WRITE_URL }}
           CAUSENT_LOAD_WRITE_SECRET: ${{ secrets.CAUSENT_STAGING_WRITE_SECRET }}
-        run: k6 run load/causent-mvp.js
+        run: |
+          mkdir -p load/results
+          k6 run load/causent-mvp.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: k6-${{ matrix.profile }}-${{ github.run_id }}
           path: load/results/*.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
-  staging-release-gate:
-    needs: load
+  staging-load-result:
+    needs: [profiles, load]
     if: always()
+    name: ${{ needs.profiles.outputs.complete_gate == 'true' && 'Staging release gate' || 'Selected staging load profile' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Require every selected profile to pass
+      - name: Require the requested staging load to pass
         env:
+          COMPLETE_GATE: ${{ needs.profiles.outputs.complete_gate }}
           LOAD_RESULT: ${{ needs.load.result }}
-        run: test "$LOAD_RESULT" = success
+          LOAD_PROFILE: ${{ inputs.profile }}
+        run: |
+          test "$LOAD_RESULT" = success
+          if [ "$COMPLETE_GATE" = true ]; then
+            echo "Complete release gate passed: steady, burst, hot_workspace, mixed_write, soak, and adversarial." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Profile-only run passed: $LOAD_PROFILE. This is not complete release-gate evidence." >> "$GITHUB_STEP_SUMMARY"
+          fi

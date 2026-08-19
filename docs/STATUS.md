@@ -1,5 +1,100 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-08-18/19 — Production database at 42/42; application rollout stopped
+
+The production Supabase project `royftsqyawtyfjolfabd` advanced from 11 to **42/42 migrations**.
+The first 41 followed the controlled phases rehearsed on the isolated with-data branch. Phase A
+applied 20 migrations;
+all eight concurrently built parent/hot indexes are ready, valid, and live. Phase B1 applied six
+migrations. The Phase B2 drain returned exactly
+`(processed_count=0, last_activation_id=NULL, has_more=false)`. Phase B3 validated all 17 target
+constraints with zero invalid. Phase B4 left activation v1/v2/v3 present and removed the rollout-only
+backfill function. The ACL hardening and dedicated worker-role migrations then applied. Migration
+42's production role catalog, error-level schema lint, and serialized post-42 dry-run all pass; the
+remote database reports up to date.
+
+The production catalog now has 37 public SECURITY DEFINER functions. Anonymous execute is 0/37 and
+37/37 use the fixed empty search path. The ACL source also closes future `postgres` function defaults,
+restores only the intended authenticated/service grants, limits `handle_new_user()` to
+`supabase_auth_admin`, and keeps regression coverage for the catalog, future default, comparator, and
+auth hook. Supabase still warns that leaked-password protection is disabled.
+
+The database deployment did not enable the product. No `decision_report_rollouts` row was inserted,
+no production seed was loaded during schema activation, and no database password rotation occurred.
+The public app alias still serves the verified rollback artifact. No drift/recompute/resolve worker
+or app candidate was deployed, canaried, or promoted.
+
+Vercel projects `causent-drift`, `causent-recompute`, and `causent-resolve` now exist. Matching
+high-entropy Sensitive worker secrets are configured on the corresponding worker projects and on
+`causent-ai`; the three app-side worker URLs are configured; and `CRON_SECRET` was rotated. The app
+also has Sensitive `SUPABASE_SERVICE_ROLE_KEY`, and stale `CAUSENT_DEMO_TODAY` remains removed. Every
+worker now has its exact role-specific Supavisor `DATABASE_URL` stored Sensitive, and the running
+rollback artifact has not consumed the repaired app configuration.
+
+Migration 42 passed a full local reset, a disposable-clone Supavisor rehearsal, and production apply.
+The clone credentials were disabled after rehearsal. Production has three separate generated role
+credentials; exact attributes, memberships, grants, and `aws-1` session-pooler access pass for each
+target. Local worker-role tests pass 8/8, local and production error-level schema lint pass, the
+credentialed Node suite reports 671 total (652 passed, 19 intentional live-model skips, zero
+failures), and the engine/bridge/isolation suite passes 1,290/1,290.
+
+Release tooling now treats drift, recompute, and resolve symmetrically and rejects weak, repetitive,
+or placeholder worker/cron secrets while accepting documented high-entropy random forms without
+logging values. The deploy gate and each Python worker runtime also require the exact target-specific
+role/ref Supavisor DSN; owner, `service_role`, cross-worker, direct-host, and malformed credentials
+fail closed. Production-mode worker deploys use `--skip-domain`; promotion remains a separate
+explicit command after immutable-URL canaries.
+
+Scheduled resolution is no longer pinned to the two demo workspaces. Production discovers only due
+workspaces through the server client, selects an explicit write-capable actor under the inherited RLS
+scope contract, and invokes at most 20 workspaces per run with four concurrent calls. Local demo keeps
+the fixed fixture path. The cron repeats every five minutes to drain backlog while retaining the
+15:00 UTC decision-day cutoff; production errors and summaries omit workspace, user, and prediction
+identities.
+
+The staging-load source contract now calls an external HTTPS broker configured by
+`CAUSENT_STAGING_SESSION_POOL_URL` and high-entropy `CAUSENT_STAGING_SESSION_POOL_TOKEN`. A durable
+allocation-set/profile lease envelope must supply the exact profile capacity using distinct,
+cross-profile-disjoint, single-use sessions with real Supabase access-token, refresh-token, and
+`session_id` lineage. The adversarial profile retains a separate foreign-owner session and real
+foreign workspace plus tenant marker; setup must observe the marker as a positive control before a
+forged-workspace isolation result is accepted. The complete `release_gate` matrix includes this
+adversarial profile, creates its result directory on a clean runner, and treats a missing k6 artifact
+as a failure. The external broker has not been implemented, audited,
+or configured, so live staging load is operator-blocked. This is source-contract hardening, not
+capacity or tenant-isolation load evidence.
+
+Next operator steps are to decide whether a later database-password rotation is desired; enable
+leaked-password protection; implement/audit/configure the session broker; run hosted CI and protected staging load; create
+no-alias worker/app candidates; canary the complete authenticated loop; and promote explicitly. The
+billable with-data rehearsal branch must be removed after its evidence is no longer needed. Founder
+review and initially unassisted partner evidence remain open.
+
+### Applied worker identity contract
+
+Migration 42 creates passwordless `NOLOGIN` roles `causent_drift_worker`,
+`causent_recompute_worker`, and `causent_resolve_worker` with mutually bounded privileges. Drift can
+touch only its queue, detector inputs, and derived projection. Recompute can claim only its queue and
+lock the current immutable target before a SET-only, non-inherited switch to `authenticated` for the
+stored actor. Resolve has no direct application-table/private-schema grants and only the same
+SET-only authenticated membership. None can assume or inherit `service_role`. The accompanying
+catalog regression contract passes locally and against the production catalog.
+
+Production now gives each worker a separate generated login password and its own Sensitive Supavisor
+session-pooler DSN:
+
+```text
+causent-drift:     postgresql://causent_drift_worker.royftsqyawtyfjolfabd:<NONEMPTY_PASSWORD>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+causent-recompute: postgresql://causent_recompute_worker.royftsqyawtyfjolfabd:<NONEMPTY_PASSWORD>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+causent-resolve:   postgresql://causent_resolve_worker.royftsqyawtyfjolfabd:<NONEMPTY_PASSWORD>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+The release check requires the exact `<role>.<20-character-project-ref>` username, a nonempty
+password, a matching `*.pooler.supabase.com` host, port `5432`, database `postgres`, and only
+`sslmode=require`. It rejects `postgres.<ref>`, `service_role.<ref>`, local/direct hosts, port `6543`,
+and cross-worker role reuse. These DSNs are stored only in the matching worker's Sensitive
+`DATABASE_URL`; they have not yet been exercised by a deployed worker candidate.
+
 ## 2026-08-17 — Product, science, and engineering hardening locally verified
 
 The founder selected the recommended product-continuity changes, a bounded scientific-contract
@@ -80,19 +175,20 @@ pre-guard deployment, `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`. Post-rollback public c
 `/login` returns 200, while `/` and Decision Report onboarding return the expected unauthenticated
 307 redirect to `/login`. PR #30 remains merged in source, but its application artifact is not live.
 
-The following configuration gaps must be closed before attempting to release `main` again:
+At that historical checkpoint, the following configuration gaps blocked release; the 2026-08-18/19
+section above records which are now closed:
 
-- the `causent-ai` production environment lacks `SUPABASE_SERVICE_ROLE_KEY`,
+- the `causent-ai` production environment lacked `SUPABASE_SERVICE_ROLE_KEY`,
   `CAUSENT_RECOMPUTE_URL`, and `CAUSENT_RECOMPUTE_SECRET`;
-- Vercel's environment-name list confirms `CRON_SECRET`, `CAUSENT_RESOLVE_URL`, and
-  `CAUSENT_RESOLVE_SECRET` exist. Their encrypted values are not retrievable through the local
-  pull/run context and appear empty there, so the local validator cannot attest their values; they
-  require deployment-time and authenticated canary verification. `CAUSENT_DEMO_TODAY` is still
-  present and stale and must be removed because the hardened production runtime now rejects it;
-- the local Supabase CLI is neither authenticated nor linked to the production project, so the seven
-  documented pending migrations have not been remotely verified or dry-run in this preflight;
-- Vercel project `causent-recompute` does not exist and no recompute worker is deployed; and
-- `causent-resolve` exists but lacks its required production `DATABASE_URL`.
+- Vercel's environment-name list confirmed `CRON_SECRET`, `CAUSENT_RESOLVE_URL`, and
+  `CAUSENT_RESOLVE_SECRET` existed. Their encrypted values were not retrievable through the local
+  pull/run context and appeared empty there, so the local validator could not attest their values; they
+  required deployment-time and authenticated canary verification. `CAUSENT_DEMO_TODAY` was present
+  and stale and had to be removed because the hardened production runtime rejects it;
+- the local Supabase CLI was neither authenticated nor linked to the production project, so the seven
+  documented pending migrations were not remotely verified or dry-run in that preflight;
+- Vercel project `causent-recompute` did not exist and no recompute worker was deployed; and
+- `causent-resolve` existed but lacked its required production `DATABASE_URL`.
 
 Release-candidate hardening replaced the brittle sample shortcut with an explicit,
 deterministic, server-validated activation-ready fixture and renamed the sample badge to
@@ -367,7 +463,7 @@ evidence; this override is not evidence that the gate passed. Slice 10 is now me
 partner-environment migration, worker configuration/deployment, authenticated canaries, and real
 partner evidence remain open.
 
-Last updated: 2026-08-16. Single source of truth for "where are we and how do I pick up."
+Last updated: 2026-08-18. Single source of truth for "where are we and how do I pick up."
 Product: **dual cold-start on one causal graph** — the retrospective wedge ("Did-It-Ship,
 Did-It-Work": tie each shipped action to a metric, honest ITS readout) PLUS the prospective
 on-ramp (human pre-registered prediction → drift watch → engine-measured resolution). See
@@ -394,10 +490,11 @@ current-report causal recomputation. A current-report-only manual AI copy/paste 
 the proposed external-agent loop without granting it a write path. Reports retains immutable lineage; the three operational tabs
 show only the workspace's explicit current report. The 45-day-per-side ITS confidence floor is
 unchanged. The founder-selected UX follow-up has its recorded green checkpoint, but the later
-product/science/engineering hardening in the dirty working tree has not yet passed the exact combined
-gate and must not inherit those results. Three real initially unassisted partner sessions, the
-continuing founder UI/workflow review, staging scale evidence, production migration/configuration,
-hosted drift/recompute capacity, and authenticated deployment canaries remain human/operator gates.**
+product/science/engineering hardening and dedicated worker-role migration now pass the refreshed
+local combined database/application/engine gate. Production schema is at 42/42, but three real initially
+unassisted partner sessions, the continuing founder UI/workflow review, staging scale evidence,
+worker/app configuration, hosted drift/recompute capacity, and authenticated deployment canaries
+remain human/operator gates.**
 The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
 all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
@@ -462,8 +559,8 @@ conversational delivery, or other production expansion before observed unassiste
            (Issues:R+W) on causent-ai + a Jira webhook → /api/webhooks/jira (deferred: no Jira
            instance tonight). Read-only deep-link + paste works with zero creds now.
 ☐ PARTNER  zero-code mechanism-mapping test  ← gates T2 connector completion + #18 drift-alert surface
-☐ CONFIG   production now requires a server-only SUPABASE_SERVICE_ROLE_KEY for provenance receipt
-           minting; set and canary it before release. Connector automation remains a separate
+◐ CONFIG   production now has a Sensitive server-only SUPABASE_SERVICE_ROLE_KEY for provenance
+           receipt minting; canary it before release. Connector automation remains a separate
            operator decision; paste-URL attribution still works without provider write automation.
 ☐ OPEN     #16 connector live (creds) · #18 drift-alert surface (gated) · ~~#19 Jira parity~~ (PR #25)
 ◐ ACTIVE   AI-assisted Decision Report partner wedge: Slices 1–10 implementation complete locally. The 24.4s
@@ -723,25 +820,34 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 - **Deferred (gated):** `#18`'s **drift-alert surface** (the `LEVER_DROPPED` assert-fact alert)
   stays behind the mechanism-mapping test + #16 live detection — verified NOT built this run.
 
-## Production deployment — deployed baseline plus 2026-08-12 preflight
+## Production deployment — schema activated 2026-08-18/19; app remains rolled back
+
+- **Current 2026-08-18/19 release state:** the public app still serves the verified pre-guard rollback
+  artifact. `CAUSENT_DEMO_TODAY` has been removed from the `causent-ai` Production environment and
+  the server-only `SUPABASE_SERVICE_ROLE_KEY` has been added as Sensitive, but no new app candidate
+  or promotion has consumed those values. Production Supabase is at 42/42. The apply, production role
+  catalog, error-level lint, and serialized post-42 dry-run pass. No rollout row was added. The three worker projects, app/worker
+  Sensitive secrets, app URLs, rotated cron secret, separate production role credentials, and exact
+  target-specific Sensitive `DATABASE_URL` values now exist. The external staging broker, hosted
+  CI/load evidence, candidates, canaries, and explicit promotions remain pending.
 
 - **THE app project is Vercel `causent-ai`** (git-connected to this repo, auto-deploys `main`),
   live at **https://app.causent.ai** (Cloudflare CNAME `app` → Vercel; apex `causent.ai` is the
   separate Astro marketing site). A second Vercel project `causent` (created 7/10 via CLI link)
   is redundant — the repo is re-linked to `causent-ai`; check `.vercel/project.json` before
   `vercel env` commands.
-- **Current release state (2026-08-12): PR #30 is merged, but its production artifact is rolled
+- **Historical release state (2026-08-12): PR #30 is merged, but its production artifact is rolled
   back.** `main` is at squash commit `b2bb98c`. Production deployment
   `dpl_58Ds3d71VdvKFTBcdUkgamd182ip` built successfully but returned 503 because runtime
   configuration failed closed. Vercel now points production to verified pre-guard deployment
   `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`; `/login` returns 200 and protected routes redirect to login.
-  The production environment currently lacks `SUPABASE_SERVICE_ROLE_KEY`,
-  `CAUSENT_RECOMPUTE_URL`, and `CAUSENT_RECOMPUTE_SECRET`. Vercel's environment list reports
+  At that checkpoint the production environment lacked `SUPABASE_SERVICE_ROLE_KEY`,
+  `CAUSENT_RECOMPUTE_URL`, and `CAUSENT_RECOMPUTE_SECRET`. Vercel's environment list reported
   `CRON_SECRET`, `CAUSENT_RESOLVE_URL`, and `CAUSENT_RESOLVE_SECRET` exist by name, but Vercel does
   not expose their encrypted values to the local pull/run context. The empty local values are not
   evidence that production lacks them; verify them at deployment time and with authenticated
-  canaries. `CAUSENT_DEMO_TODAY` remains present and stale and must be removed; the hardened
-  production runtime now rejects that override.
+  canaries. `CAUSENT_DEMO_TODAY` was then present and stale. Both app-environment defects were
+  repaired on 2026-08-18, but the rollback artifact has not been replaced.
 - **Earlier prod env snapshot (causent-ai, 2026-07-16)**: `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY`,
   `ANTHROPIC_API_KEY`, `CAUSENT_ENGINE_SECRET`, `CAUSENT_DEMO_TODAY=2025-05-23`,
   `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `CRON_SECRET` were recorded. That snapshot omitted
@@ -751,33 +857,28 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   other service-role consumers, so webhook/reconciliation behavior must be canaried separately.
   `CAUSENT_LOCAL_DEMO`, `CAUSENT_USE_SEED`, `CAUSENT_DECISION_REPORT_FIXTURE`, and
   `CAUSENT_DECISION_REPORT_LOCAL_ROLLOUT` must all be absent in production.
-- **Expanded Slice 10 and the MVP-finish migration are not armed in production.** The Supabase CLI
-  used for this preflight is not authenticated or linked, so remote migration history has not been
-  freshly verified and no dry-run was possible. Treat all seven documented migrations as pending
-  until an authenticated history check and dry-run prove otherwise. The stateful recompute function needs the
-  session-pooler `DATABASE_URL` and `CAUSENT_RECOMPUTE_SECRET`; `causent-ai` needs the matching
-  `CAUSENT_RECOMPUTE_SECRET`, `CAUSENT_RECOMPUTE_URL`, and existing `CRON_SECRET`. The app also
-  needs its Supabase URL, anon key, and server-only service-role key. Apply all five 2026-07-23
-  migrations (`20260723053444`, `20260723061012`, `20260723061925`, `20260723064500`, and
-  `20260723151939`) plus review migrations `20260810005135` and `20260810044832` before deploying
-  either side, then test immediate wake-up and the
-  five-minute recovery cron.
-- **Cloud Supabase `royftsqyawtyfjolfabd`**: migrations through the 2026-07-16 deployment are
-  applied; the local Slice 10 migrations are not. The environment was seeded 2026-07-16 through
+- **Expanded Slice 10 and the applied hardening schema are not product-armed.** Production is at
+  42/42 with no rollout assignment or serving application change. No seed ran during schema
+  activation. The three worker projects, matching strong Sensitive app/worker secrets, app worker
+  URLs, rotated `CRON_SECRET`, dedicated production role credentials, and exact role-specific
+  Sensitive `DATABASE_URL` values exist. The app retains its Supabase URL, anon key, and server-only
+  service-role key. After worker deployment and promotion, test immediate wake-up and the five-minute
+  recovery cron.
+- **Cloud Supabase `royftsqyawtyfjolfabd`**: all 42 migrations are applied. Error-level
+  `public`/`private`/`storage` lint passes; `anon` executes 0/37 public SECURITY
+  DEFINER functions; and 37/37 use an empty search path. No rollout row or seed was added during this
+  activation. The environment was historically seeded 2026-07-16 through
   the real bridge (`DATABASE_URL=<session-pooler aws-1-us-east-1, user postgres.<ref>>
   seed_demo.py`, password via `PGPASSWORD` — never in the URL). Seed is teardown-then-reseed
   under the demo-org UUID: safe to re-run, can't touch real users. Invite-only auth live:
   Google provider + Before-User-Created hook (`enforce_allowlist`) + `scripts/invite.ts`
   (service key inline-only). Data API rejects key-only anonymous requests (401) while
   session-authenticated RLS reads work — stricter than default, keep it.
-- **Known prod limits**: ~~the resolve cron spawns local Python~~ — **PORTED + DEPLOYED
-  (PR #24 merged, `causent-resolve` live)**: the cron HTTP-calls the serverless fn; one env
-  step left to fully arm (`DATABASE_URL` is currently absent on `causent-resolve`; add it and
-  redeploy/canary both sides). The separate `causent-recompute` project does not currently exist and
-  no automatic recompute worker is deployed.
-  The current working tree removes drift's request-path Python spawn and adds a materialized async
-  projection, but its separate hosted drift worker, `DATABASE_URL`, `CAUSENT_DRIFT_URL`, and matching
-  secret are not deployed or canaried. `/login` is publicly reachable and currently
+- **Known prod limits**: ~~the resolve cron spawns local Python~~ — **PORTED**. All three stateful
+  worker projects, dedicated database roles/credentials, exact Sensitive Supavisor DSNs, app URLs,
+  matching strong Sensitive app/worker secrets, and rotated `CRON_SECRET` exist. No current-source
+  drift/recompute/resolve candidate, canary, or promotion has run, so configuration alone does not arm
+  a worker. `/login` is publicly reachable and currently
   indexable (no robots.txt — the proxy redirects it; CT logs make the hostname discoverable);
   add `app/robots.ts` + proxy exclusion if stealth matters.
 
@@ -858,35 +959,46 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 
 ### 3. Deliberately activate production
 
-- **Database:** authenticate and link the Supabase CLI to the intended production project; inspect
-  remote migration history and rehearse the exact pending set on a production-sized clone. Include
-  `20260723053444`, `20260723061012`, `20260723061925`, `20260723064500`, `20260723151939`,
-  `20260810005135`, and `20260810044832` plus the current `20260817*` split multi-metric,
-  scientific, connector-inbox, drift-projection, chunked-import, and hot-index migrations. Follow
-  `supabase/rollouts/decision_report_multi_metric_activation.md` and build the documented large
-  parent/hot indexes concurrently before the canonical migrations. Rerun schema lint plus
-  authenticated RLS, Storage, import, connector, drift, package-intervention, and recompute probes.
-  Never production-seed the 122-row Northstar fixture.
-- **App environment:** add server-only `SUPABASE_SERVICE_ROLE_KEY`,
-  `CAUSENT_RECOMPUTE_URL`/`CAUSENT_RECOMPUTE_SECRET`, and
-  `CAUSENT_DRIFT_URL`/`CAUSENT_DRIFT_SECRET`; remove stale `CAUSENT_DEMO_TODAY`; and
-  verify all local demo, seed, fixture, and rollout flags are absent. The environment-name list
-  confirms `CRON_SECRET`, `CAUSENT_RESOLVE_URL`, and `CAUSENT_RESOLVE_SECRET`; because their
-  encrypted values cannot be pulled for a local config check, verify them in a secure environment
-  that supplies the values and through authenticated live canaries.
-- **Recompute worker:** create/link the standalone `causent-recompute` project, configure its
-  session-pooler `DATABASE_URL` and matching `CAUSENT_RECOMPUTE_SECRET`, deploy it from the staged
-  bundle, and verify wrong-secret denial plus bounded queue draining.
-- **Drift worker:** create/link the standalone materialization endpoint, configure its session-pooler
-  `DATABASE_URL` and matching `CAUSENT_DRIFT_SECRET`, and verify wrong-secret denial, source enqueue,
-  bounded leasing, stale-generation suppression, retry/terminal state, and the five-minute app cron.
-- **Resolver:** add the session-pooler `DATABASE_URL` to `causent-resolve`, retain the matching
-  `CAUSENT_RESOLVE_SECRET`, pass `npm run check:resolve-config`, redeploy, and canary the
+- **Database:** the exact phased production apply through migration 41 plus dedicated worker-role
+  migration 42 is complete. Preserve the
+  operator evidence: 20 Phase A migrations, eight ready/valid/live concurrent indexes, six Phase B1
+  migrations, the zero-row B2 drain, 17 validated B3 constraints, v1/v2/v3 with no rollout backfill
+  after B4, and the ACL migration. Final dry-run, error-level `public`/`private`/`storage` lint,
+  anonymous privileged-function denial, and fixed search-path checks pass. Never production-seed the
+  122-row Northstar fixture or add a rollout row before the application/worker canaries are ready.
+- **Worker-role database follow-through:** migration 42, full local reset, 8/8 local role tests,
+  disposable-clone Supavisor rehearsal, production apply/catalog checks, and local/production lint
+  pass. Clone credentials were disabled. Production roles use separate generated credentials and
+  exact target-specific Sensitive Supavisor DSNs; never use `postgres` or `service_role` as a worker
+  identity. The serialized post-42 migration dry-run reports the remote database up to date.
+- **App environment:** `SUPABASE_SERVICE_ROLE_KEY` is now Sensitive in Production and stale
+  `CAUSENT_DEMO_TODAY` is removed. All three app worker URLs and matching strong Sensitive secrets
+  are configured, and `CRON_SECRET` is rotated. Verify those protected values through
+  `check:release-config`, confirm all local demo/seed/fixture/rollout flags are absent, and canary each
+  live path; configuration is not deployment evidence.
+- **Recompute worker:** the standalone project, strong Sensitive secret, and exact
+  `causent_recompute_worker.<ref>` session-pooler `DATABASE_URL` exist. Deploy the audited stage, then
+  verify wrong-secret denial plus bounded queue draining.
+- **Drift worker:** the standalone project, strong Sensitive secret, and exact
+  `causent_drift_worker.<ref>` session-pooler `DATABASE_URL` exist. Deploy, then verify wrong-secret
+  denial, source enqueue, bounded leasing, stale-generation suppression, retry/terminal state, and
+  the five-minute app cron.
+- **Worker promotion:** each `deploy-*.sh --prod` command creates a production-environment candidate
+  with `--skip-domain`. Canary its immutable URL first, then explicitly run
+  `npx --yes vercel@56.0.0 promote <url> --scope "$VERCEL_ORG_ID"`; do not assume deploy moved an
+  alias. Full commands and target-specific config checks are in `api/DEPLOY.md`.
+- **Resolver:** its exact `causent_resolve_worker.<ref>` session-pooler `DATABASE_URL` and matching
+  Sensitive `CAUSENT_RESOLVE_SECRET` are configured. Pass `npm run check:resolve-config` in the
+  deployment context, redeploy, and canary the
   authenticated app-to-resolver path. The app release check now also requires its resolve URL and
   secret.
-- **Scale gate:** configure the protected staging-load environment and isolated write probe; run the
-  selected k6 profiles against the representative fixture, retain artifacts plus authenticated
-  plans/lock/pool/queue telemetry, and treat the stated SLOs as targets until the run passes.
+- **Scale gate:** implement, audit, and configure the external staging session broker before invoking
+  the workflow. Set protected `CAUSENT_STAGING_SESSION_POOL_URL` and high-entropy
+  `CAUSENT_STAGING_SESSION_POOL_TOKEN`; the broker must durably enforce allocation-set/profile leases,
+  cross-profile disjointness, single use, and real Supabase session lineage. Retain the separate
+  adversarial foreign-owner/workspace/marker positive control and isolated write probe. Then run the
+  selected k6 profiles, retain authenticated plans/lock/pool/queue telemetry, and treat the stated
+  SLOs as targets until the run passes.
 - **CI and merge:** commit the exact release scope, require a green hosted run for that revision, and
   merge through the reviewed release path before treating the git-connected app deployment as current.
 - **Authenticated canaries:** verify the live app, database, worker, and resolver together using a
@@ -897,7 +1009,9 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 
 ### 4. Existing operational and gated work
 
-- Arm `causent-resolve` with its session-pooler `DATABASE_URL`, then redeploy both projects.
+- Arm `causent-resolve` by deploying its already configured exact
+  `causent_resolve_worker.<ref>` session-pooler `DATABASE_URL`, then canary and promote the worker and
+  app deliberately.
 - Run the separate zero-code mechanism-mapping test before building the gated webhook
   lever-drift alert.
 - Connector automation and Jira/GitHub write credentials remain deliberate operator choices;

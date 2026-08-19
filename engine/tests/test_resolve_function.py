@@ -28,11 +28,16 @@ SECRET = "test-resolve-secret"
 TODAY = date(2025, 5, 23)
 SCOPE = "ca5e0000-0000-0000-0000-0000000000d3"
 USER = "ca5e1111-0000-0000-0000-0000000000d9"
+DATABASE_URL = (
+    "postgresql://causent_resolve_worker.abcdefghijklmnopqrst:test-password@"
+    "aws-0-us-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
+)
 
 
 @pytest.fixture(autouse=True)
 def _set_secret(monkeypatch):
     monkeypatch.setenv("CAUSENT_RESOLVE_SECRET", SECRET)
+    monkeypatch.setenv("DATABASE_URL", DATABASE_URL)
 
 
 class _Result:
@@ -82,6 +87,31 @@ def test_unset_server_secret_fails_closed(monkeypatch):
     monkeypatch.delenv("CAUSENT_RESOLVE_SECRET", raising=False)
     status, _ = _call({}, secret=SECRET)
     assert status == 401  # server secret unset -> nothing can match
+
+
+def test_invalid_database_role_fails_closed_before_sweep(monkeypatch):
+    called = False
+
+    def sweep(*_):
+        nonlocal called
+        called = True
+        return []
+
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        DATABASE_URL.replace("causent_resolve_worker", "causent_recompute_worker"),
+    )
+    status, body = api.handle_request(b"{}", SECRET, sweep=sweep, today_default=TODAY)
+    assert status == 503
+    assert body == {"error": "worker not configured", "detail": "DATABASE_URL_INVALID"}
+    assert called is False
+
+
+def test_missing_database_url_fails_closed_without_production_fallback(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL")
+    status, body = api.handle_request(b"{}", SECRET, sweep=lambda *_: [], today_default=TODAY)
+    assert status == 503
+    assert body == {"error": "worker not configured", "detail": "DATABASE_URL_MISSING"}
 
 
 # --- body caps + validation --------------------------------------------------

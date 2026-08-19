@@ -52,6 +52,10 @@ if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
 
 from persistence.resolve import ResolutionResult, resolve_due_predictions  # noqa: E402
+from persistence.worker_runtime import (  # noqa: E402
+    WorkerConfigurationError as _WorkerConfigurationError,
+    require_worker_database_url,
+)
 
 # --- Guard constants ---------------------------------------------------------
 
@@ -85,6 +89,13 @@ def _secret_ok(provided: str | None) -> bool:
     if not expected:
         return False
     return hmac.compare_digest(str(provided or ""), str(expected))
+
+
+def _database_url() -> str:
+    return require_worker_database_url(
+        os.environ.get("DATABASE_URL"),
+        expected_role="causent_resolve_worker",
+    )
 
 
 # --- Parsing -----------------------------------------------------------------
@@ -142,9 +153,7 @@ def _default_sweep(today: date, scope_id: str, user_id: str) -> list[ResolutionR
     """
     import psycopg  # local import: only the live path needs the driver
 
-    dsn = os.environ.get(
-        "DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-    )
+    dsn = _database_url()
     conn = psycopg.connect(dsn)
     conn.autocommit = False
     try:
@@ -191,6 +200,11 @@ def handle_request(
         return 400, {"error": str(exc)}
     if today is None:
         today = today_default or date.today()
+
+    try:
+        _database_url()
+    except _WorkerConfigurationError as exc:
+        return 503, {"error": "worker not configured", "detail": str(exc)}
 
     try:
         results = sweep(today, scope_id, user_id)

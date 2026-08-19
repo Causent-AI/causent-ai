@@ -60,6 +60,7 @@ jobs:
           set -o pipefail
           npm run typecheck
           npm run lint -- --max-warnings=0
+          npm run test:load-contract
           npm test | tee "$RUNNER_TEMP/lib-tests.tap"
           if grep -Eq '# .*(Supabase.*(unavailable|not reachable)|migration.*unavailable|seed not present|Storage is unavailable|provenance fixture is unavailable)' "$RUNNER_TEMP/lib-tests.tap"; then
             echo "A database integration test skipped despite the reset local Supabase stack." >&2
@@ -73,12 +74,88 @@ jobs:
         working-directory: engine
         run: python -m pytest -q
 
-      - name: Recompute deployment bundle
+      - name: Stateful worker release configuration
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-project.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-private-service-role-key
+          CAUSENT_DRIFT_URL: https://causent-drift.example/api/drift
+          CAUSENT_DRIFT_SECRET: 70cb4c9d2f8a1365e1b9670df24a58c3d960be14f75ac8923e0d6b71c4fa8532
+          CAUSENT_RECOMPUTE_URL: https://causent-recompute.example/api/recompute
+          CAUSENT_RECOMPUTE_SECRET: a73e5019c84bd62f1970e35adf248b6c091ed4735fa8c260d19b7e54c3a0682f
+          CAUSENT_RESOLVE_URL: https://causent-resolve.example/api/resolve
+          CAUSENT_RESOLVE_SECRET: 4d8a3f7062c1be9547e092bd6185fa3c9d2704e86b13ac509f72d6e4180bc935
+          CRON_SECRET: 9c21e578f40d3ba6071fe92584ac6d137e09b42c85f7a3106de2489bc5307fa1
         run: |
-          stage_dir="$RUNNER_TEMP/causent-recompute-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          scripts/deploy-recompute.sh --stage-only "$stage_dir"
-          test -f "$stage_dir/api/recompute.py"
-          test -f "$stage_dir/engine/persistence/recompute.py"
+          npm run check:release-config
+          DATABASE_URL=postgresql://causent_drift_worker.abcdefghijklmnopqrst:ci-db-password@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require \
+            npm run check:drift-config
+          DATABASE_URL=postgresql://causent_recompute_worker.abcdefghijklmnopqrst:ci-db-password@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require \
+            npm run check:recompute-config
+          DATABASE_URL=postgresql://causent_resolve_worker.abcdefghijklmnopqrst:ci-db-password@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require \
+            npm run check:resolve-config
+
+      - name: Stateful worker deployment bundles
+        run: |
+          drift_stage="$RUNNER_TEMP/causent-drift-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          recompute_stage="$RUNNER_TEMP/causent-recompute-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          resolve_stage="$RUNNER_TEMP/causent-resolve-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+
+          scripts/deploy-drift.sh --stage-only "$drift_stage"
+          scripts/deploy-recompute.sh --stage-only "$recompute_stage"
+          scripts/deploy-resolve.sh --stage-only "$resolve_stage"
+
+          for deploy_script in scripts/deploy-drift.sh scripts/deploy-recompute.sh scripts/deploy-resolve.sh; do
+            grep -Fq 'VERCEL_CLI_VERSION="56.0.0"' "$deploy_script"
+            grep -Fq -- 'DEPLOY_ARGS=(--prod --skip-domain)' "$deploy_script"
+            grep -Fq -- '--team "$VERCEL_ORG_ID"' "$deploy_script"
+          done
+
+          test "$(find "$drift_stage" -type f | wc -l)" -eq 21
+          test "$(find "$recompute_stage" -type f | wc -l)" -eq 19
+          test "$(find "$resolve_stage" -type f | wc -l)" -eq 19
+
+          test -f "$drift_stage/api/drift.py"
+          test -f "$drift_stage/engine/persistence/drift_materialization.py"
+          test -f "$recompute_stage/api/recompute.py"
+          test -f "$recompute_stage/engine/persistence/recompute.py"
+          test -f "$resolve_stage/api/resolve.py"
+          test -f "$resolve_stage/engine/persistence/resolve.py"
+          test -f "$drift_stage/engine/persistence/worker_runtime.py"
+          test -f "$recompute_stage/engine/persistence/worker_runtime.py"
+          test -f "$resolve_stage/engine/persistence/worker_runtime.py"
+
+          test ! -f "$drift_stage/engine/persistence/recompute.py"
+          test ! -f "$recompute_stage/engine/persistence/drift_materialization.py"
+          test ! -f "$resolve_stage/engine/persistence/seed_demo.py"
+
+          for stage_dir in "$drift_stage" "$recompute_stage" "$resolve_stage"; do
+            test "$(cat "$stage_dir/requirements.txt")" = $'numpy==2.5.0\npsycopg[binary]==3.3.4'
+            PYTHONPYCACHEPREFIX="$RUNNER_TEMP/causent-worker-pycache" \
+              python -m compileall -q "$stage_dir/api" "$stage_dir/engine"
+            python -m json.tool "$stage_dir/vercel.json" >/dev/null
+          done
+
+          worker_venv="$RUNNER_TEMP/causent-worker-venv"
+          python -m venv "$worker_venv"
+          "$worker_venv/bin/pip" install --disable-pip-version-check \
+            -r "$drift_stage/requirements.txt"
+
+          (
+            cd "$drift_stage"
+            PYTHONPYCACHEPREFIX="$RUNNER_TEMP/causent-worker-pycache" \
+              "$worker_venv/bin/python" -c 'import api.drift'
+          )
+          (
+            cd "$recompute_stage"
+            PYTHONPYCACHEPREFIX="$RUNNER_TEMP/causent-worker-pycache" \
+              "$worker_venv/bin/python" -c 'import api.recompute'
+          )
+          (
+            cd "$resolve_stage"
+            PYTHONPYCACHEPREFIX="$RUNNER_TEMP/causent-worker-pycache" \
+              "$worker_venv/bin/python" -c 'import api.resolve'
+          )
 
       - name: Next.js 16 webpack production build
         run: |
