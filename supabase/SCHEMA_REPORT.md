@@ -103,11 +103,12 @@ a matching `*.pooler.supabase.com` host, port `5432`, database `postgres`, and o
 `sslmode=require`. It rejects `postgres.<ref>`, `service_role.<ref>`, local/direct database hosts,
 port `6543`, and cross-worker role reuse. Each DSN is stored only in that worker's Sensitive
 `DATABASE_URL`; all three are configured and have been exercised by the promoted workers through
-the held application candidate's authorized cron canaries.
+the application's authorized cron canaries.
 
 Schema activation created no `decision_report_rollouts` assignment, loaded no production seed, and
 did not rotate the database password. The billable rehearsal branch should be deleted once its
-evidence is no longer needed. The authenticated application full-loop remains a separate gate.
+evidence is no longer needed. A later single-user, single-workspace rollout was deliberately added
+for authenticated acceptance and remains enabled; no broad rollout or production seed is claimed.
 
 Slice 8 adds a private `decision-report-assets` bucket and the `report_assets` lifecycle table.
 Application roles have scoped SELECT only; checked security-definer RPCs reserve, attach, detach,
@@ -295,9 +296,16 @@ even though the synthetic organization owner can otherwise read both workspaces.
 owns report/revision consistency, immutable receipt hashing, action/metric bindings, current-pointer
 movement, exact retry, and rollback behavior.
 
+Application fix `85860dc` changes no database object. It validates the viewer-scoped normalized
+activation metric/action rows when loading an active report and uses those rows, rather than a stale
+or empty snapshot projection, for selected metrics, the primary source action, and canonical action
+bindings. Active action **Open** controls now navigate directly to the validated canonical action and
+do not call activation again. Focused regression tests pass 21/21 and the local materialization
+integration passes 4/4.
+
 The current small production-data clone rehearsal and production schema apply passed, but
-representative-volume lock/query evidence remains open. Deploy the v3 application only after its
-worker/config canaries; roll back the application to v1/v2 first if needed and do not remove the
+representative-volume lock/query evidence remains open. Future v3 application releases must pass
+their worker/config canaries; roll back the application to v1/v2 first if needed and do not remove the
 append-only audit rows or validated constraints. The companion
 `docs/reviews/2026-08-16-engineering-schema-scale-review.md` still concludes that integrity is suitable
 for the partner MVP but 10,000 active users/hour over gigabytes is not capacity-proven. The unbounded
@@ -311,9 +319,9 @@ viewer-readable `current_prediction_drift`. The public `get_current_prediction_d
 at most 500 rows for the explicit workspace and exposes sanitized queued/current/retrying/failed
 freshness metadata. Authenticated users have SELECT only; application roles cannot mutate the queue
 or projection. The separate worker endpoint, dedicated database role/URL, shared secret, and
-five-minute app cron are deployed and configured; the held application candidate's authorized drift
-cron processed generation 4 for one workspace. Authenticated full-loop and representative-load
-evidence remain open.
+five-minute app cron are deployed and configured; the initial application candidate's authorized
+drift cron processed generation 4 for one workspace. The later controlled authenticated report loop passes;
+representative-load evidence remains open.
 
 `20260817055412_connector_webhook_inbox.sql` adds a service-only durable connector inbox. The checked
 RPC identifies one GitHub/Jira delivery by provider ID plus SHA-256 payload digest, records attempt and
@@ -373,10 +381,10 @@ The RPC creates no lever, causal edge, evidence object, observation, or impact c
 Application roles can read activation audit rows through RLS but cannot insert, update,
 or delete them directly.
 
-## Current local verdict
+## Current release verdict
 
-**Production is at 42/42; application release is not claimed.** The rehearsed phases were applied to
-`royftsqyawtyfjolfabd`: 20 Phase A
+**Production is at 42/42; the fixed application and all three workers are live for one controlled
+rollout.** The rehearsed phases were applied to `royftsqyawtyfjolfabd`: 20 Phase A
 migrations, eight ready/valid/live concurrent indexes,
 six Phase B1 migrations, the zero-row B2 drain, 17 valid B3 constraints, B4 contract with v1/v2/v3
 and no rollout backfill, then ACL hardening and the dedicated worker-role migration. Migration 42's
@@ -384,10 +392,11 @@ apply, role catalog, error-level lint, and serialized post-42 dry-run all pass.
 Error-level lint passes across
 `public`/`private`/`storage`, `anon` executes 0/37 public SECURITY DEFINER functions, and 37/37 have
 an empty search path. No rollout assignment or seed was added, and no password rotation occurred,
-during schema activation.
+during schema activation. One later controlled rollout remains enabled after authenticated
+acceptance; no broad rollout or release-run seed is claimed.
 
 **The product/science/engineering hardening schema through migration 42 and its refreshed exact local
-combined gate pass; production release is not claimed.** The clean reset replayed every migration and
+combined gate pass.** The clean reset replayed every migration and
 reseeded both workspaces. Local worker-role tests pass 8/8 and error-level schema lint passes. The
 credentialed application/Supabase/RLS/Storage suite reports 671 total, 652 passed, 19 intentional
 live-model skips, and zero failures; the full Python engine/bridge/isolation suite passes
@@ -397,19 +406,33 @@ desktop/390 px browser acceptance, and final diff audit passed. Browser QA also 
 collapsed Actions commitment card before publication. The disposable-clone Supavisor rehearsal and
 production role catalog/pooler access also pass; clone credentials were disabled afterward.
 
-The workers are deployed and their point-in-time cron canaries pass, but replacement app candidate
-`dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` remains unpromoted and no authenticated full-loop canary or
-rollout assignment exists. Candidate error logs were empty after the five canaries. Resolver UUID
-fix `f6b0204` and CI assertion fix `8b2ad20` close the observed release regression. A resolver exact
-retry returned HTTP 200 with zero workspaces/zero predictions, and Vercel logs independently confirm
-HTTP 200 for all five cron requests. Hosted CI run `32225950985` completed successfully at 07:07 UTC
-on 2026-08-19; PR #32 remains draft. Shared secrets were rotated; no value is recorded here.
+The workers are deployed and their point-in-time cron canaries pass. Initial app candidate
+`dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` passed public/cron canaries and was promoted for authenticated
+acceptance. That pass exposed an active-report binding regression, so the alias was restored to
+verified artifact `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`. Fix `85860dc` validates normalized activation
+bindings and removes the activation write from active **Open** navigation. Hosted CI run
+`32287053300` completed successfully for that fix. Replacement deployment
+`dpl_8twnZ3dwtahoCF6tLiejEFgMJCUL` passed public and authenticated canaries and now serves
+`app.causent.ai`; PR #32 remains draft. Shared secrets were rotated; no value is recorded here.
+
+The authenticated run activated iteration 1 with two metrics and three actions, completed the
+decision package, and activated three sequential successors. Post-fix direct links showed the exact
+primary/support metric bindings without changing activation, telemetry, or recompute counters.
+Cleanup soft-removed iterations 4, 3, and 2 through the checked UI path and returned the visible
+current pointer to iteration 1; the removed iteration-4 direct link failed closed, all four product
+tabs and the current direct link loaded, and checked browser development logs were empty. A later
+privileged read-only audit confirmed that each removed successor retains its revisions, activation,
+decision, prediction, canonical actions, decision-action links, and action-metric bindings. The
+current iteration-1 action set is disjoint from every removed-successor set. Iteration 4 retains one
+activation, the scoped activation-event count remains four, no recompute job exists for it, and the
+controlled rollout remains enabled.
 
 The k6 profiles and scale fixture remain instruments only. The source now requires a durable external
 session broker, but that broker has not been implemented, audited, or configured, so protected
 staging/soak execution is operator-blocked. Representative-volume plans, production CDN/egress
-behavior, and authenticated full-loop application canaries remain
-pending. This is not evidence for 10,000 active users/hour.
+behavior, private-image delivery/reattachment, provider-specific connectors, and terminal resolution
+after the due date plus sufficient post-intervention observations remain pending. This is not
+evidence for 10,000 active users/hour.
 
 ### Historical checkpoint before this hardening round
 
@@ -539,21 +562,22 @@ blocked while legitimate within-rank grants still succeed.
   operator visibility. The release check now rejects weak/repetitive/placeholder shared secrets
   without logging their values. Matching strong Sensitive app/worker secrets and exact role-specific
   Supavisor DSNs are configured; migration/catalog/pooler checks pass; the deployment is promoted;
-  and its zero-job cron canary passed. Queue-under-load and authenticated full-loop evidence remain.
+  and its zero-job cron canary passed. The authenticated report loop passes; queue-under-load and a
+  terminal result after the due date plus sufficient post-intervention observations remain open.
 - **Provenance v2 deliberately retains extracted text.** Raw URL responses and PDF bytes are not
   stored, but bounded source chunks remain inside append-only revisions so later claims are auditable.
   Soft deletion removes authenticated visibility; physical retention/garbage-collection policy still
   needs the same operator discipline as other retained audit history.
-- **Expanded Slice 10, the MVP finish, Review #2, and the schema through migration 42 are
-  production-applied but not application-armed.** Production has no rollout assignment or seed from
-  activation.
-  Authenticated application/Storage/recompute/drift/import/connector canaries and representative-
-  volume lock/query plans remain open. The app has a Sensitive server-only service-role key and no
+- **Expanded Slice 10, the MVP finish, Review #2, and the schema through migration 42 are live for
+  one controlled rollout.** Schema activation added no rollout assignment or seed; a later scoped
+  rollout remains enabled after authenticated acceptance.
+  Private-Storage delivery/reattachment, provider-specific connector behavior, terminal resolution,
+  and representative-volume lock/query plans remain open. The app has a Sensitive server-only service-role key and no
   stale demo date; all three stateful worker projects, matching Sensitive app/worker secrets, app
   URLs, rotated cron secret, separate production role credentials, and exact Sensitive role-specific
-  `DATABASE_URL` values exist. All three workers are promoted and five app-candidate cron canaries
-  passed. The public app remains on the rollback artifact; the Ready replacement candidate is not
-  promoted; and no authenticated full-loop canary or rollout assignment exists.
+  `DATABASE_URL` values exist. All three workers are promoted and five app cron canaries passed.
+  Fixed deployment `dpl_8twnZ3dwtahoCF6tLiejEFgMJCUL` serves `app.causent.ai`, and the controlled
+  authenticated report loop plus reverse-order successor cleanup pass.
 - **Protected staging load is broker-blocked.** The source validates
   `CAUSENT_STAGING_SESSION_POOL_URL`, a high-entropy `CAUSENT_STAGING_SESSION_POOL_TOKEN`, durable
   allocation-set/profile lease envelopes, real Supabase session lineage, disjoint single-use
@@ -561,5 +585,6 @@ blocked while legitimate within-rank grants still succeed.
   audited, or configured, so no live capacity or load-isolation result exists.
 - **The gates are point-in-time results.** The earlier coordinated local product gate, production
   schema activation, and worker cron canaries verify different artifacts. Hosted CI run
-  `32225950985` completed successfully; PR #32 remains draft. Prior webpack/manifest and browser acceptance do not replace
-  protected staging capacity or the authenticated full-loop app-candidate canary.
+  `32287053300` completed successfully for `85860dc`; PR #32 remains draft. The authenticated report
+  loop does not replace protected staging capacity, private-image/provider canaries, terminal
+  resolution evidence, founder review, or the PR merge gate.

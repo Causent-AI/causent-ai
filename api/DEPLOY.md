@@ -1,9 +1,10 @@
-# Production workers live; replacement app candidate held — 2026-08-18/19
+# Production application live after authenticated report-loop fix — 2026-08-18/19
 
-The production Supabase project `royftsqyawtyfjolfabd` is now at **42/42 migrations**. This is a
-database and worker release, not an application promotion: all three stateful workers are promoted on
-their dedicated domains, while `app.causent.ai` still serves the verified rollback artifact. The
-replacement app candidate is Ready but intentionally unpromoted, and no rollout assignment exists.
+The production Supabase project `royftsqyawtyfjolfabd` is at **42/42 migrations**, all three stateful
+workers are promoted on their dedicated domains, and fixed application deployment
+`dpl_8twnZ3dwtahoCF6tLiejEFgMJCUL` now serves `app.causent.ai`. Schema activation itself created no
+rollout assignment or seed. A later single-user, single-workspace rollout was used only for the
+authenticated production acceptance; it is not broad partner rollout evidence.
 
 - Phase A applied 20 migrations from the production baseline of 11. Eight parent/hot indexes were
   then built concurrently outside migration transactions; every index is ready, valid, and live.
@@ -18,15 +19,15 @@ replacement app candidate is Ready but intentionally unpromoted, and no rollout 
   fixed empty search path. The ACL migration also closes future `postgres` function defaults,
   restores only intended authenticated/service grants, and limits `handle_new_user()` to
   `supabase_auth_admin`.
-- No `decision_report_rollouts` assignment was created, so the controlled partner rollout was not
-  enabled. No production seed was loaded during schema activation, and no database password rotation
-  was performed.
+- No `decision_report_rollouts` assignment was created during schema activation. No production seed
+  was loaded, and no database password rotation was performed. The later authenticated acceptance
+  used one deliberately scoped rollout assignment without widening the release to other users.
 - Vercel projects `causent-drift`, `causent-recompute`, and `causent-resolve` now exist. Matching
   high-entropy Sensitive worker secrets are configured on each worker and on `causent-ai`; the three
   app-side worker URLs are configured; and `CRON_SECRET` was rotated. The root app also has Sensitive
   `SUPABASE_SERVICE_ROLE_KEY`, and stale `CAUSENT_DEMO_TODAY` remains removed. Each worker now has its
-  own exact role-specific Supavisor `DATABASE_URL` stored Sensitive. The serving rollback artifact
-  has not consumed the repaired app environment.
+  own exact role-specific Supavisor `DATABASE_URL` stored Sensitive. The promoted application has
+  now consumed the repaired production environment.
 - Migration 42 passed a full local reset, an isolated disposable-clone Supavisor login rehearsal,
   and production apply. Clone credentials were disabled afterward. In production, all three roles
   have separate generated credentials and exact attributes, memberships, grants, and target-specific
@@ -49,19 +50,42 @@ replacement app candidate is Ready but intentionally unpromoted, and no rollout 
   `dpl_5a5BFfP86YxCjWGBhMX3Z3iF64po`, recompute
   `dpl_2PAG63un8RvuXTDAyCJYMyGCYKFK`, and resolve
   `dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM`. Secrets were rotated; no value is recorded here.
-- Replacement app candidate `dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` is Ready at
-  `https://causent-2vyhwmswj-adamdavidowens-1984s-projects.vercel.app` but is **not** promoted to
-  `app.causent.ai`. Candidate `/login` returns 200; `/` and Decision Report onboarding return the
-  expected 307 redirect to login.
+- Initial replacement candidate `dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` passed its public and cron
+  canaries and was promoted for authenticated acceptance. That pass exposed an active-report binding
+  regression: an empty activation snapshot overrode the normalized action/metric audit rows, and an
+  active action's **Open** control replayed activation instead of acting as pure navigation. The
+  public alias was immediately rolled back to verified artifact
+  `dpl_FCGWhLDt7oZsMp1preohuNt1gTww` while the defect was repaired.
 - All five candidate cron canaries passed: resolve processed 4/4 predictions for one workspace;
   drift processed generation 4 for one workspace; recompute and connector each processed 0; reconciliation covered
   two registered workspaces and processed 0. A resolver exact retry returned HTTP 200 with zero
   workspaces and zero predictions, and Vercel logs independently confirm HTTP 200 for all five cron
   requests. Candidate error logs were empty after the canaries.
 - Production resolver UUID handling regressed during the release and was fixed in `f6b0204`; its CI
-  assertion follow-up is `8b2ad20`. Hosted CI run `32225950985` completed successfully at 07:07 UTC
-  on 2026-08-19. PR #32 remains draft. Neither the green run nor the live canaries substitute for an
-  authenticated full product loop.
+  assertion follow-up is `8b2ad20`. Active-report binding fix `85860dc` now validates and reads the
+  normalized selected metrics and action bindings, then routes active **Open** controls directly to
+  their canonical actions without calling activation. Focused tests pass 21/21, the complete library
+  run reports 678 total (612 passed, 66 expected environment/live-model skips, zero failures), the
+  materialization integration passes 4/4, and TypeScript, full lint, the Next.js 16 webpack build,
+  and `git diff --check` pass. Hosted CI run `32287053300` completed successfully for `85860dc`; PR
+  #32 remains draft.
+- Replacement deployment `dpl_8twnZ3dwtahoCF6tLiejEFgMJCUL` became Ready at
+  `https://causent-1wvs3j37l-adamdavidowens-1984s-projects.vercel.app`, passed `/login` plus protected-
+  route redirect canaries with empty error logs, and was promoted deliberately to `app.causent.ai`.
+  Authenticated retest loaded the fourth active iteration with its two metrics, registered primary
+  action, support-action assignment, and three canonical **Open** links intact. Opening primary and
+  support actions produced exact canonical query-and-fragment destinations while activation,
+  telemetry, and recompute counters remained unchanged.
+- Cleanup then soft-removed iterations 4, 3, and 2 in reverse order through the product UI. Reports
+  showed each current-pointer transition and finished with iteration 1 as the only visible current
+  version. The removed iteration-4 direct link failed closed with the report-unavailable alert;
+  iteration 1, Reports, Actions, Data Workshop, and Impact all loaded cleanly, with zero browser
+  development-log entries across the checked pages. A later privileged read-only database audit
+  confirmed that iterations 2–4 retain their revisions, activation, decision, prediction, canonical
+  actions, decision-action links, and action-metric bindings; iteration 1's current action set is
+  disjoint from all removed-successor sets. Iteration 4 remains single-activated, its account/workspace
+  activation-event count remains four, no recompute job exists for it, and the controlled rollout
+  remains enabled.
 - The staging-load source now requires an authenticated external broker configured through
   `CAUSENT_STAGING_SESSION_POOL_URL` and a high-entropy
   `CAUSENT_STAGING_SESSION_POOL_TOKEN`. Each broker response must bind a durable allocation set and
@@ -74,9 +98,11 @@ replacement app candidate is Ready but intentionally unpromoted, and no rollout 
 
 Open operator gates are: decide whether a later primary database-password rotation is desired;
 enable Supabase leaked-password protection (still reported as a warning); implement, audit, and
-configure the staging session broker; run protected staging load; complete an authenticated full-loop
-canary against the exact app candidate; then promote that candidate explicitly if every remaining
-gate passes. Delete the billable with-data rehearsal branch after its evidence is no longer needed.
+configure the staging session broker; run protected staging load; canary private-image delivery and
+reattachment plus provider-specific connector behavior in production; and wait for the due date plus
+post-intervention observations before claiming terminal causal resolution. Delete the billable
+with-data rehearsal branch after its evidence is no longer needed. PR #32 still needs its reviewed
+merge path, and founder review plus initially unassisted partner evidence remain open.
 
 ## Release secret contract
 
@@ -89,9 +115,10 @@ attested until `check:release-config` and the target-specific check run in a sec
 supplies them.
 
 Matching strong Sensitive app/worker secrets and `CRON_SECRET` were rotated without recording their
-values. The three worker deployments passed their target checks and are promoted; the app candidate
-passed unauthenticated and cron canaries and hosted CI is green, but it remains unpromoted pending the
-authenticated full loop.
+values. The three worker deployments passed their target checks and are promoted. Fixed application
+deployment `dpl_8twnZ3dwtahoCF6tLiejEFgMJCUL` passed public and authenticated report-loop canaries and
+now serves `app.causent.ai`; the separate production private-image, provider-connector, terminal-
+resolution, and protected-load gates remain open.
 
 ## Dedicated worker database identities — migration 42 applied
 
@@ -214,9 +241,11 @@ migration, merge, deployment, or canary:
   procedure was to add it, redeploy, and canary the app-to-resolver route after
   `npm run check:resolve-config` validates its `DATABASE_URL` and `CAUSENT_RESOLVE_SECRET`.
 - App release: the deterministic, server-validated activation-ready sample fix and
-  **Full-plan example** label pass the complete local release gate. Hosted CI run `32225950985`
-  completed successfully for the exact revision; PR #32 remains draft and must merge through review;
-  then verify the git-connected app deployment and complete authenticated clean-account canaries.
+  **Full-plan example** label passed that checkpoint's complete local release gate. Hosted CI run
+  `32225950985` completed successfully for the pre-binding-fix release revision; later run
+  `32287053300` is green for active-report binding fix `85860dc`. PR #32 remains draft and must merge
+  through review. The current production promotion and authenticated report-loop evidence are
+  recorded in the release section above.
 
 Founder review and three initially unassisted partner sessions remain open. Production release does
 not convert the local synthetic completed-loop result into partner evidence.
