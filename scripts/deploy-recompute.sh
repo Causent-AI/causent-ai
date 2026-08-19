@@ -142,12 +142,15 @@ if (( STAGE_ONLY )); then
   exit 0
 fi
 
+TARGET_VERCEL_ORG_ID="$VERCEL_ORG_ID"
+unset VERCEL_ORG_ID VERCEL_PROJECT_ID
+
 (cd "$REPO" && npm run check:recompute-config)
 
 cd "$STAGE"
 npx --yes "vercel@$VERCEL_CLI_VERSION" link --yes \
-  --team "$VERCEL_ORG_ID" --project causent-recompute
-EXPECTED_VERCEL_ORG_ID="$VERCEL_ORG_ID" EXPECTED_VERCEL_PROJECT="causent-recompute" \
+  --scope "$TARGET_VERCEL_ORG_ID" --project causent-recompute
+EXPECTED_VERCEL_ORG_ID="$TARGET_VERCEL_ORG_ID" EXPECTED_VERCEL_PROJECT="causent-recompute" \
   node -e '
     const fs = require("node:fs");
     const linked = JSON.parse(fs.readFileSync(".vercel/project.json", "utf8"));
@@ -157,4 +160,5 @@ EXPECTED_VERCEL_ORG_ID="$VERCEL_ORG_ID" EXPECTED_VERCEL_PROJECT="causent-recompu
       process.exit(1);
     }
   '
-npx --yes "vercel@$VERCEL_CLI_VERSION" deploy --yes "${DEPLOY_ARGS[@]}"
+npx --yes "vercel@$VERCEL_CLI_VERSION" deploy --yes \
+  --scope "$TARGET_VERCEL_ORG_ID" "${DEPLOY_ARGS[@]}"
