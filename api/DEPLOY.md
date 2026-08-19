@@ -1,8 +1,9 @@
-# Production schema activation — 2026-08-18/19; application rollout stopped
+# Production workers live; replacement app candidate held — 2026-08-18/19
 
 The production Supabase project `royftsqyawtyfjolfabd` is now at **42/42 migrations**. This is a
-database and configuration checkpoint, not an application release: the public app alias still serves
-the verified rollback artifact, and no worker/app candidate, canary, promotion, or rollout occurred.
+database and worker release, not an application promotion: all three stateful workers are promoted on
+their dedicated domains, while `app.causent.ai` still serves the verified rollback artifact. The
+replacement app candidate is Ready but intentionally unpromoted, and no rollout assignment exists.
 
 - Phase A applied 20 migrations from the production baseline of 11. Eight parent/hot indexes were
   then built concurrently outside migration transactions; every index is ready, valid, and live.
@@ -44,6 +45,23 @@ the verified rollback artifact, and no worker/app candidate, canary, promotion, 
   invocation at 20 workspaces/four concurrent calls, repeats every five minutes to drain backlog,
   preserves the 15:00 UTC decision-day cutoff, and returns identity-free production summaries; only
   local demo retains the fixed fixture registry and fallback actor.
+- The three worker deployments are promoted and live on their dedicated domains: drift
+  `dpl_5a5BFfP86YxCjWGBhMX3Z3iF64po`, recompute
+  `dpl_2PAG63un8RvuXTDAyCJYMyGCYKFK`, and resolve
+  `dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM`. Secrets were rotated; no value is recorded here.
+- Replacement app candidate `dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` is Ready at
+  `https://causent-2vyhwmswj-adamdavidowens-1984s-projects.vercel.app` but is **not** promoted to
+  `app.causent.ai`. Candidate `/login` returns 200; `/` and Decision Report onboarding return the
+  expected 307 redirect to login.
+- All five candidate cron canaries passed: resolve processed 4/4 predictions for one workspace;
+  drift processed generation 4 for one workspace; recompute and connector each processed 0; reconciliation covered
+  two registered workspaces and processed 0. A resolver exact retry returned HTTP 200 with zero
+  workspaces and zero predictions, and Vercel logs independently confirm HTTP 200 for all five cron
+  requests. Candidate error logs were empty after the canaries.
+- Production resolver UUID handling regressed during the release and was fixed in `f6b0204`; its CI
+  assertion follow-up is `8b2ad20`. Hosted CI run `32225950985` completed successfully at 07:07 UTC
+  on 2026-08-19. PR #32 remains draft. Neither the green run nor the live canaries substitute for an
+  authenticated full product loop.
 - The staging-load source now requires an authenticated external broker configured through
   `CAUSENT_STAGING_SESSION_POOL_URL` and a high-entropy
   `CAUSENT_STAGING_SESSION_POOL_TOKEN`. Each broker response must bind a durable allocation set and
@@ -54,11 +72,11 @@ the verified rollback artifact, and no worker/app candidate, canary, promotion, 
   The broker itself has not been implemented, audited, or configured, so live staging load is
   operator-blocked and no protected profile has run.
 
-Open operator gates are: decide whether a later primary database-password rotation is desired; enable
-Supabase leaked-password protection (still reported as a warning); implement, audit, and configure the staging
-session broker; run the exact hosted source gate and protected staging profiles; deploy no-alias
-worker/app candidates; canary the complete authenticated loop; then promote explicitly. Delete the
-billable with-data rehearsal branch after its evidence is no longer needed.
+Open operator gates are: decide whether a later primary database-password rotation is desired;
+enable Supabase leaked-password protection (still reported as a warning); implement, audit, and
+configure the staging session broker; run protected staging load; complete an authenticated full-loop
+canary against the exact app candidate; then promote that candidate explicitly if every remaining
+gate passes. Delete the billable with-data rehearsal branch after its evidence is no longer needed.
 
 ## Release secret contract
 
@@ -70,10 +88,10 @@ variable name and `weak_secret` code—never the value. Existing encrypted Verce
 attested until `check:release-config` and the target-specific check run in a secure context that
 supplies them.
 
-The current operator inventory records matching strong Sensitive app/worker secrets and the three
-app worker URLs as configured, with `CRON_SECRET` rotated. That configuration is not deployment or
-canary evidence; every target-specific check still must pass with its protected values before a
-candidate is created.
+Matching strong Sensitive app/worker secrets and `CRON_SECRET` were rotated without recording their
+values. The three worker deployments passed their target checks and are promoted; the app candidate
+passed unauthenticated and cron canaries and hosted CI is green, but it remains unpromoted pending the
+authenticated full loop.
 
 ## Dedicated worker database identities — migration 42 applied
 
@@ -196,8 +214,8 @@ migration, merge, deployment, or canary:
   procedure was to add it, redeploy, and canary the app-to-resolver route after
   `npm run check:resolve-config` validates its `DATABASE_URL` and `CAUSENT_RESOLVE_SECRET`.
 - App release: the deterministic, server-validated activation-ready sample fix and
-  **Full-plan example** label pass the complete local release gate. Obtain green hosted CI for the
-  exact revision; merge through review;
+  **Full-plan example** label pass the complete local release gate. Hosted CI run `32225950985`
+  completed successfully for the exact revision; PR #32 remains draft and must merge through review;
   then verify the git-connected app deployment and complete authenticated clean-account canaries.
 
 Founder review and three initially unassisted partner sessions remain open. Production release does
@@ -340,15 +358,15 @@ Guards: `401` (missing/wrong/unset secret), `413` (body cap), `400` (bad JSON /
 date / uuid), `500` (a genuine DB/driver fault — type name only, no message leaked),
 `405` (non-POST).
 
-## Deploy steps (project `causent-resolve`) — CONFIGURED; REDEPLOY PENDING
+## Deploy steps (project `causent-resolve`) — PROMOTED AND LIVE
 
 The project exists, its matching strong Sensitive secret is configured on the worker and app, and
 the app URL is configured. Its exact `causent_resolve_worker.royftsqyawtyfjolfabd` production
-Supavisor DSN is stored Sensitive and the role login/catalog contract passed. Treat the resolver as
-unavailable until a new candidate is deployed and the authenticated route is canaried. Before
-deployment, load the intended resolver environment and run `npm run check:resolve-config`; it
-requires both `DATABASE_URL` and `CAUSENT_RESOLVE_SECRET`. No resolver candidate, canary, or promotion
-occurred in this release run.
+Supavisor DSN is stored Sensitive and the role login/catalog contract passed. Deployment
+`dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM` is promoted on the dedicated resolver domain. The app-candidate
+resolve cron canary processed 4/4 predictions for one workspace. The production UUID regression was
+fixed in `f6b0204`, with CI assertion follow-up `8b2ad20`. Future releases must still load the intended
+resolver environment and pass `npm run check:resolve-config` before creating a candidate.
 
 1. **Deploy** (stages the audited import closure, links the exact team/project, and creates a
    candidate; production mode does not move an alias):
@@ -436,13 +454,14 @@ and platform monitoring see a failure. Guards: `401` (missing/wrong/unset secret
 (missing `DATABASE_URL`), `500` (terminal job or non-sensitive exception class
 only), and `405` (non-POST).
 
-## Deploy steps (project `causent-recompute`) — CONFIGURED; DEPLOYMENT PENDING
+## Deploy steps (project `causent-recompute`) — PROMOTED AND LIVE
 
 The Vercel project exists. Its matching strong Sensitive secret is configured on the worker and app,
 and the app URL is configured; `CRON_SECRET` has been rotated. The worker `DATABASE_URL` is
 configured with `causent_recompute_worker.royftsqyawtyfjolfabd`, and its role login/catalog contract
-passed. No recompute candidate, deployment, canary, or promotion occurred in this release run.
-The following steps are the deployment procedure, not evidence of a deployment.
+passed. Deployment `dpl_2PAG63un8RvuXTDAyCJYMyGCYKFK` is promoted on the dedicated recompute domain.
+The app-candidate recompute cron canary passed with 0 queued jobs. The following steps remain the
+procedure for a future deployment.
 
 1. **Stage and deploy** the minimal standalone project. Production mode creates an immutable
    no-alias candidate:
@@ -503,13 +522,13 @@ The drift worker drains the private coalesced workspace refresh queue and atomic
 bounded `current_prediction_drift` projection. It holds a Postgres DSN and therefore deploys as the
 standalone `causent-drift` project. It must never be folded into the app or credential-free engine.
 
-## Deploy steps (project `causent-drift`) — CONFIGURED; DEPLOYMENT PENDING
+## Deploy steps (project `causent-drift`) — PROMOTED AND LIVE
 
 The Vercel project exists. Its matching strong Sensitive secret is configured on the worker and app,
 the app URL is configured, and `CRON_SECRET` is rotated. Its exact
 `causent_drift_worker.royftsqyawtyfjolfabd` Supavisor `DATABASE_URL` is stored Sensitive and its role
-login/catalog contract passed. No drift candidate, deployment, canary, or promotion occurred in this
-release run.
+login/catalog contract passed. Deployment `dpl_5a5BFfP86YxCjWGBhMX3Z3iF64po` is promoted on the
+dedicated drift domain. The app-candidate drift cron canary processed generation 4 for one workspace.
 
 1. Audit or deploy the narrow pinned stage:
    ```
@@ -527,5 +546,5 @@ release run.
    behavior, and the app recovery cron against the immutable URL. Only then run
    `npx --yes vercel@56.0.0 promote <url> --scope "$VERCEL_ORG_ID"` and update the app worker URL.
 
-No drift worker candidate, alias promotion, or production queue drain occurred in the 2026-08-18
-rehearsal.
+The current drift release is promoted. Future releases must repeat the immutable-URL canary before
+promotion; the successful generation-4 canary is point-in-time evidence only.

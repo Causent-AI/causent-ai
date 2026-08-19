@@ -1,6 +1,6 @@
 # Causent — Build Status & Resume Guide
 
-## 2026-08-18/19 — Production database at 42/42; application rollout stopped
+## 2026-08-18/19 — Workers live; replacement app candidate held
 
 The production Supabase project `royftsqyawtyfjolfabd` advanced from 11 to **42/42 migrations**.
 The first 41 followed the controlled phases rehearsed on the isolated with-data branch. Phase A
@@ -19,10 +19,10 @@ restores only the intended authenticated/service grants, limits `handle_new_user
 `supabase_auth_admin`, and keeps regression coverage for the catalog, future default, comparator, and
 auth hook. Supabase still warns that leaked-password protection is disabled.
 
-The database deployment did not enable the product. No `decision_report_rollouts` row was inserted,
-no production seed was loaded during schema activation, and no database password rotation occurred.
-The public app alias still serves the verified rollback artifact. No drift/recompute/resolve worker
-or app candidate was deployed, canaried, or promoted.
+No `decision_report_rollouts` row was inserted, no production seed was loaded during schema
+activation, and no primary database-password rotation occurred. All three stateful workers are now
+promoted on their dedicated domains. The public app alias still serves the verified rollback artifact;
+the replacement app candidate is Ready but deliberately unpromoted.
 
 Vercel projects `causent-drift`, `causent-recompute`, and `causent-resolve` now exist. Matching
 high-entropy Sensitive worker secrets are configured on the corresponding worker projects and on
@@ -37,6 +37,23 @@ credentials; exact attributes, memberships, grants, and `aws-1` session-pooler a
 target. Local worker-role tests pass 8/8, local and production error-level schema lint pass, the
 credentialed Node suite reports 671 total (652 passed, 19 intentional live-model skips, zero
 failures), and the engine/bridge/isolation suite passes 1,290/1,290.
+
+Promoted worker deployments are drift `dpl_5a5BFfP86YxCjWGBhMX3Z3iF64po`, recompute
+`dpl_2PAG63un8RvuXTDAyCJYMyGCYKFK`, and resolve
+`dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM`. Replacement app candidate
+`dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` is Ready at
+`https://causent-2vyhwmswj-adamdavidowens-1984s-projects.vercel.app` but is not promoted to
+`app.causent.ai`. Candidate `/login` returns 200; `/` and Decision Report onboarding return the
+expected 307 login redirect.
+
+All five candidate cron canaries passed: resolve processed 4/4 predictions for one workspace; drift
+processed generation 4 for one workspace; recompute and connector each processed 0; and reconciliation covered
+two registered workspaces and processed 0. A resolver exact retry returned HTTP 200 with zero
+workspaces and zero predictions; Vercel logs independently confirm HTTP 200 for all five cron
+requests. Candidate error logs were empty afterward. The production resolver UUID regression was
+fixed in `f6b0204`, with CI assertion follow-up `8b2ad20`. Hosted CI run `32225950985` completed
+successfully at 07:07 UTC on 2026-08-19; PR #32 remains draft. Secrets were rotated; values are never
+recorded.
 
 Release tooling now treats drift, recompute, and resolve symmetrically and rejects weak, repetitive,
 or placeholder worker/cron secrets while accepting documented high-entropy random forms without
@@ -64,11 +81,12 @@ as a failure. The external broker has not been implemented, audited,
 or configured, so live staging load is operator-blocked. This is source-contract hardening, not
 capacity or tenant-isolation load evidence.
 
-Next operator steps are to decide whether a later database-password rotation is desired; enable
-leaked-password protection; implement/audit/configure the session broker; run hosted CI and protected staging load; create
-no-alias worker/app candidates; canary the complete authenticated loop; and promote explicitly. The
-billable with-data rehearsal branch must be removed after its evidence is no longer needed. Founder
-review and initially unassisted partner evidence remain open.
+Next operator steps are to decide whether a later primary database-password rotation is desired;
+enable leaked-password protection; implement/audit/configure the session broker; run protected
+staging load; complete an authenticated full-loop canary against the exact Ready app candidate; and
+promote it explicitly only if every remaining gate passes. The billable
+with-data rehearsal branch must be removed after its evidence is no longer needed. Founder review and
+initially unassisted partner evidence remain open.
 
 ### Applied worker identity contract
 
@@ -93,7 +111,8 @@ The release check requires the exact `<role>.<20-character-project-ref>` usernam
 password, a matching `*.pooler.supabase.com` host, port `5432`, database `postgres`, and only
 `sslmode=require`. It rejects `postgres.<ref>`, `service_role.<ref>`, local/direct hosts, port `6543`,
 and cross-worker role reuse. These DSNs are stored only in the matching worker's Sensitive
-`DATABASE_URL`; they have not yet been exercised by a deployed worker candidate.
+`DATABASE_URL`; all three are now exercised by promoted worker deployments and point-in-time cron
+canaries.
 
 ## 2026-08-17 — Product, science, and engineering hardening locally verified
 
@@ -493,8 +512,9 @@ unchanged. The founder-selected UX follow-up has its recorded green checkpoint, 
 product/science/engineering hardening and dedicated worker-role migration now pass the refreshed
 local combined database/application/engine gate. Production schema is at 42/42, but three real initially
 unassisted partner sessions, the continuing founder UI/workflow review, staging scale evidence,
-worker/app configuration, hosted drift/recompute capacity, and authenticated deployment canaries
-remain human/operator gates.**
+the external session broker/load gate and authenticated full-loop app candidate canary remain
+human/operator gates. Hosted CI is green. The workers are promoted; the Ready replacement app
+candidate is not.**
 The retrospective loop closed 2026-07-08 (PR #1) and the
 **prospective Foundations tranche landed 2026-07-12 (PR #12, epic #6, children #7–#11
 all closed, cloud CI green)**: intent-layer schema (`decisions`/`decision_actions(is_lever)`/
@@ -516,7 +536,7 @@ conversational delivery, or other production expansion before observed unassiste
 ✓ Engine   honest causal inference, 1058 tests (1078 with engine-fn), signed off 8/10
 ✓ Schema   11 tables, RLS + RBAC memberships, tenant-isolation verified (0 leaks)
 ✓ Bridge   engine → evidence (append-only) → causal graph, live E2E verified
-◐ CI       expanded pinned workflow configured; Slice 10 review revision awaiting hosted CI
+✓ CI       run 32225950985 completed success at 07:07 UTC; PR #32 remains draft
 ✓ App/UI   approved shell (Next 16): 4 tabs + Core Metrics drawer, visual-QA'd vs mockups
 ✓ Loop     seed → real bridge → Supabase → UI; /impact matches DB cell-for-cell (A1–A4, A-verify)
 ✓ Ingest   fixture-tested capped/idempotent GitHub → actions + live adapters/CLI (C1, C-verify)
@@ -541,17 +561,18 @@ conversational delivery, or other production expansion before observed unassiste
            (segmented_ols reuse) + calm assert-fact notice + stub Restate; seeded, 1147 pytest
 ✓ FUNNEL   #15 onboarding funnel CLOSED (PR #23, 2026-07-13): Step-1 auth wired + instrumentation
            + E2E-under-auth; #18 ship-state + resolution scorecard shipped (drift-alert deferred)
-✓ DEPLOY   app LIVE at https://app.causent.ai (2026-07-16): Vercel project `causent-ai`
-           (git-connected, auto-deploys main), invite-only Google OAuth ARMED (allowlist
-           hook + owner invited), cloud Supabase seeded via seed_demo.py — all 7 verdicts
-           + drift beat live; Google OAuth + GitHub App + fine-grained PAT all configured
-✓ RESOLVE  resolution PORT MERGED (PR #24) + DEPLOYED 2026-07-18: api/resolve.py stateful
+✓ DEPLOY   historical public alias established at https://app.causent.ai (2026-07-16): Vercel
+           project `causent-ai` (git-connected, auto-deploys main), invite-only Google OAuth
+           ARMED (allowlist hook + owner invited), cloud Supabase seeded via seed_demo.py — all
+           7 verdicts + drift beat available then; Google OAuth, GitHub App, and fine-grained PAT
+           configured for that release; the alias now serves the rollback artifact
+✓ RESOLVE  resolution PORT MERGED (PR #24); current worker deployment
+           dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM promoted: api/resolve.py stateful
            sibling of the engine fn LIVE at https://causent-resolve.vercel.app/api/resolve
            (own Vercel project `causent-resolve`); CAUSENT_RESOLVE_SECRET set on both projects
-           + CAUSENT_RESOLVE_URL on the app; guards smoke-tested (GET 405, no/bad secret 401).
-           ☐ ONE STEP TO ARM: set DATABASE_URL (Supabase SESSION pooler DSN, :5432) on
-           causent-resolve, then REDEPLOY BOTH projects (Vercel env added post-deploy needs a
-           redeploy). Until then the cron 500s at the DB connect (auth passes).
+           + CAUSENT_RESOLVE_URL on the app; exact dedicated-role Supavisor DSN configured.
+           Candidate cron processed 4/4 predictions for one workspace; UUID fix f6b0204 and CI
+           assertion fix 8b2ad20 are included in the release record.
 ✓ JIRA     #19 Jira parity + write-scope auto-create MERGED (PR #25, closes #19): read-only
            deep-link + scan-detect + canonical map + webhook + write-scope issue-property/label
            create; 27 tests + 334 lib green, no migration. Code LIVE on main; route INERT until
@@ -800,8 +821,9 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   4 states screenshotted (`docs/screenshots/drift/`). Evidence: `docs/OVERNIGHT_REPORT_6.md`.
 - **Historical limitation, superseded in the current working tree:** PR #22 ran seeded drift
   compute-on-read. The 2026-08-16 hardening moves that detector behind an async materialized
-  projection, but a hosted drift worker and production canary remain pending. Level-shift threshold
-  tuning is still an open scientific question. Design doc:
+  projection; the dedicated drift worker is now promoted and its app-candidate canary processed
+  generation 4 for one workspace. Level-shift threshold tuning is still an open scientific question.
+  Design doc:
   `~/.gstack/projects/adam-causent-causent-ai/adamowens-main-design-20260712-220650.md`.
 
 ## Funnel finish + ship-state/scorecard — as built (2026-07-13, PR #23)
@@ -824,18 +846,20 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 
 - **Current 2026-08-18/19 release state:** the public app still serves the verified pre-guard rollback
   artifact. `CAUSENT_DEMO_TODAY` has been removed from the `causent-ai` Production environment and
-  the server-only `SUPABASE_SERVICE_ROLE_KEY` has been added as Sensitive, but no new app candidate
-  or promotion has consumed those values. Production Supabase is at 42/42. The apply, production role
-  catalog, error-level lint, and serialized post-42 dry-run pass. No rollout row was added. The three worker projects, app/worker
+  the server-only `SUPABASE_SERVICE_ROLE_KEY` has been added as Sensitive. Production Supabase is at
+  42/42; apply, production role catalog, error-level lint, and serialized post-42 dry-run pass. No
+  rollout row was added. The three worker projects, app/worker
   Sensitive secrets, app URLs, rotated cron secret, separate production role credentials, and exact
-  target-specific Sensitive `DATABASE_URL` values now exist. The external staging broker, hosted
-  CI/load evidence, candidates, canaries, and explicit promotions remain pending.
+  target-specific Sensitive `DATABASE_URL` values now exist. All three workers are promoted and
+  live. The replacement app candidate is Ready and canaried but not promoted; the external staging
+  broker/load gate and authenticated full loop remain pending. Hosted CI is green.
 
-- **THE app project is Vercel `causent-ai`** (git-connected to this repo, auto-deploys `main`),
-  live at **https://app.causent.ai** (Cloudflare CNAME `app` → Vercel; apex `causent.ai` is the
-  separate Astro marketing site). A second Vercel project `causent` (created 7/10 via CLI link)
-  is redundant — the repo is re-linked to `causent-ai`; check `.vercel/project.json` before
-  `vercel env` commands.
+- **THE app project is Vercel `causent-ai`** (git-connected to this repo, auto-deploys `main`). The
+  public alias **https://app.causent.ai** resolves through the Cloudflare `app` CNAME to Vercel but
+  currently serves the rollback artifact; the Ready replacement candidate is not promoted. The apex
+  `causent.ai` is the separate Astro marketing site. A second Vercel project `causent` (created 7/10
+  via CLI link) is redundant — the repo is re-linked to `causent-ai`; check `.vercel/project.json`
+  before `vercel env` commands.
 - **Historical release state (2026-08-12): PR #30 is merged, but its production artifact is rolled
   back.** `main` is at squash commit `b2bb98c`. Production deployment
   `dpl_58Ds3d71VdvKFTBcdUkgamd182ip` built successfully but returned 503 because runtime
@@ -862,8 +886,8 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   activation. The three worker projects, matching strong Sensitive app/worker secrets, app worker
   URLs, rotated `CRON_SECRET`, dedicated production role credentials, and exact role-specific
   Sensitive `DATABASE_URL` values exist. The app retains its Supabase URL, anon key, and server-only
-  service-role key. After worker deployment and promotion, test immediate wake-up and the five-minute
-  recovery cron.
+  service-role key. Worker deployment/promotion and five candidate cron canaries now pass, but the
+  public app alias and rollout boundary remain unchanged.
 - **Cloud Supabase `royftsqyawtyfjolfabd`**: all 42 migrations are applied. Error-level
   `public`/`private`/`storage` lint passes; `anon` executes 0/37 public SECURITY
   DEFINER functions; and 37/37 use an empty search path. No rollout row or seed was added during this
@@ -876,9 +900,9 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   session-authenticated RLS reads work — stricter than default, keep it.
 - **Known prod limits**: ~~the resolve cron spawns local Python~~ — **PORTED**. All three stateful
   worker projects, dedicated database roles/credentials, exact Sensitive Supavisor DSNs, app URLs,
-  matching strong Sensitive app/worker secrets, and rotated `CRON_SECRET` exist. No current-source
-  drift/recompute/resolve candidate, canary, or promotion has run, so configuration alone does not arm
-  a worker. `/login` is publicly reachable and currently
+  matching strong Sensitive app/worker secrets, and rotated `CRON_SECRET` exist. The three workers
+  are promoted and the five app-candidate cron canaries pass. The app candidate is not promoted and
+  no authenticated full-loop canary or rollout assignment exists. `/login` is publicly reachable and currently
   indexable (no robots.txt — the proxy redirects it; CT logs make the hostname discoverable);
   add `app/robots.ts` + proxy exclusion if stealth matters.
 
@@ -965,7 +989,8 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   migrations, the zero-row B2 drain, 17 validated B3 constraints, v1/v2/v3 with no rollout backfill
   after B4, and the ACL migration. Final dry-run, error-level `public`/`private`/`storage` lint,
   anonymous privileged-function denial, and fixed search-path checks pass. Never production-seed the
-  122-row Northstar fixture or add a rollout row before the application/worker canaries are ready.
+  122-row Northstar fixture or add a rollout row before the authenticated application full-loop gate
+  passes.
 - **Worker-role database follow-through:** migration 42, full local reset, 8/8 local role tests,
   disposable-clone Supavisor rehearsal, production apply/catalog checks, and local/production lint
   pass. Clone credentials were disabled. Production roles use separate generated credentials and
@@ -974,24 +999,22 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 - **App environment:** `SUPABASE_SERVICE_ROLE_KEY` is now Sensitive in Production and stale
   `CAUSENT_DEMO_TODAY` is removed. All three app worker URLs and matching strong Sensitive secrets
   are configured, and `CRON_SECRET` is rotated. Verify those protected values through
-  `check:release-config`, confirm all local demo/seed/fixture/rollout flags are absent, and canary each
-  live path; configuration is not deployment evidence.
+  `check:release-config`, confirm all local demo/seed/fixture/rollout flags are absent, and retain the
+  successful worker/app-candidate canary evidence. Secrets were rotated; never record their values.
 - **Recompute worker:** the standalone project, strong Sensitive secret, and exact
-  `causent_recompute_worker.<ref>` session-pooler `DATABASE_URL` exist. Deploy the audited stage, then
-  verify wrong-secret denial plus bounded queue draining.
+  `causent_recompute_worker.<ref>` session-pooler `DATABASE_URL` exist. Deployment
+  `dpl_2PAG63un8RvuXTDAyCJYMyGCYKFK` is promoted; the candidate cron canary passed with 0 queued jobs.
 - **Drift worker:** the standalone project, strong Sensitive secret, and exact
-  `causent_drift_worker.<ref>` session-pooler `DATABASE_URL` exist. Deploy, then verify wrong-secret
-  denial, source enqueue, bounded leasing, stale-generation suppression, retry/terminal state, and
-  the five-minute app cron.
-- **Worker promotion:** each `deploy-*.sh --prod` command creates a production-environment candidate
-  with `--skip-domain`. Canary its immutable URL first, then explicitly run
-  `npx --yes vercel@56.0.0 promote <url> --scope "$VERCEL_ORG_ID"`; do not assume deploy moved an
-  alias. Full commands and target-specific config checks are in `api/DEPLOY.md`.
+  `causent_drift_worker.<ref>` session-pooler `DATABASE_URL` exist. Deployment
+  `dpl_5a5BFfP86YxCjWGBhMX3Z3iF64po` is promoted; the candidate cron canary processed generation 4
+  for one workspace.
+- **Worker promotion:** drift, recompute, and resolve are promoted on their dedicated domains. Future
+  `deploy-*.sh --prod` releases still create no-alias candidates and require immutable-URL canaries
+  plus explicit `vercel@56.0.0 promote`.
 - **Resolver:** its exact `causent_resolve_worker.<ref>` session-pooler `DATABASE_URL` and matching
-  Sensitive `CAUSENT_RESOLVE_SECRET` are configured. Pass `npm run check:resolve-config` in the
-  deployment context, redeploy, and canary the
-  authenticated app-to-resolver path. The app release check now also requires its resolve URL and
-  secret.
+  Sensitive `CAUSENT_RESOLVE_SECRET` are configured. Deployment
+  `dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM` is promoted; the candidate cron canary processed 4/4 predictions
+  for one workspace. UUID fix `f6b0204` and assertion fix `8b2ad20` close the release regression.
 - **Scale gate:** implement, audit, and configure the external staging session broker before invoking
   the workflow. Set protected `CAUSENT_STAGING_SESSION_POOL_URL` and high-entropy
   `CAUSENT_STAGING_SESSION_POOL_TOKEN`; the broker must durably enforce allocation-set/profile leases,
@@ -999,8 +1022,8 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
   adversarial foreign-owner/workspace/marker positive control and isolated write probe. Then run the
   selected k6 profiles, retain authenticated plans/lock/pool/queue telemetry, and treat the stated
   SLOs as targets until the run passes.
-- **CI and merge:** commit the exact release scope, require a green hosted run for that revision, and
-  merge through the reviewed release path before treating the git-connected app deployment as current.
+- **CI and merge:** hosted CI run `32225950985` completed successfully at 07:07 UTC on 2026-08-19.
+  PR #32 remains draft and still requires the reviewed merge path.
 - **Authenticated canaries:** verify the live app, database, worker, and resolver together using a
   clean account across URL/PDF generation, save/activate, three successors, private-image
   reattachment/signed delivery, resumable observation import, all-action package completion,
@@ -1009,9 +1032,8 @@ tabs. Structure (as-built lives at repo root, NOT `/src`):
 
 ### 4. Existing operational and gated work
 
-- Arm `causent-resolve` by deploying its already configured exact
-  `causent_resolve_worker.<ref>` session-pooler `DATABASE_URL`, then canary and promote the worker and
-  app deliberately.
+- Keep the three promoted workers under log/canary review; do not promote Ready app candidate
+  `dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` until the authenticated full loop passes.
 - Run the separate zero-code mechanism-mapping test before building the gated webhook
   lever-drift alert.
 - Connector automation and Jira/GitHub write credentials remain deliberate operator choices;

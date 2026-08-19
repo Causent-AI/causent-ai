@@ -3,22 +3,37 @@
 ## Outcome
 
 Production Supabase `royftsqyawtyfjolfabd` advanced from 11 to **42/42 migrations** through the
-rehearsed phased run plus the dedicated worker-role apply. The database schema and worker
-configuration are deployed; the application and workers are not. The public app alias still serves the verified rollback artifact,
-and no worker/app candidate, canary, rollout assignment, or promotion occurred. Causent is not
+rehearsed phased run plus the dedicated worker-role apply. The database schema and all three workers
+are deployed. A replacement application candidate is Ready and canaried but deliberately not
+promoted; the public app alias still serves the verified rollback artifact. No rollout assignment
+occurred. Causent is not
 declared production-ready, scale-proven, founder-approved, or partner-validated by this work.
 
 ## Source, app, and rollout state
 
 - The release source began from the reviewed `codex/decision-report-review-hardening` tree, whose
   content matched `origin/main` before this hardening work.
-- The public app remains on the pre-guard rollback artifact. No new Vercel app deployment or domain
-  promotion occurred.
+- The public app remains on the pre-guard rollback artifact. Replacement production candidate
+  `dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` is Ready at
+  `https://causent-2vyhwmswj-adamdavidowens-1984s-projects.vercel.app`, but it has not been promoted
+  to `app.causent.ai`. Its `/login` route returned 200; `/` and Decision Report onboarding returned
+  307 redirects to login.
 - `causent-drift`, `causent-recompute`, and `causent-resolve` Vercel projects now exist. Matching
   high-entropy Sensitive secrets are configured on each worker and on `causent-ai`; all three app
   worker URLs are configured; and `CRON_SECRET` was rotated. The app also retains Sensitive,
   server-only `SUPABASE_SERVICE_ROLE_KEY`, and stale `CAUSENT_DEMO_TODAY` remains removed. Every
-  worker has its own exact role-specific Supavisor `DATABASE_URL` stored Sensitive.
+  worker has its own exact role-specific Supavisor `DATABASE_URL` stored Sensitive. Drift deployment
+  `dpl_5a5BFfP86YxCjWGBhMX3Z3iF64po`, recompute deployment
+  `dpl_2PAG63un8RvuXTDAyCJYMyGCYKFK`, and resolve deployment
+  `dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM` are promoted on their dedicated domains.
+- All five candidate cron canaries passed: resolve processed 4/4 predictions in one workspace; drift
+  processed generation 4 in one workspace; recompute and connector each processed zero work; and
+  reconcile examined two registered workspaces and processed zero. A resolver exact retry returned
+  HTTP 200 with zero workspaces and zero predictions; Vercel logs independently confirm HTTP 200 for
+  all five cron requests. Candidate error logs were empty after the canaries.
+- The production resolver UUID regression was fixed in `f6b0204`, followed by the CI assertion fix
+  `8b2ad20`. Hosted CI run `32225950985` completed successfully at 07:07 UTC on 2026-08-19; PR #32
+  remains draft.
 - No `decision_report_rollouts` row was inserted. The schema apply did not enable Decision Report
   onboarding for a partner account.
 - No production seed was loaded and no database password rotation occurred.
@@ -99,12 +114,13 @@ nonempty, and the host/port/path/query must remain
 `*.pooler.supabase.com:5432/postgres?sslmode=require`. Never use `postgres`, `service_role`, a direct
 database host, port `6543`, or one DSN for multiple workers. All three Sensitive worker
 `DATABASE_URL` values are configured on their matching projects and verified through the `aws-1`
-session pooler. No deployed worker has consumed them yet.
+session pooler. All three promoted workers have consumed their dedicated DSNs successfully.
 
 The refreshed local gate reports a full reset, 8/8 worker-role tests, local error-level schema lint,
 671 credentialed Node tests total (652 passed, 19 intentional live-model skips, zero failures), and
 1,290/1,290 engine/bridge/isolation tests passed. Production error-level lint and role catalog checks
-also pass. These results are database/source evidence, not worker or app deployment canaries.
+also pass. These are database/source test results; the separate promoted-worker and held
+application-candidate canary evidence is recorded below.
 
 ## Query-plan and scale boundary
 
@@ -151,23 +167,19 @@ scale claim is supported, and the protected remote k6 matrix remains unrun.
   its marker. Only then may load-user sessions forge that workspace cookie and prove the marker is
   absent. Without the positive control, the isolation run fails rather than producing false evidence.
 
-These are source and network-free contract changes. The external broker has not been implemented,
-audited, or configured, so protected live staging load is operator-blocked and did not run. Worker
-projects, matching strong Sensitive app/worker secrets, app URLs, and rotated cron secret exist, but
-their role-specific Sensitive `DATABASE_URL` values are configured and no worker was
-deployed/canaried/promoted.
+The external broker has not been implemented, audited, or configured, so protected live staging load
+is operator-blocked and did not run. Worker projects, matching strong Sensitive app/worker secrets,
+app URLs, rotated cron secret, role-specific Sensitive `DATABASE_URL` values, promoted workers, and
+the held application candidate now exist. Secret values were rotated and are never recorded here.
 
 ## Explicitly not done
 
 - No production seed or Decision Report rollout assignment was added during schema activation.
 - No production database password rotation.
-- Worker projects, matching strong Sensitive secrets, app URLs, rotated cron secret, dedicated role
-  credentials, and exact Sensitive Supavisor DSNs were configured, but no worker candidate,
-  deployment, canary, or promotion was added.
 - No external session broker implementation, audit, configuration, or protected live staging run.
-- No app candidate, worker candidate, authenticated canary, alias promotion, or rollback-pointer
-  change.
-- No hosted CI result for this exact release-hardening source.
+- No authenticated full-loop canary, application alias promotion, rollout row, or rollback-pointer
+  change. The Ready replacement app candidate remains isolated from `app.causent.ai`.
+- PR #32 remains draft even though hosted CI is green.
 - No production private-image byte-delivery canary.
 - No founder sign-off or initially unassisted partner-session evidence.
 
@@ -177,19 +189,20 @@ deployed/canaried/promoted.
    credentials are already separate and configured.
 2. Enable Supabase leaked-password protection.
 3. Remove the billable rehearsal branch after its evidence is no longer needed.
-4. Retain the verified, separate worker credentials and exact role/ref Supavisor DSNs; run every
-   target release check with protected values immediately before deployment. Never use `postgres` or
+4. Monitor the promoted workers, dedicated domains, and production logs. Retain the verified,
+   separate worker credentials and exact role/ref Supavisor DSNs. Never use `postgres` or
    `service_role` as a worker identity.
 5. Implement and security-audit the durable session broker. Configure
    `CAUSENT_STAGING_SESSION_POOL_URL` and high-entropy `CAUSENT_STAGING_SESSION_POOL_TOKEN`, then
-   obtain green hosted CI and protected staging-load artifacts for the exact revision. Preserve the
+   obtain protected staging-load artifacts for the exact revision; hosted CI run `32225950985` is
+   already green. Preserve the
    adversarial foreign-tenant positive control, retain plans/pool/lock/queue telemetry, and do not
    convert the small-clone plans into a scale claim.
-6. Create worker candidates with `--prod --skip-domain`, canary immutable URLs, then promote each
-   explicitly. Update and verify the app worker endpoints only after worker promotion.
-7. Create a no-alias app candidate, run clean-account URL/PDF/save/activate/successor/private-image/
-   import/completion/recompute/drift/resolution/rollback canaries and review logs. Add a rollout row
-   only as a deliberate controlled-release step after these dependencies work.
-8. Promote the app deliberately only after the exact candidate passes.
+6. Keep PR #32 in the reviewed draft/merge path; hosted CI run `32225950985` is green.
+7. Run the authenticated clean-account URL/PDF/save/activate/successor/private-image/import/
+   completion/recompute/drift/resolution/rollback full-loop against replacement candidate
+   `dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai`; review logs and retain evidence. Add a rollout row only as a
+   deliberate controlled-release step after these dependencies work.
+8. Promote that exact app candidate deliberately only after the authenticated full-loop gate passes.
 9. Continue the founder's deep UI/workflow review and the still-missing initially unassisted partner
    sessions. Neither is replaced by database schema activation.

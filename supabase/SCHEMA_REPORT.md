@@ -102,11 +102,12 @@ The runtime guard requires exact `<role>.<20-character-project-ref>` usernames, 
 a matching `*.pooler.supabase.com` host, port `5432`, database `postgres`, and only
 `sslmode=require`. It rejects `postgres.<ref>`, `service_role.<ref>`, local/direct database hosts,
 port `6543`, and cross-worker role reuse. Each DSN is stored only in that worker's Sensitive
-`DATABASE_URL`; all three are configured and none has yet been exercised by a deployed candidate.
+`DATABASE_URL`; all three are configured and have been exercised by the promoted workers through
+the held application candidate's authorized cron canaries.
 
 Schema activation created no `decision_report_rollouts` assignment, loaded no production seed, and
 did not rotate the database password. The billable rehearsal branch should be deleted once its
-evidence is no longer needed. Production application and worker canaries remain separate gates.
+evidence is no longer needed. The authenticated application full-loop remains a separate gate.
 
 Slice 8 adds a private `decision-report-assets` bucket and the `report_assets` lifecycle table.
 Application roles have scoped SELECT only; checked security-definer RPCs reserve, attach, detach,
@@ -179,8 +180,12 @@ exact NumPy/psycopg versions and a 300-second function limit; nine recompute-fun
 That earlier source checkpoint linked no Vercel project and deployed no worker. The current operator
 inventory now confirms that drift, recompute, and resolve projects exist with matching strong
 Sensitive app/worker secrets and app URLs, plus a rotated cron secret. Their exact role-specific
-Supavisor `DATABASE_URL` values are stored Sensitive and their production logins/catalogs pass. No
-current-source worker candidate, canary, or promotion has occurred.
+Supavisor `DATABASE_URL` values are stored Sensitive and their production logins/catalogs pass. Drift
+deployment `dpl_5a5BFfP86YxCjWGBhMX3Z3iF64po`, recompute
+`dpl_2PAG63un8RvuXTDAyCJYMyGCYKFK`, and resolve
+`dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM` are promoted on dedicated domains. App-candidate cron canaries
+passed for resolve (4/4 predictions), drift (generation 4), recompute (0), connector (0), and
+reconciliation (two registered workspaces, 0).
 
 Source provenance v2 remains inside the append-only, RLS-protected revision snapshot rather than a
 new public source table. Each brief/URL/PDF summary carries bounded chunks, locators, extracted text,
@@ -301,12 +306,14 @@ staging load/soak evidence remain open.
 
 `20260817055415_materialize_current_prediction_drift.sql` moves baseline drift off the dashboard
 request path. Private `drift_refresh_jobs` coalesce source changes by workspace and generation;
-service-role workers lease with bounded attempts and replace only the matching generation of
+dedicated workers lease with bounded attempts and replace only the matching generation of
 viewer-readable `current_prediction_drift`. The public `get_current_prediction_drift_v1` RPC returns
 at most 500 rows for the explicit workspace and exposes sanitized queued/current/retrying/failed
 freshness metadata. Authenticated users have SELECT only; application roles cannot mutate the queue
-or projection. The separate worker endpoint, database URL, shared secret, and five-minute app cron
-still require deployment and authenticated canaries.
+or projection. The separate worker endpoint, dedicated database role/URL, shared secret, and
+five-minute app cron are deployed and configured; the held application candidate's authorized drift
+cron processed generation 4 for one workspace. Authenticated full-loop and representative-load
+evidence remain open.
 
 `20260817055412_connector_webhook_inbox.sql` adds a service-only durable connector inbox. The checked
 RPC identifies one GitHub/Jira delivery by provider ID plus SHA-256 payload digest, records attempt and
@@ -390,10 +397,18 @@ desktop/390 px browser acceptance, and final diff audit passed. Browser QA also 
 collapsed Actions commitment card before publication. The disposable-clone Supavisor rehearsal and
 production role catalog/pooler access also pass; clone credentials were disabled afterward.
 
+The workers are deployed and their point-in-time cron canaries pass, but replacement app candidate
+`dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` remains unpromoted and no authenticated full-loop canary or
+rollout assignment exists. Candidate error logs were empty after the five canaries. Resolver UUID
+fix `f6b0204` and CI assertion fix `8b2ad20` close the observed release regression. A resolver exact
+retry returned HTTP 200 with zero workspaces/zero predictions, and Vercel logs independently confirm
+HTTP 200 for all five cron requests. Hosted CI run `32225950985` completed successfully at 07:07 UTC
+on 2026-08-19; PR #32 remains draft. Shared secrets were rotated; no value is recorded here.
+
 The k6 profiles and scale fixture remain instruments only. The source now requires a durable external
 session broker, but that broker has not been implemented, audited, or configured, so protected
-staging/soak execution is operator-blocked. Representative-volume plans, deployed stateful workers,
-production CDN/egress behavior, and authenticated application/worker canaries remain
+staging/soak execution is operator-blocked. Representative-volume plans, production CDN/egress
+behavior, and authenticated full-loop application canaries remain
 pending. This is not evidence for 10,000 active users/hour.
 
 ### Historical checkpoint before this hardening round
@@ -523,8 +538,8 @@ blocked while legitimate within-rank grants still succeed.
   remain deployment responsibilities. Jobs stop retrying after the bounded failure ceiling and need
   operator visibility. The release check now rejects weak/repetitive/placeholder shared secrets
   without logging their values. Matching strong Sensitive app/worker secrets and exact role-specific
-  Supavisor DSNs are configured; the migration/catalog/pooler checks pass, but deployment and canaries
-  do not exist yet.
+  Supavisor DSNs are configured; migration/catalog/pooler checks pass; the deployment is promoted;
+  and its zero-job cron canary passed. Queue-under-load and authenticated full-loop evidence remain.
 - **Provenance v2 deliberately retains extracted text.** Raw URL responses and PDF bytes are not
   stored, but bounded source chunks remain inside append-only revisions so later claims are auditable.
   Soft deletion removes authenticated visibility; physical retention/garbage-collection policy still
@@ -536,15 +551,15 @@ blocked while legitimate within-rank grants still succeed.
   volume lock/query plans remain open. The app has a Sensitive server-only service-role key and no
   stale demo date; all three stateful worker projects, matching Sensitive app/worker secrets, app
   URLs, rotated cron secret, separate production role credentials, and exact Sensitive role-specific
-  `DATABASE_URL` values exist. The serving app has not been redeployed, and no worker
-  candidate/canary/promotion has run. Database/configuration evidence is not deployment evidence.
+  `DATABASE_URL` values exist. All three workers are promoted and five app-candidate cron canaries
+  passed. The public app remains on the rollback artifact; the Ready replacement candidate is not
+  promoted; and no authenticated full-loop canary or rollout assignment exists.
 - **Protected staging load is broker-blocked.** The source validates
   `CAUSENT_STAGING_SESSION_POOL_URL`, a high-entropy `CAUSENT_STAGING_SESSION_POOL_TOKEN`, durable
   allocation-set/profile lease envelopes, real Supabase session lineage, disjoint single-use
   sessions, and an adversarial foreign positive control. The external broker is not implemented,
   audited, or configured, so no live capacity or load-isolation result exists.
-- **The gates are point-in-time results.** The earlier coordinated local product gate and the current
-  production schema activation verify different artifacts; the ACL/release-tooling source still needs
-  its exact hosted CI result. Prior webpack/manifest and browser acceptance remain useful historical
-  product evidence, but they do not replace protected staging capacity or authenticated production
-  canaries.
+- **The gates are point-in-time results.** The earlier coordinated local product gate, production
+  schema activation, and worker cron canaries verify different artifacts. Hosted CI run
+  `32225950985` completed successfully; PR #32 remains draft. Prior webpack/manifest and browser acceptance do not replace
+  protected staging capacity or the authenticated full-loop app-candidate canary.
