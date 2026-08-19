@@ -108,7 +108,7 @@ jobs:
           for deploy_script in scripts/deploy-drift.sh scripts/deploy-recompute.sh scripts/deploy-resolve.sh; do
             grep -Fq 'VERCEL_CLI_VERSION="56.0.0"' "$deploy_script"
             grep -Fq -- 'DEPLOY_ARGS=(--prod --skip-domain)' "$deploy_script"
-            grep -Fq -- '--team "$VERCEL_ORG_ID"' "$deploy_script"
+            grep -Fq -- '--scope "$TARGET_VERCEL_ORG_ID"' "$deploy_script"
           done
 
           test "$(find "$drift_stage" -type f | wc -l)" -eq 21
