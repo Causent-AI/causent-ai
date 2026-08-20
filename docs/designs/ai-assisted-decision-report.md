@@ -128,14 +128,14 @@ display that shift in percentage points. This does not set causal direction or b
 enter the confident aggregate, and does not lower the 45-day-per-side ITS floor. Expanded Slice 10
 may recompute the underlying evidence automatically, but these display gates still apply unchanged.
 
-Slice 9 implements controlled partner rollout without changing any durable report contract.
-`decision_report_rollouts` is an operator-managed per-user assignment within the shared partner
-workspace. Authenticated users may read only their own assignment and cannot mutate it. Unassigned
-users fail closed to legacy onboarding. New starts canonicalize to `?flow=legacy` or
-`?flow=decision-report`; the legacy choice remains pinned across refresh, browser Back, and later
-enablement, so an in-progress legacy session is never migrated in place. Disabling rollout rejects
-new and unsaved Decision Report starts, but `?report=<id>` takes precedence and continues to load
-durable draft, ready, or active reports unchanged.
+Slice 9 introduced controlled partner rollout without changing any durable report contract.
+`decision_report_rollouts` remains an operator-managed per-user assignment within the shared partner
+workspace. Authenticated users may read only their own assignment and cannot mutate it. The
+2026-08-19 product-direction follow-up promotes the current Decision Report onboarding for
+authenticated users who are unassigned as well as explicitly enabled. A stale `?flow=legacy` URL is
+canonicalized to `?flow=decision-report` for those users. An explicit `enabled=false` assignment or
+an unavailable assignment lookup remains the fail-closed rollback to legacy. `?report=<id>` still
+takes precedence and continues to load durable draft, ready, or active reports unchanged.
 
 Rollback criteria are explicit: disable an assignment if the new-start flow repeatedly fails to
 generate an editable report, loses a saved revision, repeats onboarding after activation, requires
@@ -243,6 +243,12 @@ Review round 2 presents Claude and Codex as separate UI triggers. Both open the 
 clipboard handoff dialog; neither signs in, calls a provider, sends Causent data, or establishes an
 MCP connection. The dialog retains the bounded preview, any required egress confirmation, explicit
 copy action, and transient fingerprint-matched paste-back contract.
+
+Multi-metric actions use the immutable normalized activation binding for this handoff. Every current
+activated action can expose both controls when its binding and assigned metric are valid. The packet
+keeps the registered prediction as the primary decision outcome; a supporting action's different
+metric is labeled monitoring-only and never represented as an independent prediction or causal
+attribution. Stale activations, missing metrics, forged roles, and historical actions fail closed.
 
 The user may paste a matching structured review back into the card. Causent checks its bounded JSON
 shape, current-context fingerprint, and visible action coordinates, then renders it only as escaped

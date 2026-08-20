@@ -1,5 +1,38 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-08-19 — latest onboarding and per-action handoff prepared for release
+
+The evidence, root causes, contributing factors, and revised release contract are recorded in
+[the 2026-08-19 rollout regression postmortem](../memory/2026-08-19-onboarding-action-handoff-rollout-postmortem.md).
+
+Two production-review regressions are fixed in the current working tree. The original Slice 9
+policy still required an exact enabled rollout row and kept `?flow=legacy` sticky, so a newly
+provisioned authenticated member could continue seeing the old funnel. Current source now sends
+enabled and authenticated-unassigned users to Decision Report and removes a stale legacy query.
+Explicit `enabled=false` and assignment lookup failures remain the fail-closed rollback; saved report
+links remain reachable; anonymous local demo still requires its explicit rollout flag.
+
+The second missing action control was a stale single-metric guard. The Actions server built every
+handoff against the one registered prediction and silently omitted a row when a supporting action's
+normalized metric differed. Current source verifies the active activation and the action's exact
+metric binding, then builds the same Claude and Codex controls for each valid current action. The
+registered prediction remains the primary decision outcome; secondary action metrics are exported
+only as monitoring context with no individual causal claim. Focused regression tests pass 28/28;
+the complete library suite reports 687 total, 621 passed, 66 intentional skips, and zero failures.
+TypeScript, zero-warning lint, the load contract, webpack build, dashboard build contract, local
+stale-query browser redirect, 390 px layout, clean console, diff check, and plugin check pass. The
+owner explicitly authorized an application-only release and the source-to-exposure manifest is
+recorded in [the latest editor release manifest](../memory/2026-08-19-latest-editor-release-manifest.md).
+Production remains on the previous verified artifact until fresh hosted CI, immutable-candidate
+acceptance, explicit promotion, and post-promotion verification complete.
+
+A reusable personal rollout workflow is installed at
+`$HOME/.agents/skills/causent-production-rollout/`. It requires one release manifest, explicit
+source/database/worker/app/exposure authority, fresh-account acceptance, and every-action
+multi-metric checks before promotion. The repository postmortem is the durable context source; no
+GBrain CLI, config, MCP, or source pin is available on this machine, so no external semantic index
+refresh is claimed.
+
 ## 2026-08-18/19 — Fixed application and workers live
 
 The production Supabase project `royftsqyawtyfjolfabd` advanced from 11 to **42/42 migrations**.

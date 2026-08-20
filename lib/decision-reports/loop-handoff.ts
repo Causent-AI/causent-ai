@@ -18,12 +18,21 @@ type ReportLifecycleStatus = "draft" | "report_ready" | "active";
 type DataClassification =
   DecisionReportV1["implementation"]["governance"]["dataClassification"];
 
+export type DecisionLoopActionMetric = {
+  /** Visible UI identity used only to verify the normalized action assignment. */
+  id: string;
+  /** Visible metric label; raw observations and database identities stay server-side. */
+  name: string;
+};
+
 export type DecisionLoopHandoffInput = {
   currentReport: {
     /** Internal identity used only to fail closed. It is never serialized. */
     reportId: string;
     /** Internal identity used only to fail closed. It is never serialized. */
     revisionId: string;
+    /** Current immutable activation identity used only to fail closed. */
+    activeActivationId: string | null;
     status: ReportLifecycleStatus;
     isCurrent: boolean;
     iterationNumber: number;
@@ -42,6 +51,8 @@ export type DecisionLoopHandoffInput = {
     decision: Decision;
     prediction: Prediction;
     action: Action;
+    /** Minimal authorized metric projection for the selected action. */
+    actionMetric: DecisionLoopActionMetric;
   };
 };
 
@@ -68,6 +79,18 @@ export type DecisionLoopHandoff = {
   contextFingerprint: string;
   /** Complete manual prompt copied by the user to an external assistant. */
   clipboardText: string;
+};
+
+export type DecisionLoopActionHandoff = {
+  actionId: string;
+  handoff: DecisionLoopHandoff;
+};
+
+export type DecisionLoopHandoffAssemblyInput = {
+  currentReport: DecisionLoopHandoffInput["currentReport"] | null | undefined;
+  decisions: readonly Decision[];
+  actions: readonly Action[];
+  actionMetrics: readonly DecisionLoopActionMetric[];
 };
 
 export type DecisionLoopHandoffBuildResult =
@@ -240,8 +263,20 @@ function egressFor(classification: DataClassification): DecisionLoopEgress {
   };
 }
 
-function isNonEmptyIdentity(value: string): boolean {
-  return value.trim().length > 0 && value.length <= 200 && !FORBIDDEN_TEXT_CONTROL.test(value);
+function isNonEmptyIdentity(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    value.length <= 200 &&
+    !FORBIDDEN_TEXT_CONTROL.test(value)
+  );
+}
+
+function isValidOptionalDate(value: unknown): value is string | null {
+  if (value === null) return true;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function reviewTemplate(contextFingerprint: string): DecisionLoopReview {
@@ -296,6 +331,9 @@ export function buildDecisionLoopHandoff(
   if (!isNonEmptyIdentity(currentReport.reportId) || !isNonEmptyIdentity(currentReport.revisionId)) {
     errors.push("The current report identity is invalid.");
   }
+  if (!isNonEmptyIdentity(currentReport.activeActivationId)) {
+    errors.push("The current report activation identity is invalid.");
+  }
   if (
     currentReport.decisionId === null ||
     currentReport.predictionId === null ||
@@ -326,6 +364,25 @@ export function buildDecisionLoopHandoff(
   if (selection.decision.origin !== "decision_report") {
     errors.push("The selected decision is not report-native.");
   }
+  const actionReportContext = selection.action.reportContext;
+  if (
+    !actionReportContext ||
+    !isNonEmptyIdentity(actionReportContext.activationId) ||
+    actionReportContext.activationId !== currentReport.activeActivationId
+  ) {
+    errors.push("The selected action is not bound to the current report activation.");
+  } else {
+    if (
+      actionReportContext.monitoringExpectedDirection !== null &&
+      actionReportContext.monitoringExpectedDirection !== "INCREASE" &&
+      actionReportContext.monitoringExpectedDirection !== "DECREASE"
+    ) {
+      errors.push("The selected action monitoring direction is invalid.");
+    }
+    if (!isValidOptionalDate(actionReportContext.monitoringCheckDate)) {
+      errors.push("The selected action monitoring date is invalid.");
+    }
+  }
   if (
     !isNonEmptyIdentity(selection.action.id) ||
     !selection.action.sourceItemId ||
@@ -345,6 +402,7 @@ export function buildDecisionLoopHandoff(
   } else {
     const attachedPrediction = decisionPredictions[0];
     if (
+      attachedPrediction.metricId !== selection.prediction.metricId ||
       attachedPrediction.direction !== selection.prediction.direction ||
       attachedPrediction.magnitudePctMean !== selection.prediction.magnitudePctMean ||
       attachedPrediction.resolutionDate !== selection.prediction.resolutionDate ||
@@ -356,8 +414,36 @@ export function buildDecisionLoopHandoff(
       errors.push("The selected prediction does not match the active decision snapshot.");
     }
   }
-  if (selection.prediction.metricId !== selection.action.primaryMetricId) {
-    errors.push("The selected action and active prediction do not share the report metric.");
+  if (
+    !isNonEmptyIdentity(selection.action.primaryMetricId) ||
+    !isNonEmptyIdentity(selection.actionMetric.id) ||
+    !isNonEmptyIdentity(selection.actionMetric.name) ||
+    selection.actionMetric.id !== selection.action.primaryMetricId
+  ) {
+    errors.push("The selected action metric does not match its current activation binding.");
+  }
+  if (actionReportContext) {
+    if (
+      actionReportContext.role !== "registered-primary" &&
+      actionReportContext.role !== "supporting"
+    ) {
+      errors.push("The selected action role is invalid.");
+    } else if (actionReportContext.role === "registered-primary") {
+      if (selection.decision.leverActionId !== selection.action.id) {
+        errors.push("The selected primary action does not match the active decision lever.");
+      }
+      if (selection.prediction.metricId !== selection.actionMetric.id) {
+        errors.push("The selected primary action and active prediction do not share the outcome metric.");
+      }
+      if (
+        actionReportContext.monitoringExpectedDirection !== null ||
+        actionReportContext.monitoringCheckDate !== null
+      ) {
+        errors.push("The selected primary action cannot carry supporting monitoring context.");
+      }
+    } else if (selection.decision.leverActionId === selection.action.id) {
+      errors.push("The selected supporting action conflicts with the active decision lever.");
+    }
   }
   if (
     !["POSITIVE", "NEGATIVE"].includes(selection.prediction.direction) ||
@@ -405,6 +491,10 @@ export function buildDecisionLoopHandoff(
   const actionDisplayCode = selection.action.displayCode
     ? boundedSingleLine(selection.action.displayCode, 32) || null
     : null;
+  const actionMetricName = boundedSingleLine(selection.actionMetric.name, 180);
+  const actionMetricRole = actionReportContext?.role === "registered-primary"
+    ? "primary_decision_outcome"
+    : "monitoring_only";
   const dataClassification = report.implementation.governance.dataClassification;
   const actionSummary = boundedClaims(selectedAction.summary, 3);
   const decisionCommitment = boundedClaims(report.decision.decision, 2);
@@ -423,6 +513,19 @@ export function buildDecisionLoopHandoff(
   const context: CanonicalValue = {
     action: {
       displayCode: actionDisplayCode,
+      metricAssignment: {
+        causalInterpretation: actionMetricRole === "primary_decision_outcome"
+          ? "Registered primary action for the decision outcome."
+          : "Monitoring context only; not an independent causal prediction or causal attribution.",
+        metricName: actionMetricName,
+        monitoringCheckDate: actionMetricRole === "monitoring_only"
+          ? actionReportContext?.monitoringCheckDate ?? null
+          : null,
+        monitoringExpectedDirection: actionMetricRole === "monitoring_only"
+          ? actionReportContext?.monitoringExpectedDirection ?? null
+          : null,
+        role: actionMetricRole,
+      },
       summary: actionSummary.items,
       title: actionTitle,
     },
@@ -440,6 +543,7 @@ export function buildDecisionLoopHandoff(
     measurement: {
       baselineLabel: boundedSingleLine(metric.baselineLabel, 160),
       baselinePct: metric.baselinePct,
+      contractRole: "primary_decision_outcome",
       definition: boundedSingleLine(metric.definition, 500),
       evidenceState: metric.evidenceState,
       humanCommitment: {
@@ -505,6 +609,62 @@ export function buildDecisionLoopHandoff(
       clipboardText,
     },
   };
+}
+
+/**
+ * Assemble the current Actions-page handoffs without exposing a button for any
+ * stale, ambiguous, or incompletely normalized action. The individual builder
+ * remains the final validation and redaction boundary.
+ */
+export function buildDecisionLoopActionHandoffs({
+  currentReport,
+  decisions,
+  actions,
+  actionMetrics,
+}: DecisionLoopHandoffAssemblyInput): DecisionLoopActionHandoff[] {
+  if (
+    !currentReport ||
+    !isNonEmptyIdentity(currentReport.activeActivationId) ||
+    !isNonEmptyIdentity(currentReport.decisionId) ||
+    !isNonEmptyIdentity(currentReport.predictionId)
+  ) {
+    return [];
+  }
+
+  const matchingDecisions = decisions.filter(
+    (decision) => decision.id === currentReport.decisionId,
+  );
+  if (matchingDecisions.length !== 1) return [];
+  const decision = matchingDecisions[0];
+  const matchingPredictions = decision.predictions.filter(
+    (prediction) => prediction.id === currentReport.predictionId,
+  );
+  if (matchingPredictions.length !== 1) return [];
+  const prediction = matchingPredictions[0];
+
+  return actions.flatMap((action) => {
+    if (actions.filter((candidate) => candidate.id === action.id).length !== 1) return [];
+    if (decision.actionIds.filter((actionId) => actionId === action.id).length !== 1) return [];
+    if (action.reportContext?.activationId !== currentReport.activeActivationId) return [];
+    const matchingMetrics = actionMetrics.filter(
+      (metric) => metric.id === action.primaryMetricId,
+    );
+    if (matchingMetrics.length !== 1) return [];
+
+    const result = buildDecisionLoopHandoff({
+      currentReport,
+      selection: {
+        reportId: currentReport.reportId,
+        revisionId: currentReport.revisionId,
+        iterationNumber: currentReport.iterationNumber,
+        decision,
+        prediction,
+        action,
+        actionMetric: matchingMetrics[0],
+      },
+    });
+    return result.ok ? [{ actionId: action.id, handoff: result.handoff }] : [];
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

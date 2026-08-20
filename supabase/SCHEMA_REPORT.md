@@ -139,8 +139,10 @@ views rather than deleted.
 Slice 9 adds `decision_report_rollouts`, keyed by workspace and authenticated user. A user may read
 only their own assignment when they also have viewer access to the workspace. Authenticated roles
 have no insert, update, or delete grant, so assignment and rollback remain operator-managed through
-the service role or direct SQL. Unassigned and lookup-failure users fail closed to legacy onboarding;
-the table does not own or mutate durable report state.
+the service role or direct SQL. Current application policy treats an absent row for an authenticated
+user as the current Decision Report onboarding, while an explicit `enabled=false` row or a lookup
+failure selects legacy. This 2026-08-19 source change does not alter the table, RLS, grants, or durable
+report state; it makes the row an explicit rollback override instead of a required opt-in.
 
 Slice 10 adds `decision_report_series` plus report lineage columns. Each report belongs to one
 workspace-bound linear series; a partial unique index permits only one non-deleted direct successor.

@@ -18,6 +18,24 @@ tab continuity pass; hosted CI run `32287053300` is green for `85860dc`. Protect
 representative-volume evidence, private-image and provider-connector production canaries, terminal
 resolution, founder sign-off, and partner evidence remain open below.
 
+## 2026-08-19 onboarding and action-handoff regression follow-up
+
+- [x] Promote authenticated users with no rollout assignment to the current Decision Report
+  onboarding. Canonicalize stale `?flow=legacy` URLs for enabled/unassigned users while preserving
+  explicit `enabled=false` and lookup failure as the legacy rollback. Saved report links still win,
+  and anonymous local demo remains behind its existing environment flag.
+- [x] Restore Claude and Codex copy controls for supporting actions assigned to a secondary metric.
+  Validate the current activation and normalized action/metric binding; retain the registered
+  prediction as the primary outcome; and label the action-specific metric monitoring-only.
+- [x] Capture the application-only release manifest and rerun the final local source gates after the
+  owner explicitly authorized release. Focused tests pass 28/28; the complete library suite reports
+  687 total, 621 passed, 66 intentional skips, and zero failures; TypeScript, zero-warning lint, load
+  contract, webpack/dashboard build, local redirect/mobile/console checks, diff check, and plugin
+  check pass.
+- [ ] Require fresh hosted CI on the pushed release commit, then create an immutable app candidate,
+  complete the authenticated fresh-user plus all-action acceptance matrix, promote explicitly, and
+  repeat the smallest acceptance on `app.causent.ai`.
+
 ## Production schema activation and release rehearsal — 2026-08-18/19
 
 - [x] Authenticate the Supabase CLI, inspect the production migration baseline, and rehearse the

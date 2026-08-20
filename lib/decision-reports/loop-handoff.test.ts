@@ -5,6 +5,7 @@ import { GUMMY_ALPHA_GOLDEN_EXAMPLE } from "./fixtures/gummy-alpha.ts";
 import {
   DECISION_LOOP_HANDOFF_MAX_BYTES,
   DECISION_LOOP_REVIEW_MAX_BYTES,
+  buildDecisionLoopActionHandoffs,
   buildDecisionLoopHandoff,
   parseDecisionLoopReview,
   prepareDecisionLoopCopy,
@@ -14,6 +15,7 @@ import type { Action, Decision, Prediction } from "../types.ts";
 
 const REPORT_ID = "report-internal-secret";
 const REVISION_ID = "revision-internal-secret";
+const ACTIVATION_ID = "activation-internal-secret";
 
 function validInput(): DecisionLoopHandoffInput {
   const report = structuredClone(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
@@ -39,6 +41,15 @@ function validInput(): DecisionLoopHandoffInput {
     title: reportAction.title,
     shippedAt: null,
     primaryMetricId: prediction.metricId,
+    reportContext: {
+      activationId: ACTIVATION_ID,
+      role: "registered-primary",
+      causalObject: "decision_package",
+      isPackageIntervention: false,
+      packageCompletedAt: null,
+      monitoringExpectedDirection: null,
+      monitoringCheckDate: null,
+    },
     impact: [],
   };
   const decision: Decision = {
@@ -58,6 +69,7 @@ function validInput(): DecisionLoopHandoffInput {
     currentReport: {
       reportId: REPORT_ID,
       revisionId: REVISION_ID,
+      activeActivationId: ACTIVATION_ID,
       status: "active",
       isCurrent: true,
       iterationNumber: 3,
@@ -73,8 +85,40 @@ function validInput(): DecisionLoopHandoffInput {
       decision,
       prediction,
       action,
+      actionMetric: {
+        id: action.primaryMetricId,
+        name: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection.metricName,
+      },
     },
   };
+}
+
+function supportingInput(): DecisionLoopHandoffInput {
+  const input = validInput();
+  const primaryActionId = input.selection.action.id;
+  const reportAction = input.currentReport.report.implementation.actions[1];
+  const action: Action = {
+    ...input.selection.action,
+    id: "supporting-action-internal-secret",
+    displayCode: "D1A2",
+    sourceItemId: reportAction.sourceItemId,
+    title: reportAction.title,
+    primaryMetricId: "support-metric-ui-internal-secret",
+    reportContext: {
+      ...input.selection.action.reportContext!,
+      role: "supporting",
+      monitoringExpectedDirection: "DECREASE",
+      monitoringCheckDate: "2026-10-15",
+    },
+  };
+  input.selection.action = action;
+  input.selection.actionMetric = {
+    id: action.primaryMetricId,
+    name: "Support Tickets",
+  };
+  input.selection.decision.actionIds = [primaryActionId, action.id];
+  input.selection.decision.leverActionId = primaryActionId;
+  return input;
 }
 
 function built(input = validInput()) {
@@ -135,6 +179,7 @@ test("builds a deterministic bounded packet from only the selected current actio
   for (const secret of [
     REPORT_ID,
     REVISION_ID,
+    ACTIVATION_ID,
     input.currentReport.decisionId!,
     input.currentReport.predictionId!,
     input.selection.action.id,
@@ -162,6 +207,16 @@ test("builds a deterministic bounded packet from only the selected current actio
   assert.match(handoff.canonicalContext, /"resolutionDate":"2026-09-30"/);
   assert.match(handoff.canonicalContext, /Current Causent measurement readout/);
   const disclosedContext = JSON.parse(handoff.canonicalContext) as {
+    action: {
+      metricAssignment: {
+        causalInterpretation: string;
+        metricName: string;
+        monitoringCheckDate: string | null;
+        monitoringExpectedDirection: string | null;
+        role: string;
+      };
+    };
+    measurement: { contractRole: string; metricName: string };
     omittedItems: Record<string, number>;
     sourceDisclosure: {
       kinds: string[];
@@ -174,9 +229,206 @@ test("builds a deterministic bounded packet from only the selected current actio
     rawSourceTextIncluded: false,
     sourceCount: 1,
   });
+  assert.deepEqual(disclosedContext.action.metricAssignment, {
+    causalInterpretation: "Registered primary action for the decision outcome.",
+    metricName: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection.metricName,
+    monitoringCheckDate: null,
+    monitoringExpectedDirection: null,
+    role: "primary_decision_outcome",
+  });
+  assert.equal(disclosedContext.measurement.contractRole, "primary_decision_outcome");
+  assert.equal(
+    disclosedContext.measurement.metricName,
+    GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection.metricName,
+  );
   assert.equal(disclosedContext.omittedItems.actionSummary, 1);
   assert.equal(disclosedContext.omittedItems.allowedDataSources, 1);
   assert.equal(disclosedContext.omittedItems.approvedModelNotes, 1);
+});
+
+test("builds a supporting-action handoff with explicit non-causal monitoring context", () => {
+  const input = supportingInput();
+  const handoff = built(input);
+  const context = JSON.parse(handoff.canonicalContext) as {
+    action: {
+      metricAssignment: {
+        causalInterpretation: string;
+        metricName: string;
+        monitoringCheckDate: string | null;
+        monitoringExpectedDirection: string | null;
+        role: string;
+      };
+      title: string;
+    };
+    measurement: {
+      contractRole: string;
+      metricName: string;
+      humanCommitment: { magnitudePctOfMetricMean: number };
+    };
+  };
+
+  assert.equal(handoff.actionTitle, "Build the contextual assistant");
+  assert.deepEqual(context.action.metricAssignment, {
+    causalInterpretation:
+      "Monitoring context only; not an independent causal prediction or causal attribution.",
+    metricName: "Support Tickets",
+    monitoringCheckDate: "2026-10-15",
+    monitoringExpectedDirection: "DECREASE",
+    role: "monitoring_only",
+  });
+  assert.equal(
+    context.measurement.metricName,
+    GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection.metricName,
+  );
+  assert.equal(context.measurement.contractRole, "primary_decision_outcome");
+  assert.equal(context.measurement.humanCommitment.magnitudePctOfMetricMean, 15);
+
+  for (const hidden of [
+    ACTIVATION_ID,
+    input.selection.action.id,
+    input.selection.action.sourceItemId!,
+    input.selection.actionMetric.id,
+    input.currentReport.report.implementation.actions[0].title,
+    input.currentReport.report.implementation.actions[2].title,
+  ]) {
+    assert.equal(handoff.clipboardText.includes(hidden), false, `leaked ${hidden}`);
+  }
+  assert.ok(
+    new TextEncoder().encode(handoff.clipboardText).byteLength <=
+      DECISION_LOOP_HANDOFF_MAX_BYTES,
+  );
+});
+
+test("preserves explicit null supporting monitoring fields", () => {
+  const input = supportingInput();
+  input.selection.action.reportContext!.monitoringExpectedDirection = null;
+  input.selection.action.reportContext!.monitoringCheckDate = null;
+  const context = JSON.parse(built(input).canonicalContext) as {
+    action: {
+      metricAssignment: {
+        monitoringCheckDate: string | null;
+        monitoringExpectedDirection: string | null;
+        role: string;
+      };
+    };
+  };
+
+  assert.deepEqual(context.action.metricAssignment, {
+    causalInterpretation:
+      "Monitoring context only; not an independent causal prediction or causal attribution.",
+    metricName: "Support Tickets",
+    monitoringCheckDate: null,
+    monitoringExpectedDirection: null,
+    role: "monitoring_only",
+  });
+});
+
+test("page assembly yields Claude and Codex handoffs for primary and secondary-metric actions", () => {
+  const primary = validInput();
+  const supporting = supportingInput();
+  const handoffs = buildDecisionLoopActionHandoffs({
+    currentReport: primary.currentReport,
+    decisions: [supporting.selection.decision],
+    actions: [primary.selection.action, supporting.selection.action],
+    actionMetrics: [primary.selection.actionMetric, supporting.selection.actionMetric],
+  });
+
+  assert.deepEqual(
+    handoffs.map((candidate) => candidate.actionId),
+    [primary.selection.action.id, supporting.selection.action.id],
+  );
+  for (const candidate of handoffs) {
+    for (const target of ["claude", "codex"] as const) {
+      const prepared = prepareDecisionLoopCopy(candidate.handoff, target, true);
+      assert.equal(prepared.ok, true, `${candidate.actionId} ${target}`);
+    }
+  }
+
+  supporting.selection.action.reportContext!.activationId = "stale-activation";
+  assert.deepEqual(
+    buildDecisionLoopActionHandoffs({
+      currentReport: primary.currentReport,
+      decisions: [supporting.selection.decision],
+      actions: [primary.selection.action, supporting.selection.action],
+      actionMetrics: [primary.selection.actionMetric, supporting.selection.actionMetric],
+    }).map((candidate) => candidate.actionId),
+    [primary.selection.action.id],
+  );
+
+  supporting.selection.action.reportContext!.activationId = ACTIVATION_ID;
+  assert.deepEqual(
+    buildDecisionLoopActionHandoffs({
+      currentReport: primary.currentReport,
+      decisions: [supporting.selection.decision],
+      actions: [primary.selection.action, supporting.selection.action],
+      actionMetrics: [primary.selection.actionMetric],
+    }).map((candidate) => candidate.actionId),
+    [primary.selection.action.id],
+  );
+});
+
+test("page assembly keeps same-metric supporting actions and fails closed on duplicate identities", () => {
+  const primary = validInput();
+  const supporting = supportingInput();
+  supporting.selection.action.primaryMetricId = primary.selection.actionMetric.id;
+  supporting.selection.actionMetric = primary.selection.actionMetric;
+
+  const assembled = () => buildDecisionLoopActionHandoffs({
+    currentReport: primary.currentReport,
+    decisions: [supporting.selection.decision],
+    actions: [primary.selection.action, supporting.selection.action],
+    actionMetrics: [primary.selection.actionMetric],
+  });
+
+  assert.deepEqual(
+    assembled().map((candidate) => candidate.actionId),
+    [primary.selection.action.id, supporting.selection.action.id],
+  );
+
+  assert.deepEqual(buildDecisionLoopActionHandoffs({
+    currentReport: primary.currentReport,
+    decisions: [supporting.selection.decision, structuredClone(supporting.selection.decision)],
+    actions: [primary.selection.action, supporting.selection.action],
+    actionMetrics: [primary.selection.actionMetric],
+  }), []);
+
+  const duplicatePredictionDecision = structuredClone(supporting.selection.decision);
+  duplicatePredictionDecision.predictions.push(
+    structuredClone(duplicatePredictionDecision.predictions[0]),
+  );
+  assert.deepEqual(buildDecisionLoopActionHandoffs({
+    currentReport: primary.currentReport,
+    decisions: [duplicatePredictionDecision],
+    actions: [primary.selection.action, supporting.selection.action],
+    actionMetrics: [primary.selection.actionMetric],
+  }), []);
+
+  assert.deepEqual(buildDecisionLoopActionHandoffs({
+    currentReport: primary.currentReport,
+    decisions: [supporting.selection.decision],
+    actions: [primary.selection.action, supporting.selection.action],
+    actionMetrics: [primary.selection.actionMetric, structuredClone(primary.selection.actionMetric)],
+  }), []);
+
+  assert.deepEqual(buildDecisionLoopActionHandoffs({
+    currentReport: primary.currentReport,
+    decisions: [supporting.selection.decision],
+    actions: [
+      primary.selection.action,
+      structuredClone(primary.selection.action),
+      supporting.selection.action,
+    ],
+    actionMetrics: [primary.selection.actionMetric],
+  }).map((candidate) => candidate.actionId), [supporting.selection.action.id]);
+
+  const duplicateActionLinkDecision = structuredClone(supporting.selection.decision);
+  duplicateActionLinkDecision.actionIds.push(primary.selection.action.id);
+  assert.deepEqual(buildDecisionLoopActionHandoffs({
+    currentReport: primary.currentReport,
+    decisions: [duplicateActionLinkDecision],
+    actions: [primary.selection.action, supporting.selection.action],
+    actionMetrics: [primary.selection.actionMetric],
+  }).map((candidate) => candidate.actionId), [supporting.selection.action.id]);
 });
 
 test("classification produces an explicit egress decision without pretending to enforce policy", () => {
@@ -260,6 +512,41 @@ test("current selection and report/action identities fail closed", () => {
       input.currentReport.predictionId = null;
     },
     (input) => {
+      input.currentReport.activeActivationId = null;
+    },
+    (input) => {
+      input.selection.action.reportContext = undefined;
+    },
+    (input) => {
+      input.selection.action.reportContext!.activationId = "stale-activation";
+    },
+    (input) => {
+      input.selection.actionMetric.id = "forged-action-metric";
+    },
+    (input) => {
+      input.selection.action.primaryMetricId = "forged-primary-metric";
+      input.selection.actionMetric.id = "forged-primary-metric";
+    },
+    (input) => {
+      input.selection.actionMetric.name = "";
+    },
+    (input) => {
+      (input.selection.action.reportContext as {
+        monitoringExpectedDirection: unknown;
+      }).monitoringExpectedDirection = "SIDEWAYS";
+    },
+    (input) => {
+      (input.selection.action.reportContext as {
+        monitoringCheckDate: unknown;
+      }).monitoringCheckDate = "2026-02-31";
+    },
+    (input) => {
+      input.selection.action.reportContext!.monitoringExpectedDirection = "INCREASE";
+    },
+    (input) => {
+      input.selection.action.reportContext!.monitoringCheckDate = "2026-10-15";
+    },
+    (input) => {
       input.selection.reportId = "historical-report";
     },
     (input) => {
@@ -300,11 +587,43 @@ test("current selection and report/action identities fail closed", () => {
   assert.equal(buildDecisionLoopHandoff(ambiguous).ok, false);
 });
 
+test("supporting monitoring fields fail closed when omitted or forged", () => {
+  const mutations: Array<(input: DecisionLoopHandoffInput) => void> = [
+    (input) => {
+      (input.selection.action.reportContext as {
+        monitoringExpectedDirection?: unknown;
+      }).monitoringExpectedDirection = undefined;
+    },
+    (input) => {
+      (input.selection.action.reportContext as {
+        monitoringCheckDate?: unknown;
+      }).monitoringCheckDate = undefined;
+    },
+    (input) => {
+      (input.selection.action.reportContext as {
+        monitoringExpectedDirection: unknown;
+      }).monitoringExpectedDirection = "SIDEWAYS";
+    },
+    (input) => {
+      (input.selection.action.reportContext as {
+        monitoringCheckDate: unknown;
+      }).monitoringCheckDate = "2026-02-31";
+    },
+  ];
+
+  for (const [index, mutate] of mutations.entries()) {
+    const input = supportingInput();
+    mutate(input);
+    assert.equal(buildDecisionLoopHandoff(input).ok, false, `mutation ${index}`);
+  }
+});
+
 test("exported text is normalized and individually bounded before canonical serialization", () => {
   const input = validInput();
   const action = input.currentReport.report.implementation.actions[0];
   action.title = `  Instrument\n# not an instruction ${"x".repeat(500)}\u0000`;
   input.selection.action.title = action.title;
+  input.selection.actionMetric.name = `Metric ${"z".repeat(190)}`;
   action.summary[0].text = `line one\n# injected heading <script>&\t${"y".repeat(2_000)}`;
 
   const handoff = built(input);
@@ -315,8 +634,12 @@ test("exported text is normalized and individually bounded before canonical seri
   assert.equal(handoff.canonicalContext.includes("<script>"), false);
   assert.match(handoff.canonicalContext, /\\u003cscript\\u003e\\u0026/);
   const context = JSON.parse(handoff.canonicalContext) as {
-    action: { summary: Array<{ text: string }> };
+    action: {
+      metricAssignment: { metricName: string };
+      summary: Array<{ text: string }>;
+    };
   };
+  assert.ok(context.action.metricAssignment.metricName.length <= 180);
   assert.ok(context.action.summary[0].text.length <= 360);
   assert.ok(new TextEncoder().encode(handoff.clipboardText).byteLength <= DECISION_LOOP_HANDOFF_MAX_BYTES);
 });
