@@ -142,6 +142,34 @@ def test_enforce_allowlist_allows_allowlisted_case_insensitive(seeded):
 # ============================================================================
 # UNIT — handle_new_user (the AFTER INSERT provisioner)
 # ============================================================================
+def test_handle_new_user_acl_is_auth_admin_only():
+    with _superuser_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "select "
+            "pg_catalog.has_function_privilege('anon', p.oid, 'EXECUTE'), "
+            "pg_catalog.has_function_privilege('authenticated', p.oid, 'EXECUTE'), "
+            "pg_catalog.has_function_privilege('service_role', p.oid, 'EXECUTE'), "
+            "pg_catalog.has_function_privilege("
+            "  'supabase_auth_admin', p.oid, 'EXECUTE'"
+            "), "
+            "exists ("
+            "  select 1 "
+            "  from pg_catalog.aclexplode("
+            "    coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))"
+            "  ) as acl "
+            "  where acl.grantee = 0 and acl.privilege_type = 'EXECUTE'"
+            ") "
+            "from pg_catalog.pg_proc as p "
+            "where p.oid = 'public.handle_new_user()'::regprocedure"
+        )
+        acl = cur.fetchone()
+
+    assert acl == (False, False, False, True, False), (
+        "handle_new_user must be callable only by supabase_auth_admin among "
+        f"application roles and must not inherit PUBLIC EXECUTE; got {acl}"
+    )
+
+
 def _membership_count(conn: psycopg.Connection, user_id: uuid.UUID) -> tuple[int, str | None]:
     with conn.cursor() as cur:
         cur.execute(

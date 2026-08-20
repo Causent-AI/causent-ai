@@ -16,7 +16,7 @@ import {
 import { getServerSupabase, isLocalDemo } from "@/lib/supabase-server";
 import { loadAttachedReportAsset } from "@/lib/decision-reports/assets";
 import {
-  isDecisionReportRolloutEnabled,
+  loadDecisionReportRolloutState,
   resolveOnboardingFlow,
 } from "@/lib/decision-reports/rollout";
 
@@ -55,19 +55,19 @@ export default async function OnboardingPage({
   let activationMetrics: ReportActivationMetric[] = [];
   const session = await getSession();
   const sb = await getServerSupabase();
-  const [rolloutEnabled, activeScope] = await Promise.all([
-    isDecisionReportRolloutEnabled(
+  const [rolloutState, activeScope] = await Promise.all([
+    loadDecisionReportRolloutState(
       sb,
       session.workspaceId,
       session.userId,
       isLocalDemo() && process.env.CAUSENT_DECISION_REPORT_LOCAL_ROLLOUT === "1",
-    ).catch(() => false),
+    ),
     getScope(session.workspaceId),
   ]);
   const flow = resolveOnboardingFlow({
     requestedFlow: requestedFlow ?? null,
     hasSavedReport: Boolean(requestedReportId),
-    rolloutEnabled,
+    rolloutState,
   });
 
   if (!requestedReportId && requestedFlow !== flow) {

@@ -7,8 +7,11 @@
 # Usage:
 #   scripts/deploy-recompute.sh              # preview deploy
 #   scripts/deploy-recompute.sh preview      # explicit preview deploy
-#   scripts/deploy-recompute.sh --prod       # production deploy
+#   scripts/deploy-recompute.sh --prod       # production canary, no alias promotion
 #   scripts/deploy-recompute.sh --stage-only /tmp/causent-recompute-check
+#
+# `--prod` deliberately passes `--skip-domain`. Canary the returned deployment
+# URL before using `vercel@56.0.0 promote <url> --scope "$VERCEL_ORG_ID"`.
 #
 # The stage-only form performs no network calls. It exists so CI and local
 # verification can inspect the exact upload without linking or deploying.
@@ -16,12 +19,15 @@
 # Required Vercel project env (preview + production):
 #   DATABASE_URL                 Supabase session-pooler DSN
 #   CAUSENT_RECOMPUTE_SECRET     shared secret sent by the Next.js app
+# Required local deploy context (not required by --stage-only):
+#   VERCEL_ORG_ID                exact Vercel team ID that owns causent-recompute
 #
 # The Next.js app separately needs CAUSENT_RECOMPUTE_URL,
 # CAUSENT_RECOMPUTE_SECRET, and CRON_SECRET. See api/DEPLOY.md.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+VERCEL_CLI_VERSION="56.0.0"
 MODE="${1:-preview}"
 STAGE_ONLY=0
 DEPLOY_ARGS=()
@@ -38,7 +44,7 @@ case "$MODE" in
       echo "usage: $0 [preview|--prod|--stage-only PATH]" >&2
       exit 2
     fi
-    DEPLOY_ARGS=(--prod)
+    DEPLOY_ARGS=(--prod --skip-domain)
     ;;
   --stage-only)
     if (( $# != 2 )); then
@@ -53,9 +59,14 @@ case "$MODE" in
     ;;
 esac
 
+if (( ! STAGE_ONLY )) && [[ -z "${VERCEL_ORG_ID:-}" ]]; then
+  echo "VERCEL_ORG_ID is required to link the exact Vercel team" >&2
+  exit 2
+fi
+
 if (( STAGE_ONLY )); then
   STAGE="$2"
-  if [[ -e "$STAGE" ]]; then
+  if [[ -e "$STAGE" || -L "$STAGE" ]]; then
     echo "stage path already exists: $STAGE" >&2
     exit 2
   fi
@@ -72,6 +83,7 @@ PERSISTENCE_MODULES=(
   __init__.py
   bridge.py
   recompute.py
+  worker_runtime.py
 )
 CAUSAL_MODULES=(
   __init__.py
@@ -130,6 +142,23 @@ if (( STAGE_ONLY )); then
   exit 0
 fi
 
+TARGET_VERCEL_ORG_ID="$VERCEL_ORG_ID"
+unset VERCEL_ORG_ID VERCEL_PROJECT_ID
+
+(cd "$REPO" && npm run check:recompute-config)
+
 cd "$STAGE"
-npx vercel link --yes --project causent-recompute
-npx vercel deploy "${DEPLOY_ARGS[@]}"
+npx --yes "vercel@$VERCEL_CLI_VERSION" link --yes \
+  --scope "$TARGET_VERCEL_ORG_ID" --project causent-recompute
+EXPECTED_VERCEL_ORG_ID="$TARGET_VERCEL_ORG_ID" EXPECTED_VERCEL_PROJECT="causent-recompute" \
+  node -e '
+    const fs = require("node:fs");
+    const linked = JSON.parse(fs.readFileSync(".vercel/project.json", "utf8"));
+    if (linked.orgId !== process.env.EXPECTED_VERCEL_ORG_ID ||
+        linked.projectName !== process.env.EXPECTED_VERCEL_PROJECT) {
+      console.error("linked Vercel project does not match the expected worker target");
+      process.exit(1);
+    }
+  '
+npx --yes "vercel@$VERCEL_CLI_VERSION" deploy --yes \
+  --scope "$TARGET_VERCEL_ORG_ID" "${DEPLOY_ARGS[@]}"

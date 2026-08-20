@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { loadDashboardData } from "@/lib/data/dashboard";
 import { ActionsPageClient } from "@/components/actions/ActionsPageClient";
-import { buildDecisionLoopHandoff } from "@/lib/decision-reports/loop-handoff";
+import { buildDecisionLoopActionHandoffs } from "@/lib/decision-reports/loop-handoff";
 
 // Server page: reads decisions + actions + metrics from lib/data (Supabase,
 // seed fallback) and hands them to the client child, which owns the
@@ -21,42 +21,25 @@ export default async function ActionsPage() {
     objective,
     activeDecisionReport,
   } = await loadDashboardData();
-  const activeDecision = activeDecisionReport?.decisionId
-    ? decisions.find((decision) => decision.id === activeDecisionReport.decisionId)
-    : undefined;
-  const activePrediction = activeDecisionReport?.predictionId
-    ? activeDecision?.predictions.find(
-        (prediction) => prediction.id === activeDecisionReport.predictionId,
-      )
-    : undefined;
-  const decisionLoopHandoffs =
-    activeDecisionReport && activeDecision && activePrediction
-      ? actions.flatMap((action) => {
-          if (!activeDecision.actionIds.includes(action.id)) return [];
-          const result = buildDecisionLoopHandoff({
-            currentReport: {
-              reportId: activeDecisionReport.id,
-              revisionId: activeDecisionReport.revisionId,
-              status: activeDecisionReport.status,
-              isCurrent: activeDecisionReport.isCurrent,
-              iterationNumber: activeDecisionReport.iterationNumber,
-              decisionId: activeDecisionReport.decisionId,
-              predictionId: activeDecisionReport.predictionId,
-              report: activeDecisionReport.report,
-              metricProjection: activeDecisionReport.metricProjection,
-            },
-            selection: {
-              reportId: activeDecisionReport.id,
-              revisionId: activeDecisionReport.revisionId,
-              iterationNumber: activeDecisionReport.iterationNumber,
-              decision: activeDecision,
-              prediction: activePrediction,
-              action,
-            },
-          });
-          return result.ok ? [{ actionId: action.id, handoff: result.handoff }] : [];
-        })
-      : [];
+  const decisionLoopHandoffs = buildDecisionLoopActionHandoffs({
+    currentReport: activeDecisionReport
+      ? {
+          reportId: activeDecisionReport.id,
+          revisionId: activeDecisionReport.revisionId,
+          activeActivationId: activeDecisionReport.activeActivationId,
+          status: activeDecisionReport.status,
+          isCurrent: activeDecisionReport.isCurrent,
+          iterationNumber: activeDecisionReport.iterationNumber,
+          decisionId: activeDecisionReport.decisionId,
+          predictionId: activeDecisionReport.predictionId,
+          report: activeDecisionReport.report,
+          metricProjection: activeDecisionReport.metricProjection,
+        }
+      : null,
+    decisions,
+    actions,
+    actionMetrics: metrics.map((metric) => ({ id: metric.id, name: metric.name })),
+  });
   return (
     <Suspense>
       <ActionsPageClient

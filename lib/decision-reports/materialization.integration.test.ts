@@ -375,6 +375,25 @@ test("activation atomically materializes once, reuses retries, and locks the rep
   if (loaded.ok) {
     assert.equal(loaded.saved.status, "active");
     assert.equal(loaded.saved.activation?.decisionId, first.activation.decisionId);
+    assert.deepEqual(loaded.saved.activation?.selectedMetricIds, [METRIC]);
+    assert.deepEqual(
+      new Set(loaded.saved.activation?.selectedActionSourceItemIds),
+      new Set(input.selectedActionSourceItemIds),
+    );
+    assert.equal(
+      loaded.saved.activation?.primaryLeverActionSourceItemId,
+      input.primaryLeverActionSourceItemId,
+    );
+    assert.deepEqual(
+      new Set(loaded.saved.activation?.actionBindings.map((binding) => binding.actionId)),
+      new Set(first.activation.actionIds),
+    );
+    assert.equal(
+      loaded.saved.activation?.actionBindings.find(
+        (binding) => binding.actionSourceItemId === input.primaryLeverActionSourceItemId,
+      )?.actionId,
+      first.activation.primaryLeverActionId,
+    );
   }
 
   const editAfterActivation = await saveDecisionReport(sb, WORKSPACE, {

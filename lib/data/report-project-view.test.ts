@@ -31,6 +31,7 @@ function report(): DashboardDecisionReport {
     id: "report", revisionId: "revision", title: "Report", status: "active",
     updatedAt: "2026-07-22T00:00:00Z", report: GUMMY_ALPHA_GOLDEN_EXAMPLE.report,
     metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
+    activeActivationId: "activation",
     decisionId: "report-decision", predictionId: "prediction", metricId: "metric-uuid",
     seriesId: "series", iterationNumber: 1, predecessorReportId: null,
     iterationReason: null, isCurrent: true,
@@ -47,6 +48,7 @@ test("explicit current pointer wins over report order and timestamps", () => {
     aggregatedImpact: [], impactByMetric: [],
   });
   assert.equal(view.activeReport?.id, "current");
+  assert.equal(view.activeReport?.activeActivationId, "activation");
 });
 
 test("an active report isolates every dashboard dataset to its project", () => {

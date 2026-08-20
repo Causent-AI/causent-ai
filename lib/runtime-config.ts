@@ -1,7 +1,11 @@
 export type RuntimeEnvironment = Readonly<Record<string, string | undefined>>;
 
 export type RuntimeConfigIssue = {
-  code: "missing_required" | "forbidden_production_flag" | "invalid_url";
+  code:
+    | "missing_required"
+    | "forbidden_production_flag"
+    | "invalid_url"
+    | "weak_secret";
   variable: string;
 };
 
@@ -11,7 +15,7 @@ export type RuntimeConfigValidation = {
   issues: RuntimeConfigIssue[];
 };
 
-export type ReleaseConfigTarget = "app" | "worker" | "resolver";
+export type ReleaseConfigTarget = "app" | "worker" | "resolver" | "drift";
 
 export const PRODUCTION_APP_REQUIRED_ENV = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -32,6 +36,8 @@ export const PRODUCTION_FORBIDDEN_LOCAL_FLAGS = [
 ] as const;
 
 const APP_RELEASE_REQUIRED_ENV = [
+  "CAUSENT_DRIFT_URL",
+  "CAUSENT_DRIFT_SECRET",
   "CAUSENT_RECOMPUTE_URL",
   "CAUSENT_RECOMPUTE_SECRET",
   "CAUSENT_RESOLVE_URL",
@@ -48,6 +54,43 @@ const RESOLVER_RELEASE_REQUIRED_ENV = [
   "DATABASE_URL",
   "CAUSENT_RESOLVE_SECRET",
 ] as const;
+
+const DRIFT_RELEASE_REQUIRED_ENV = [
+  "DATABASE_URL",
+  "CAUSENT_DRIFT_SECRET",
+] as const;
+
+const APP_RELEASE_SECRET_ENV = [
+  "CAUSENT_DRIFT_SECRET",
+  "CAUSENT_RECOMPUTE_SECRET",
+  "CAUSENT_RESOLVE_SECRET",
+  "CRON_SECRET",
+] as const;
+
+const PLACEHOLDER_SECRET_MARKERS = [
+  "changeme",
+  "replaceme",
+  "placeholder",
+  "notsecure",
+  "insecure",
+  "password",
+  "letmein",
+  "dummy",
+  "example",
+  "sample",
+  "testonly",
+  "testsecret",
+  "yoursecret",
+  "secretvalue",
+  "defaultsecret",
+] as const;
+
+const MIN_HEX_SECRET_LENGTH = 64;
+const MIN_ENCODED_SECRET_LENGTH = 43;
+const MIN_SECRET_UNIQUE_CHARACTERS = 12;
+const MIN_ESTIMATED_SECRET_BITS = 180;
+const SUPABASE_PROJECT_REF = /^[a-z0-9]{20}$/;
+const SUPAVISOR_HOST = /(?:^|\.)pooler\.supabase\.com$/;
 
 function value(env: RuntimeEnvironment, variable: string): string {
   return env[variable]?.trim() ?? "";
@@ -83,16 +126,85 @@ function pushInvalidPostgresUrl(
   issues: RuntimeConfigIssue[],
   env: RuntimeEnvironment,
   variable: string,
+  expectedRole: string,
 ): void {
   const candidate = value(env, variable);
   if (!candidate) return;
   try {
-    const protocol = new URL(candidate).protocol;
-    if (protocol !== "postgres:" && protocol !== "postgresql:") {
+    const parsed = new URL(candidate);
+    const protocol = parsed.protocol;
+    const hostname = parsed.hostname.toLowerCase();
+    const database = parsed.pathname.replace(/^\/+/, "");
+    const usernamePrefix = `${expectedRole}.`;
+    const projectRef = parsed.username.startsWith(usernamePrefix)
+      ? parsed.username.slice(usernamePrefix.length)
+      : "";
+    const localHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local");
+    if (
+      (protocol !== "postgres:" && protocol !== "postgresql:") ||
+      !SUPAVISOR_HOST.test(hostname) ||
+      parsed.port !== "5432" ||
+      database !== "postgres" ||
+      !parsed.password ||
+      !SUPABASE_PROJECT_REF.test(projectRef) ||
+      localHost ||
+      parsed.searchParams.size !== 1 ||
+      parsed.searchParams.get("sslmode") !== "require"
+    ) {
       issues.push({ code: "invalid_url", variable });
     }
   } catch {
     issues.push({ code: "invalid_url", variable });
+  }
+}
+
+/**
+ * This is a release guard, not an entropy oracle. It accepts the documented
+ * `openssl rand -hex 32` shape and similarly dense non-hex encodings of at
+ * least 32 random bytes, while rejecting obvious placeholders and repetition.
+ */
+function isStrongReleaseSecret(candidate: string): boolean {
+  const normalized = candidate.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (
+    PLACEHOLDER_SECRET_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /^(.{1,16})\1+$/.test(candidate)
+  ) {
+    return false;
+  }
+
+  const hex = /^[0-9a-f]+$/i.test(candidate);
+  if (candidate.length < (hex ? MIN_HEX_SECRET_LENGTH : MIN_ENCODED_SECRET_LENGTH)) {
+    return false;
+  }
+
+  const counts = new Map<string, number>();
+  for (const character of candidate) {
+    counts.set(character, (counts.get(character) ?? 0) + 1);
+  }
+  if (counts.size < MIN_SECRET_UNIQUE_CHARACTERS) return false;
+
+  const estimatedBits = [...counts.values()].reduce((bits, count) => {
+    const probability = count / candidate.length;
+    return bits - probability * Math.log2(probability) * candidate.length;
+  }, 0);
+  return estimatedBits >= MIN_ESTIMATED_SECRET_BITS;
+}
+
+function pushWeakSecrets(
+  issues: RuntimeConfigIssue[],
+  env: RuntimeEnvironment,
+  variables: readonly string[],
+): void {
+  for (const variable of variables) {
+    const candidate = value(env, variable);
+    if (candidate && !isStrongReleaseSecret(candidate)) {
+      issues.push({ code: "weak_secret", variable });
+    }
   }
 }
 
@@ -139,13 +251,37 @@ export function validateReleaseConfig(
   if (target === "worker") {
     const issues: RuntimeConfigIssue[] = [];
     pushMissing(issues, env, WORKER_RELEASE_REQUIRED_ENV);
-    pushInvalidPostgresUrl(issues, env, "DATABASE_URL");
+    pushInvalidPostgresUrl(
+      issues,
+      env,
+      "DATABASE_URL",
+      "causent_recompute_worker",
+    );
+    pushWeakSecrets(issues, env, ["CAUSENT_RECOMPUTE_SECRET"]);
     return { ok: issues.length === 0, production: true, issues };
   }
   if (target === "resolver") {
     const issues: RuntimeConfigIssue[] = [];
     pushMissing(issues, env, RESOLVER_RELEASE_REQUIRED_ENV);
-    pushInvalidPostgresUrl(issues, env, "DATABASE_URL");
+    pushInvalidPostgresUrl(
+      issues,
+      env,
+      "DATABASE_URL",
+      "causent_resolve_worker",
+    );
+    pushWeakSecrets(issues, env, ["CAUSENT_RESOLVE_SECRET"]);
+    return { ok: issues.length === 0, production: true, issues };
+  }
+  if (target === "drift") {
+    const issues: RuntimeConfigIssue[] = [];
+    pushMissing(issues, env, DRIFT_RELEASE_REQUIRED_ENV);
+    pushInvalidPostgresUrl(
+      issues,
+      env,
+      "DATABASE_URL",
+      "causent_drift_worker",
+    );
+    pushWeakSecrets(issues, env, ["CAUSENT_DRIFT_SECRET"]);
     return { ok: issues.length === 0, production: true, issues };
   }
 
@@ -155,7 +291,9 @@ export function validateReleaseConfig(
   });
   const issues = [...runtime.issues];
   pushMissing(issues, env, APP_RELEASE_REQUIRED_ENV);
+  pushInvalidHttpsUrl(issues, env, "CAUSENT_DRIFT_URL");
   pushInvalidHttpsUrl(issues, env, "CAUSENT_RECOMPUTE_URL");
   pushInvalidHttpsUrl(issues, env, "CAUSENT_RESOLVE_URL");
+  pushWeakSecrets(issues, env, APP_RELEASE_SECRET_ENV);
   return { ok: issues.length === 0, production: true, issues };
 }

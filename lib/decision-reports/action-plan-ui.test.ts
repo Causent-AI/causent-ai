@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   formatMetricReadinessDetail,
   isSupportingActionForMonitoring,
+  resolveDecisionReportActionSelection,
 } from "./action-plan-ui.ts";
 
 test("metric readiness keeps the latest native value and percent scale compact", () => {
@@ -55,4 +56,55 @@ test("metric readiness remains honest when no observation exists", () => {
 test("monitoring context belongs only to supporting actions", () => {
   assert.equal(isSupportingActionForMonitoring("support", "primary"), true);
   assert.equal(isSupportingActionForMonitoring("primary", "primary"), false);
+});
+
+test("an active report uses canonical source-item bindings instead of action UUIDs", () => {
+  assert.deepEqual(
+    resolveDecisionReportActionSelection({
+      active: true,
+      reportActionSourceItemIds: ["report-action-1", "report-action-2"],
+      draftSelectedActionSourceItemIds: [],
+      draftPrimaryActionSourceItemId: null,
+      activationSelectedActionSourceItemIds: ["report-action-1", "report-action-2"],
+      activationPrimaryActionSourceItemId: "report-action-2",
+    }),
+    {
+      selectedActionIds: ["report-action-1", "report-action-2"],
+      primaryActionId: "report-action-2",
+    },
+  );
+});
+
+test("a legacy active report does not infer a primary action when the audit has none", () => {
+  assert.deepEqual(
+    resolveDecisionReportActionSelection({
+      active: true,
+      reportActionSourceItemIds: ["report-action-1", "report-action-2"],
+      draftSelectedActionSourceItemIds: ["report-action-1"],
+      draftPrimaryActionSourceItemId: "report-action-1",
+      activationSelectedActionSourceItemIds: ["report-action-1", "report-action-2"],
+      activationPrimaryActionSourceItemId: null,
+    }),
+    {
+      selectedActionIds: ["report-action-1", "report-action-2"],
+      primaryActionId: "",
+    },
+  );
+});
+
+test("a new report includes every suggested action and keeps its draft primary", () => {
+  assert.deepEqual(
+    resolveDecisionReportActionSelection({
+      active: false,
+      reportActionSourceItemIds: ["report-action-1", "report-action-2"],
+      draftSelectedActionSourceItemIds: ["report-action-2"],
+      draftPrimaryActionSourceItemId: "report-action-2",
+      activationSelectedActionSourceItemIds: [],
+      activationPrimaryActionSourceItemId: null,
+    }),
+    {
+      selectedActionIds: ["report-action-1", "report-action-2"],
+      primaryActionId: "report-action-2",
+    },
+  );
 });

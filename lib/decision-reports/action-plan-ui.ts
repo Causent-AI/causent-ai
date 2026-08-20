@@ -1,6 +1,42 @@
 import { formatMetricValue } from "../format.ts";
 import type { ReportActivationMetric } from "./materialization.ts";
 
+export type DecisionReportActionSelectionInput = {
+  active: boolean;
+  reportActionSourceItemIds: string[];
+  draftSelectedActionSourceItemIds: string[];
+  draftPrimaryActionSourceItemId: string | null;
+  activationSelectedActionSourceItemIds: string[];
+  activationPrimaryActionSourceItemId: string | null;
+};
+
+export type DecisionReportActionSelection = {
+  selectedActionIds: string[];
+  primaryActionId: string;
+};
+
+/**
+ * Report actions are keyed by their stable source-item identity. Canonical
+ * action UUIDs belong to the materialized graph and must never be compared to
+ * these editor keys.
+ */
+export function resolveDecisionReportActionSelection(
+  input: DecisionReportActionSelectionInput,
+): DecisionReportActionSelection {
+  const hasCanonicalActivation =
+    input.active && input.activationSelectedActionSourceItemIds.length > 0;
+  const selectedActionIds = hasCanonicalActivation
+    ? [...input.activationSelectedActionSourceItemIds]
+    : input.active
+      ? [...input.draftSelectedActionSourceItemIds]
+      : [...input.reportActionSourceItemIds];
+  const primaryActionId = hasCanonicalActivation
+    ? input.activationPrimaryActionSourceItemId ?? ""
+    : input.draftPrimaryActionSourceItemId ?? selectedActionIds[0] ?? "";
+
+  return { selectedActionIds, primaryActionId };
+}
+
 type MetricReadinessDetail = Pick<
   ReportActivationMetric,
   | "unit"

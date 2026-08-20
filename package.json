@@ -17,10 +17,12 @@
     "check:release-config": "node scripts/check-release-config.mjs app",
     "check:recompute-config": "node scripts/check-release-config.mjs worker",
     "check:resolve-config": "node scripts/check-release-config.mjs resolver",
+    "check:drift-config": "node scripts/check-release-config.mjs drift",
     "check:dashboard-build": "node scripts/check-dashboard-build.mjs",
     "check:query-plans": "bash scripts/check-hot-query-plans.sh",
+    "test:load-contract": "node --test load/contract.test.mjs",
     "load:smoke": "CAUSENT_LOAD_ACK=I_UNDERSTAND_STAGING_LOAD CAUSENT_LOAD_ENV=local CAUSENT_LOAD_PROFILE=smoke k6 run load/causent-mvp.js",
-    "load:inspect": "k6 inspect load/causent-mvp.js",
+    "load:inspect": "CAUSENT_LOAD_ACK=I_UNDERSTAND_STAGING_LOAD CAUSENT_LOAD_ENV=local CAUSENT_LOAD_PROFILE=smoke k6 inspect load/causent-mvp.js",
     "scale:plan": "python3 engine/persistence/scale_fixture.py --profile gigabyte"
   },
   "dependencies": {

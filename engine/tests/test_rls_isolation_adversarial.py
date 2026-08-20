@@ -23,7 +23,7 @@ import uuid
 
 import psycopg
 import pytest
-from psycopg import errors as pgerr
+from psycopg import errors as pgerr, sql
 
 DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
@@ -268,6 +268,99 @@ def test_anon_sees_no_rows(seeded):
     with as_anon() as conn, conn.cursor() as cur:
         for m in (M_C1A, M_C1B, M_C2, M_D):
             assert _visible_metrics(cur, m) == 0, "anon LEAK: unauthenticated read"
+
+
+# --- Privileged-function ACLs: anon must not reach SECURITY DEFINER code ------
+def test_anon_cannot_execute_any_public_security_definer_function():
+    with _su() as conn, conn.cursor() as cur:
+        cur.execute(
+            "select p.oid::regprocedure::text "
+            "from pg_catalog.pg_proc as p "
+            "join pg_catalog.pg_namespace as n on n.oid = p.pronamespace "
+            "where n.nspname = 'public' "
+            "and p.prosecdef "
+            "and pg_catalog.has_function_privilege('anon', p.oid, 'EXECUTE') "
+            "order by 1"
+        )
+        reachable = [row[0] for row in cur.fetchall()]
+
+    assert reachable == [], (
+        "anon can execute public SECURITY DEFINER functions: "
+        + ", ".join(reachable)
+    )
+
+
+def test_role_rank_has_fixed_search_path_and_denies_anon():
+    with _su() as conn, conn.cursor() as cur:
+        cur.execute(
+            "select "
+            "coalesce(p.proconfig, array[]::text[]) @> "
+            "array['search_path=\"\"'], "
+            "pg_catalog.has_function_privilege('anon', p.oid, 'EXECUTE'), "
+            "pg_catalog.has_function_privilege('authenticated', p.oid, 'EXECUTE'), "
+            "pg_catalog.has_function_privilege('service_role', p.oid, 'EXECUTE') "
+            "from pg_catalog.pg_proc as p "
+            "where p.oid = 'public.role_rank(text)'::regprocedure"
+        )
+        acl = cur.fetchone()
+
+    assert acl == (True, False, True, True), (
+        "role_rank must use an empty search_path, deny anon, and remain "
+        f"available to authenticated/service roles; got {acl}"
+    )
+
+    with as_anon(autocommit=False) as conn, conn.cursor() as cur:
+        with pytest.raises(pgerr.InsufficientPrivilege):
+            cur.execute("select public.role_rank('viewer')")
+        conn.rollback()
+
+
+def test_new_postgres_security_definer_functions_default_closed():
+    """The postgres owner's default ACL must deny both PUBLIC and anon.
+
+    DDL is transactional in Postgres, so the probe never survives this test.
+    The effective anon check catches either a direct anon grant or an inherited
+    PUBLIC grant; the ACL expansion identifies those grants explicitly too.
+    """
+    probe_name = f"causent_acl_default_probe_{uuid.uuid4().hex}"
+    conn = psycopg.connect(DSN)
+    conn.autocommit = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL(
+                    "create function public.{}() returns integer "
+                    "language sql security definer set search_path = '' "
+                    "as 'select 1'"
+                ).format(sql.Identifier(probe_name))
+            )
+            cur.execute(
+                "select owner.rolname, "
+                "pg_catalog.has_function_privilege('anon', p.oid, 'EXECUTE'), "
+                "exists ("
+                "  select 1 "
+                "  from pg_catalog.aclexplode("
+                "    coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))"
+                "  ) as acl "
+                "  left join pg_catalog.pg_roles as grantee "
+                "    on grantee.oid = acl.grantee "
+                "  where acl.privilege_type = 'EXECUTE' "
+                "    and (acl.grantee = 0 or grantee.rolname = 'anon')"
+                ") "
+                "from pg_catalog.pg_proc as p "
+                "join pg_catalog.pg_roles as owner on owner.oid = p.proowner "
+                "where p.oid = pg_catalog.to_regprocedure(%s)",
+                (f"public.{probe_name}()",),
+            )
+            probe_acl = cur.fetchone()
+
+        assert probe_acl == ("postgres", False, False), (
+            "new postgres-owned public SECURITY DEFINER function inherited "
+            f"PUBLIC/anon EXECUTE: {probe_acl}"
+        )
+    finally:
+        conn.rollback()
+        conn.close()
 
 
 # --- UPDATE-side cross-tenant move: WITH CHECK on the destination scope --------

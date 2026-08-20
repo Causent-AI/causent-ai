@@ -20,12 +20,16 @@ SPEC.loader.exec_module(api)
 SECRET = "drift-test-secret"
 SCOPE = "ca5e0000-0000-0000-0000-000000000071"
 SCOPE_UUID = UUID(SCOPE)
+DATABASE_URL = (
+    "postgresql://causent_drift_worker.abcdefghijklmnopqrst:test-password@"
+    "aws-0-us-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
+)
 
 
 @pytest.fixture(autouse=True)
 def secret(monkeypatch):
     monkeypatch.setenv("CAUSENT_DRIFT_SECRET", SECRET)
-    monkeypatch.setenv("DATABASE_URL", "postgresql://worker.example/postgres")
+    monkeypatch.setenv("DATABASE_URL", DATABASE_URL)
 
 
 def test_fails_closed_before_drain(monkeypatch):
@@ -53,6 +57,25 @@ def test_requires_explicit_database_url_after_auth(monkeypatch, capsys):
         "service": "causent-drift",
         "status": 503,
     }
+
+
+def test_rejects_wrong_database_role_before_drain(monkeypatch, capsys):
+    called = False
+
+    def drain(*_):
+        nonlocal called
+        called = True
+        return []
+
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        DATABASE_URL.replace("causent_drift_worker", "causent_recompute_worker"),
+    )
+    status, body = api.handle_request(b"{}", SECRET, drain=drain)
+    assert status == 503
+    assert body == {"error": "worker not configured", "detail": "DATABASE_URL_INVALID"}
+    assert called is False
+    assert "test-password" not in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

@@ -43,6 +43,73 @@ only that subset before authenticated RLS, Storage, provenance-receipt, recomput
 successor-isolation canaries. The 122-row Northstar fixture is local-only synthetic data and must
 never be production-seeded.
 
+The 2026-08-18/19 release run supersedes that operational snapshot. After isolated persistent
+with-data and disposable worker-role rehearsals, production Supabase `royftsqyawtyfjolfabd` advanced
+from 11 to **42/42 migrations**. The first 41 used the same controlled phases. Phase A applied 20 migrations. All eight parent/hot
+indexes built concurrently outside migration transactions are ready, valid, and live. Phase B1
+applied six migrations. Phase B2's owner drain returned exactly
+`(processed_count=0, last_activation_id=NULL, has_more=false)`. Phase B3 validated all 17 targeted
+constraints and left zero invalid. Phase B4 left one activation v1, v2, and v3 overload present and
+removed the rollout-only backfill function. The ACL migration then applied. The last successful
+migration dry-run through 41 reported the remote database up to date. Migration 42 then passed a full
+local reset, disposable-clone Supavisor rehearsal, and production apply. Its local/production role
+catalog checks and error-level schema lint pass, and a serialized post-42 dry-run reports the remote
+database up to date.
+
+Migration `20260819044116_harden_security_definer_function_acl.sql` closes a privileged-function ACL
+regression found in the cloned catalog. Seventeen public SECURITY DEFINER functions were still
+effectively executable by `anon`, primarily because owner/default privileges survived older
+schema-local revokes. The migration revokes function execute from PUBLIC and `anon` in both the
+`postgres` owner default and current privileged catalog; explicitly restores only the RLS helpers'
+authenticated/service access; sets `role_rank(text)` to an empty search path; and grants
+`handle_new_user()` only to `supabase_auth_admin`. A transactional probe proves that a newly created
+`postgres`-owned SECURITY DEFINER function does not inherit anonymous execution, and the migration
+aborts if any current public SECURITY DEFINER function remains anonymous-executable. Production now
+has 37 public SECURITY DEFINER functions: `anon` executes 0/37 and 37/37 use the fixed empty search
+path. Regression tests cover the catalog invariant, future default, comparator ACL/search path, and
+auth trigger ACL. Supabase's leaked-password-protection advisor remains a separate platform warning.
+
+Migration 42 is the applied least-privilege contract for the three stateful workers. It creates
+passwordless `NOLOGIN`, `NOINHERIT` roles and clears rehearsal memberships/grants before installing
+the exact graph:
+
+- `causent_drift_worker` has `BYPASSRLS`, can select/update only `private.drift_refresh_jobs`, can
+  read the bounded detector inputs, and can insert/delete only the derived
+  `public.current_prediction_drift` projection.
+- `causent_recompute_worker` has `BYPASSRLS`, can select/update only
+  `private.causal_recompute_jobs`, read the immutable target relations, and update only the target
+  primary-key columns needed for `SELECT ... FOR UPDATE`. Its `authenticated` membership is
+  SET-only and non-inherited so graph work can switch to the stored actor's existing RLS identity.
+- `causent_resolve_worker` has no `BYPASSRLS`, direct application-table grant, or private-schema
+  access. Its sole application capability is the same SET-only, non-inherited `authenticated`
+  membership for the supplied actor's RLS sweep.
+
+No worker can assume or inherit `service_role`. The catalog regression suite enumerates role
+attributes, memberships, schema/table/column/sequence grants, effective access, queue separation,
+and auth/storage denial; it passes 8/8 locally, and the production catalog checks pass. The
+disposable-clone Supavisor login rehearsal passed and its credentials were disabled afterward.
+Production enables `LOGIN` with separate generated passwords without widening those contracts, and
+each exact role was verified through the `aws-1` session pooler. Production worker DSNs use these
+target-specific Supavisor forms:
+
+```text
+postgresql://causent_drift_worker.royftsqyawtyfjolfabd:<NONEMPTY_PASSWORD>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+postgresql://causent_recompute_worker.royftsqyawtyfjolfabd:<NONEMPTY_PASSWORD>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+postgresql://causent_resolve_worker.royftsqyawtyfjolfabd:<NONEMPTY_PASSWORD>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+The runtime guard requires exact `<role>.<20-character-project-ref>` usernames, a nonempty password,
+a matching `*.pooler.supabase.com` host, port `5432`, database `postgres`, and only
+`sslmode=require`. It rejects `postgres.<ref>`, `service_role.<ref>`, local/direct database hosts,
+port `6543`, and cross-worker role reuse. Each DSN is stored only in that worker's Sensitive
+`DATABASE_URL`; all three are configured and have been exercised by the promoted workers through
+the application's authorized cron canaries.
+
+Schema activation created no `decision_report_rollouts` assignment, loaded no production seed, and
+did not rotate the database password. The billable rehearsal branch should be deleted once its
+evidence is no longer needed. A later single-user, single-workspace rollout was deliberately added
+for authenticated acceptance and remains enabled; no broad rollout or production seed is claimed.
+
 Slice 8 adds a private `decision-report-assets` bucket and the `report_assets` lifecycle table.
 Application roles have scoped SELECT only; checked security-definer RPCs reserve, attach, detach,
 and abandon metadata at member rank. Storage policies allow only matching pending uploads,
@@ -72,8 +139,10 @@ views rather than deleted.
 Slice 9 adds `decision_report_rollouts`, keyed by workspace and authenticated user. A user may read
 only their own assignment when they also have viewer access to the workspace. Authenticated roles
 have no insert, update, or delete grant, so assignment and rollback remain operator-managed through
-the service role or direct SQL. Unassigned and lookup-failure users fail closed to legacy onboarding;
-the table does not own or mutate durable report state.
+the service role or direct SQL. Current application policy treats an absent row for an authenticated
+user as the current Decision Report onboarding, while an explicit `enabled=false` row or a lookup
+failure selects legacy. This 2026-08-19 source change does not alter the table, RLS, grants, or durable
+report state; it makes the row an explicit rollback override instead of a required opt-in.
 
 Slice 10 adds `decision_report_series` plus report lineage columns. Each report belongs to one
 workspace-bound linear series; a partial unique index permits only one non-deleted direct successor.
@@ -111,7 +180,15 @@ full eligible workspace action family.
 The stateful recompute deployment path is intentionally separate from the app. The network-free
 `scripts/deploy-recompute.sh --stage-only` verification produces an 18-file Python 3.12 bundle with
 exact NumPy/psycopg versions and a 300-second function limit; nine recompute-function tests pass.
-No Vercel project was linked and no worker was deployed in this run.
+That earlier source checkpoint linked no Vercel project and deployed no worker. The current operator
+inventory now confirms that drift, recompute, and resolve projects exist with matching strong
+Sensitive app/worker secrets and app URLs, plus a rotated cron secret. Their exact role-specific
+Supavisor `DATABASE_URL` values are stored Sensitive and their production logins/catalogs pass. Drift
+deployment `dpl_5a5BFfP86YxCjWGBhMX3Z3iF64po`, recompute
+`dpl_2PAG63un8RvuXTDAyCJYMyGCYKFK`, and resolve
+`dpl_2pra4r5dHLiPvPpKP92Qk8ojphMM` are promoted on dedicated domains. App-candidate cron canaries
+passed for resolve (4/4 predictions), drift (generation 4), recompute (0), connector (0), and
+reconciliation (two registered workspaces, 0).
 
 Source provenance v2 remains inside the append-only, RLS-protected revision snapshot rather than a
 new public source table. Each brief/URL/PDF summary carries bounded chunks, locators, extracted text,
@@ -154,9 +231,9 @@ contract rather than one production-sized transaction:
 The operator runbook at `supabase/rollouts/decision_report_multi_metric_activation.md` builds the
 three parent identity indexes concurrently outside the migration transaction, rehearses and drains
 the bounded backfill, and keeps v1/v2 callers live until the final contract phase. The reset-safe
-index statements in the expand migration are fallbacks for new/empty databases. A production-clone
-rehearsal is still required; the split design is not evidence that its lock time is acceptable at
-material volume.
+index statements in the expand migration are fallbacks for new/empty databases. The current 13 MiB
+production-data clone rehearsal and phased production apply passed, but that is still not evidence
+that lock time is acceptable at material or projected volume.
 
 `activate_decision_report_v3` accepts one to five unique selected daily metrics and one to twenty-five
 unique selected report actions, requires exactly one selected-metric assignment for every action,
@@ -221,9 +298,17 @@ even though the synthetic organization owner can otherwise read both workspaces.
 owns report/revision consistency, immutable receipt hashing, action/metric bindings, current-pointer
 movement, exact retry, and rollback behavior.
 
-The historical upgrade still requires a production-clone dry run before remote apply. Apply the
-database phases first and the v3 application second; roll back the application to v1/v2 first and do
-not remove the append-only audit rows or validated constraints. The companion
+Application fix `85860dc` changes no database object. It validates the viewer-scoped normalized
+activation metric/action rows when loading an active report and uses those rows, rather than a stale
+or empty snapshot projection, for selected metrics, the primary source action, and canonical action
+bindings. Active action **Open** controls now navigate directly to the validated canonical action and
+do not call activation again. Focused regression tests pass 21/21 and the local materialization
+integration passes 4/4.
+
+The current small production-data clone rehearsal and production schema apply passed, but
+representative-volume lock/query evidence remains open. Future v3 application releases must pass
+their worker/config canaries; roll back the application to v1/v2 first if needed and do not remove the
+append-only audit rows or validated constraints. The companion
 `docs/reviews/2026-08-16-engineering-schema-scale-review.md` still concludes that integrity is suitable
 for the partner MVP but 10,000 active users/hour over gigabytes is not capacity-proven. The unbounded
 dashboard/history contract, representative query plans, hosted worker capacity, pool budget, and
@@ -231,12 +316,14 @@ staging load/soak evidence remain open.
 
 `20260817055415_materialize_current_prediction_drift.sql` moves baseline drift off the dashboard
 request path. Private `drift_refresh_jobs` coalesce source changes by workspace and generation;
-service-role workers lease with bounded attempts and replace only the matching generation of
+dedicated workers lease with bounded attempts and replace only the matching generation of
 viewer-readable `current_prediction_drift`. The public `get_current_prediction_drift_v1` RPC returns
 at most 500 rows for the explicit workspace and exposes sanitized queued/current/retrying/failed
 freshness metadata. Authenticated users have SELECT only; application roles cannot mutate the queue
-or projection. The separate worker endpoint, database URL, shared secret, and five-minute app cron
-still require deployment and authenticated canaries.
+or projection. The separate worker endpoint, dedicated database role/URL, shared secret, and
+five-minute app cron are deployed and configured; the initial application candidate's authorized
+drift cron processed generation 4 for one workspace. The later controlled authenticated report loop passes;
+representative-load evidence remains open.
 
 `20260817055412_connector_webhook_inbox.sql` adds a service-only durable connector inbox. The checked
 RPC identifies one GitHub/Jira delivery by provider ID plus SHA-256 payload digest, records attempt and
@@ -260,7 +347,10 @@ scope/methodology/edge/time, and open lever reconciliation. The canonical reset 
 idempotent ordinary DDL; `scripts/query-plans/create-hot-indexes-concurrently.sql` is the
 production-clone preflight for online builds. `scripts/query-plans/hot-read-paths.sql` runs the five
 queries as an authenticated fixture user. Plans against representative volume are pending, and these
-indexes do not close the separately deferred unbounded dashboard contract.
+indexes do not close the separately deferred unbounded dashboard contract. On the 13 MiB production-
+data clone, three of five reads used the expected indexes; the actions and evidence reads used
+sequential scans, and the evidence read took roughly 60–87 ms. That small-catalog choice is not a
+failure by itself, but it leaves the representative-volume plan/load gate open.
 
 The private-image schema and sanitation contract are unchanged. The application read route now
 authorizes the asset metadata by exact workspace/status and optional content hash, then issues a
@@ -293,21 +383,58 @@ The RPC creates no lever, causal edge, evidence object, observation, or impact c
 Application roles can read activation audit rows through RLS but cannot insert, update,
 or delete them directly.
 
-## Current local verdict
+## Current release verdict
 
-**The product/science/engineering hardening schema and its exact local combined gate pass; production
-release is not claimed.** The clean reset replayed every migration and reseeded both workspaces.
-Warning-level schema lint passed with four pre-existing advisories. The credentialed application/
-Supabase/RLS/Storage suite reported 660 total, 641 passed, 19 intentional live-model skips, and zero
-failures; the full Python engine/bridge/isolation suite passed 1,251/1,251. Authenticated hot-query
+**Production is at 42/42; the fixed application and all three workers are live for one controlled
+rollout.** The rehearsed phases were applied to `royftsqyawtyfjolfabd`: 20 Phase A
+migrations, eight ready/valid/live concurrent indexes,
+six Phase B1 migrations, the zero-row B2 drain, 17 valid B3 constraints, B4 contract with v1/v2/v3
+and no rollout backfill, then ACL hardening and the dedicated worker-role migration. Migration 42's
+apply, role catalog, error-level lint, and serialized post-42 dry-run all pass.
+Error-level lint passes across
+`public`/`private`/`storage`, `anon` executes 0/37 public SECURITY DEFINER functions, and 37/37 have
+an empty search path. No rollout assignment or seed was added, and no password rotation occurred,
+during schema activation. One later controlled rollout remains enabled after authenticated
+acceptance; no broad rollout or release-run seed is claimed.
+
+**The product/science/engineering hardening schema through migration 42 and its refreshed exact local
+combined gate pass.** The clean reset replayed every migration and
+reseeded both workspaces. Local worker-role tests pass 8/8 and error-level schema lint passes. The
+credentialed application/Supabase/RLS/Storage suite reports 671 total, 652 passed, 19 intentional
+live-model skips, and zero failures; the full Python engine/bridge/isolation suite passes
+1,290/1,290. Authenticated hot-query
 EXPLAINs, the deterministic 1.19 GiB fixture plan, Next.js 16.2.11 webpack build, dashboard guard,
 desktop/390 px browser acceptance, and final diff audit passed. Browser QA also found and fixed a
-collapsed Actions commitment card before publication.
+collapsed Actions commitment card before publication. The disposable-clone Supavisor rehearsal and
+production role catalog/pooler access also pass; clone credentials were disabled afterward.
 
-The k6 profiles and scale fixture remain instruments only. Protected staging/soak execution,
-representative-volume plans, production-clone migration rehearsal, hosted drift/recompute workers,
-remote migration application, production CDN/egress behavior, and authenticated canaries remain
-pending. This is not evidence for 10,000 active users/hour.
+The workers are deployed and their point-in-time cron canaries pass. Initial app candidate
+`dpl_GC2TDZGLx6DijqGwgEXfxgMVn6ai` passed public/cron canaries and was promoted for authenticated
+acceptance. That pass exposed an active-report binding regression, so the alias was restored to
+verified artifact `dpl_FCGWhLDt7oZsMp1preohuNt1gTww`. Fix `85860dc` validates normalized activation
+bindings and removes the activation write from active **Open** navigation. Hosted CI run
+`32287053300` completed successfully for that fix. Replacement deployment
+`dpl_8twnZ3dwtahoCF6tLiejEFgMJCUL` passed public and authenticated canaries and now serves
+`app.causent.ai`; PR #32 remains draft. Shared secrets were rotated; no value is recorded here.
+
+The authenticated run activated iteration 1 with two metrics and three actions, completed the
+decision package, and activated three sequential successors. Post-fix direct links showed the exact
+primary/support metric bindings without changing activation, telemetry, or recompute counters.
+Cleanup soft-removed iterations 4, 3, and 2 through the checked UI path and returned the visible
+current pointer to iteration 1; the removed iteration-4 direct link failed closed, all four product
+tabs and the current direct link loaded, and checked browser development logs were empty. A later
+privileged read-only audit confirmed that each removed successor retains its revisions, activation,
+decision, prediction, canonical actions, decision-action links, and action-metric bindings. The
+current iteration-1 action set is disjoint from every removed-successor set. Iteration 4 retains one
+activation, the scoped activation-event count remains four, no recompute job exists for it, and the
+controlled rollout remains enabled.
+
+The k6 profiles and scale fixture remain instruments only. The source now requires a durable external
+session broker, but that broker has not been implemented, audited, or configured, so protected
+staging/soak execution is operator-blocked. Representative-volume plans, production CDN/egress
+behavior, private-image delivery/reattachment, provider-specific connectors, and terminal resolution
+after the due date plus sufficient post-intervention observations remain pending. This is not
+evidence for 10,000 active users/hour.
 
 ### Historical checkpoint before this hardening round
 
@@ -434,23 +561,32 @@ blocked while legitimate within-rank grants still succeed.
   `CAUSENT_RECOMPUTE_SECRET`. The worker switches to the queued actor's authenticated RLS identity
   before graph access, but secret handling, pooler configuration, failure monitoring, and rotation
   remain deployment responsibilities. Jobs stop retrying after the bounded failure ceiling and need
-  operator visibility.
+  operator visibility. The release check now rejects weak/repetitive/placeholder shared secrets
+  without logging their values. Matching strong Sensitive app/worker secrets and exact role-specific
+  Supavisor DSNs are configured; migration/catalog/pooler checks pass; the deployment is promoted;
+  and its zero-job cron canary passed. The authenticated report loop passes; queue-under-load and a
+  terminal result after the due date plus sufficient post-intervention observations remain open.
 - **Provenance v2 deliberately retains extracted text.** Raw URL responses and PDF bytes are not
   stored, but bounded source chunks remain inside append-only revisions so later claims are auditable.
   Soft deletion removes authenticated visibility; physical retention/garbage-collection policy still
   needs the same operator discipline as other retained audit history.
-- **Expanded Slice 10, the MVP finish, Review #2, and the 2026-08-17 hardening migrations are not
-  production-verified.** The previously listed seven migrations plus the split multi-metric,
-  scientific-contract, connector-inbox, drift-projection, chunked-import, and hot-index migrations
-  need exact remote-history comparison, production-clone rehearsal, deliberate partner-environment
-  application, and authenticated RLS/Storage/recompute/drift/import/connector canaries. The app
-  also needs a server-only service-role key for receipt minting, and the recompute app/worker secrets
-  must pass their release checks. The production app currently lacks the service-role and recompute
-  settings; the new drift worker needs its URL/secret/database configuration;
-  `causent-recompute` does not exist; and `causent-resolve` lacks `DATABASE_URL`. The app
-  release check now requires the resolve URL/secret, and the resolver must pass its dedicated
-  `DATABASE_URL`/secret config check. Passing local reset is not production evidence.
-- **The gate is a point-in-time result** against the seeded fixture. The current hardening tree has
-  not completed its coordinated local gate or produced a hosted CI result. Prior webpack/manifest
-  and browser acceptance remain useful historical product evidence, but they do not verify this
-  source and cannot replace staging capacity or authenticated partner-environment database canaries.
+- **Expanded Slice 10, the MVP finish, Review #2, and the schema through migration 42 are live for
+  one controlled rollout.** Schema activation added no rollout assignment or seed; a later scoped
+  rollout remains enabled after authenticated acceptance.
+  Private-Storage delivery/reattachment, provider-specific connector behavior, terminal resolution,
+  and representative-volume lock/query plans remain open. The app has a Sensitive server-only service-role key and no
+  stale demo date; all three stateful worker projects, matching Sensitive app/worker secrets, app
+  URLs, rotated cron secret, separate production role credentials, and exact Sensitive role-specific
+  `DATABASE_URL` values exist. All three workers are promoted and five app cron canaries passed.
+  Fixed deployment `dpl_8twnZ3dwtahoCF6tLiejEFgMJCUL` serves `app.causent.ai`, and the controlled
+  authenticated report loop plus reverse-order successor cleanup pass.
+- **Protected staging load is broker-blocked.** The source validates
+  `CAUSENT_STAGING_SESSION_POOL_URL`, a high-entropy `CAUSENT_STAGING_SESSION_POOL_TOKEN`, durable
+  allocation-set/profile lease envelopes, real Supabase session lineage, disjoint single-use
+  sessions, and an adversarial foreign positive control. The external broker is not implemented,
+  audited, or configured, so no live capacity or load-isolation result exists.
+- **The gates are point-in-time results.** The earlier coordinated local product gate, production
+  schema activation, and worker cron canaries verify different artifacts. Hosted CI run
+  `32287053300` completed successfully for `85860dc`; PR #32 remains draft. The authenticated report
+  loop does not replace protected staging capacity, private-image/provider canaries, terminal
+  resolution evidence, founder review, or the PR merge gate.

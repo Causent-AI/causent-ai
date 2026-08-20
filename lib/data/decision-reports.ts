@@ -15,6 +15,7 @@ export type DashboardDecisionReport = {
   updatedAt: string;
   report: DecisionReportV1;
   metricProjection: MetricProjection;
+  activeActivationId: string | null;
   decisionId: string | null;
   predictionId: string | null;
   metricId: string | null;
@@ -30,6 +31,7 @@ type ReportRow = {
   title: string;
   status: DashboardDecisionReport["status"];
   current_revision_id: string | null;
+  active_activation_id: string | null;
   active_decision_id: string | null;
   active_prediction_id: string | null;
   active_metric_id: string | null;
@@ -70,7 +72,7 @@ export const getDecisionReports = cache(async function getDecisionReports(scopeI
   const reportsRes = await sb
     .from("decision_reports")
     .select(
-      "report_id, title, status, current_revision_id, active_decision_id, " +
+      "report_id, title, status, current_revision_id, active_activation_id, active_decision_id, " +
         "active_prediction_id, active_metric_id, updated_at, series_id, iteration_number, " +
         "predecessor_report_id, iteration_reason",
     )
@@ -110,6 +112,7 @@ export const getDecisionReports = cache(async function getDecisionReports(scopeI
       updatedAt: row.updated_at,
       report: report.data,
       metricProjection: projection.data,
+      activeActivationId: row.active_activation_id,
       decisionId: row.active_decision_id,
       predictionId: row.active_prediction_id,
       metricId: row.active_metric_id,
