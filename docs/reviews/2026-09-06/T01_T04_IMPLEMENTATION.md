@@ -76,7 +76,7 @@ No dependencies were added and no license review is claimed. Existing statistica
 | Schema and bundles | [Replay](verification-t01-t04/migration-final-replay.log), [lint](verification-t01-t04/schema-lint-final.log), [bundles](verification-t01-t04/worker-bundles-final.log) | Final replay and checks passed; no deployment |
 | Local browser | [Browser record and inspected screenshots](verification-t01-t04/BROWSER.md) | CSV/history, Actions/Impact/Reports and workspace switching passed in local demo mode |
 
-The 19 skipped tests explicitly require live model credentials; they are not counted as passes. No database integration test skipped. Live GitHub replay, authenticated browser acceptance, partner validation, production catalog parity, production load/lock duration and restore acceptance were not performed. Hosted checks will be assessed on the pushed draft PR separately.
+The 19 skipped tests explicitly require live model credentials; they are not counted as passes. No database integration test skipped. Live GitHub replay, authenticated browser acceptance, partner validation, production catalog parity, production load/lock duration and restore acceptance were not performed. Exact implementation-commit CI and both preview builds passed; runtime preview acceptance remains incomplete. See [hosted verification and blocker](HOSTED_VERIFICATION.md).
 
 ## Reproduce without touching a shared database
 

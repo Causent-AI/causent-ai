@@ -61,3 +61,11 @@ Logs and acceptance matrix will be linked as checks complete. No implementation 
 - Final diff review confirmed no statistical-model, recompute-cache, exposure, metric-definition, tenancy or deferred P2 changes. Added a UI regression proving canonical same-number PRs keep distinct UUID keys and readable labels. Existing demo deep links are preserved.
 - Engineering implementation, acceptance matrix, operations/rollback guidance, read-only identity audit and four editable/rendered diagrams are prepared. Superseded setup logs were retained only in the temporary working folder; published evidence retains final results and material query-plan diagnostics.
 - Rechecked remote main at `2c2b1bf`. Ready for explicit-path commit, push and draft PR, followed by exact-commit hosted verification and final document delivery.
+
+## Pushed draft and hosted findings
+
+- Implementation commit `98f8697e347a74fcf243eab5f502f9c9de6aacf6` pushed to `codex/t01-t04-integrity`. Draft PR **33** opened against main: https://github.com/Causent-AI/causent-ai/pull/33.
+- Exact-commit CI run **34083916927 passed** all application, DB, engine, worker and build gates. Both Vercel preview build statuses are successful and their deployments are READY.
+- Browser acceptance is more limited: `causent` preview fails because `NEXT_PUBLIC_SUPABASE_URL` is absent (confirmed by runtime log, not an inferred schema failure). `causent-ai` preview reaches sign-in without browser errors. No live/shared schema or environment mutation was performed. Authenticated hosted acceptance remains blocked on a separately configured/migrated preview environment.
+- No actionable inline comments or submitted reviews were present. PR remains draft. A documentation-only follow-up records these results and will receive the same hosted checks.
+- Final editable Markdown, DOCX, inspected render, diagram sources and native Google Doc are being delivered in the task artifact folder. This progress record is linked to `HOSTED_VERIFICATION.md`; the final artifact records the final PR head and document links.
