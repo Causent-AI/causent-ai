@@ -72,17 +72,14 @@ from __future__ import annotations
 
 import json
 import os
-from bisect import bisect_left
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 import numpy as np
 from psycopg import Connection
 
 from persistence.bridge import (
-    _load_metric,
-    persist_lever_cluster_readout,
     persist_metric_readouts,
 )
 
@@ -442,222 +439,154 @@ def resolve_prediction(
     ).fetchone()
     if row is None:
         return ResolutionResult(
-            pid, "SKIPPED_NOT_VISIBLE", None,
+            pid,
+            "SKIPPED_NOT_VISIBLE",
+            None,
             "prediction not visible under this connection's RLS scope",
         )
-    (scope_id, decision_id, metric_id, predicted_direction,
-     magnitude_pct_mean, resolution_date, resolved_verdict) = row
+    (
+        scope_id,
+        decision_id,
+        metric_id,
+        predicted_direction,
+        magnitude_pct_mean,
+        resolution_date,
+        resolved_verdict,
+    ) = row
 
     if resolved_verdict is not None and resolved_verdict in TERMINAL_VERDICTS:
         return ResolutionResult(
-            pid, "SKIPPED_ALREADY_RESOLVED", resolved_verdict,
+            pid,
+            "SKIPPED_ALREADY_RESOLVED",
+            resolved_verdict,
             "terminal verdict already written; re-run is a no-op",
         )
     if not force and resolution_date > today:
         return ResolutionResult(
-            pid, "SKIPPED_NOT_DUE", None,
+            pid,
+            "SKIPPED_NOT_DUE",
+            None,
             f"due {resolution_date.isoformat()}",
         )
 
-    decision_package = _decision_package_for_prediction(conn, pid)
-    is_decision_package = decision_package is not None
-    levers = (
-        [decision_package.intervention_action]
-        if decision_package is not None and decision_package.intervention_action is not None
-        else [] if is_decision_package else _levers_for(conn, decision_id, metric_id)
-    )
-    features = _reference_class_features(conn, decision_id, metric_id)
-
-    tuple_base = {
-        "predicted_direction": predicted_direction,
-        "predicted_magnitude_pct": float(magnitude_pct_mean),
-        **features,
-        "decision_id": str(decision_id),
-        "metric_id": str(metric_id),
-    }
-    if is_decision_package:
-        tuple_base.update({
-            "causal_object": "decision_package",
-            "intervention_rule": "latest_effective_included_action",
-            "individual_attribution": False,
-            "registered_primary_action_id": str(
-                decision_package.registered_primary_action_id
-            ),
-            "intervention_action_id": (
-                None if decision_package.intervention_action is None
-                else str(decision_package.intervention_action.action_id)
-            ),
-            "intervention_date": (
-                None if decision_package.intervention_action is None
-                else decision_package.intervention_action.effective_date.isoformat()
-            ),
-            "included_action_ids": [
-                str(action_id) for action_id in decision_package.included_action_ids
-            ],
-            "package_hash": decision_package.package_hash,
-            "package_completed_at": (
-                None if decision_package.completed_at is None
-                else decision_package.completed_at.isoformat()
-            ),
-        })
-
-    if is_decision_package and decision_package.intervention_action is None:
-        verdict = "GATHERING"
-        extended = today + timedelta(days=GATHERING_EXTENSION_DAYS)
-        conn.execute(
-            "update public.predictions set resolved_verdict = 'GATHERING', "
-            "resolution_date = %s, resolved_edge_id = null, resolution_tuple = %s "
-            "where prediction_id = %s",
-            (
-                extended,
-                json.dumps({**tuple_base, "verdict": verdict}),
-                pid,
-            ),
-        )
-        conn.commit()
-        return ResolutionResult(
-            pid,
-            "GATHERING",
-            verdict,
-            "decision package is incomplete — no intervention event exists yet",
-        )
-
-    # A declared metric that never received observations cannot be measured —
-    # say so BEFORE any ITS runs (C1/#14 added the verdict; C4 routes it).
-    metric_meta = conn.execute(
-        "select m.source, exists(select 1 from public.metric_observations o "
-        "where o.metric_id = m.metric_id) "
-        "from public.metrics m where m.metric_id = %s",
-        (metric_id,),
+    activation = conn.execute(
+        "select activation_id,action_ids,primary_lever_action_id from public.decision_report_activations "
+        "where prediction_id=%s and scope_id=%s and metric_id=%s",
+        (pid, scope_id, metric_id),
     ).fetchone()
-    if metric_meta is not None:
-        metric_source, has_observations = metric_meta
-        if metric_source == "declared" and not has_observations:
-            verdict = "UNMEASURABLE_NO_METRIC"
-            _write_terminal(conn, pid, None, verdict, {**tuple_base, "verdict": verdict})
+    if activation is None:
+        legacy_levers = _levers_for(conn, decision_id, metric_id)
+        metadata = conn.execute(
+            "select source,exists(select 1 from public.metric_observations where metric_id=%s) from public.metrics where metric_id=%s",
+            (metric_id, metric_id),
+        ).fetchone()
+        disposition = (
+            "UNMEASURABLE_NO_METRIC"
+            if metadata and metadata[0] == "declared" and not metadata[1]
+            else pre_verdict(legacy_levers, today)
+        )
+        if disposition in ("VOIDED", "UNATTRIBUTED", "UNMEASURABLE_NO_METRIC"):
+            _write_terminal(
+                conn,
+                pid,
+                None,
+                disposition,
+                {
+                    "verdict": disposition,
+                    "interpretation": "cannot_attribute",
+                    "individual_attribution": False,
+                    "ai_attribution": False,
+                },
+            )
             conn.commit()
             return ResolutionResult(
-                pid, "RESOLVED", verdict,
-                "declared metric has no observations — nothing to measure against",
+                pid,
+                "RESOLVED",
+                disposition,
+                "No completed, measurable registered intervention",
             )
-
-    early = pre_verdict(levers, today)
-    if early is not None:
-        details = {
-            "UNATTRIBUTED": "no lever mapped — nothing to measure",
-            "VOIDED": "no lever shipped by the resolution date "
-                      "(unshipped or DROPPED)",
-            "UNRESOLVABLE": (
-                f"shipped-lever ships span {ship_span_days(shipped_levers(levers, today))} "
-                f"days > MAX_CLUSTER_SPAN_DAYS={MAX_CLUSTER_SPAN_DAYS} — "
-                "the co-occurrence premise fails; refusing to force one breakpoint"
-            ),
-        }
-        _write_terminal(conn, pid, None, early, {**tuple_base, "verdict": early})
-        conn.commit()
-        return ResolutionResult(pid, "RESOLVED", early, details[early])
-
-    shipped = shipped_levers(levers, today)
-
-    # Measure only the explicitly shipped levers for this prediction. The
-    # surrounding resolution transaction owns the commit so graph evidence and
-    # the verdict cannot land separately.
-    persist_metric_readouts(
+    targets = (
+        list(activation[1])
+        if activation
+        else [lever.action_id for lever in _levers_for(conn, decision_id, metric_id)]
+    )
+    inputs, evaluation_id = persist_metric_readouts(
         conn,
         scope_id,
         metric_id,
-        action_ids=[lever.action_id for lever in shipped],
+        activation_id=activation[0] if activation else None,
+        action_ids=targets,
+        today=today,
         commit=False,
     )
-
-    if decision_package is not None and decision_package.intervention_action is not None:
-        # The complete plan is one causal object. Its latest effective included
-        # action supplies timing only; no action receives individual credit.
-        intervention = decision_package.intervention_action
-        edge = _load_edge_state(
-            conn,
-            scope_id,
-            "ACTION",
-            intervention.action_id,
-            metric_id,
-        )
-        intervention_date = intervention.effective_date
-    elif len(shipped) == 1:
-        # Single lever — the unchanged single-intervention path.
-        lever = shipped[0]
-        tuple_base["lever_action_id"] = str(lever.action_id)
-        tuple_base["lever_ref"] = lever.ref
-        edge = _load_edge_state(conn, scope_id, "ACTION", lever.action_id, metric_id)
-        intervention_date = lever.effective_date
-    else:
-        # Multi-lever — cluster overlay: one intervention at the earliest ship,
-        # resolved against the CLUSTER -> METRIC edge (C4/#17).
-        tuple_base["lever_action_ids"] = [str(lv.action_id) for lv in shipped]
-        tuple_base["lever_refs"] = [lv.ref for lv in shipped]
-        tuple_base["ship_span_days"] = ship_span_days(shipped)
-        cluster_id = persist_lever_cluster_readout(
-            conn,
-            scope_id,
-            metric_id,
-            [lv.action_id for lv in shipped],
-            commit=False,
-        )
-        tuple_base["cluster_id"] = None if cluster_id is None else str(cluster_id)
-        edge = (
-            None if cluster_id is None
-            else _load_edge_state(conn, scope_id, "CLUSTER", cluster_id, metric_id)
-        )
-        intervention_date = shipped[0].effective_date
-
-    # The scoring denominator: the exact pre-window the ITS saw for this
-    # intervention (the cluster's window opens at the earliest lever ship).
-    metric = _load_metric(conn, metric_id)
-    denom = None
-    if metric is not None and intervention_date is not None:
-        split = bisect_left(metric.ordinals, intervention_date.toordinal())
-        denom = pre_window_mean_for(metric.series.values, split)
-
-    predicted_native = predicted_native_value(
-        float(magnitude_pct_mean), predicted_direction, denom
+    interpretation = (
+        "waiting"
+        if inputs.resume_at
+        else "cannot_attribute"
+        if inputs.refusal
+        else "observational"
     )
-    verdict = verdict_for(edge, predicted_direction, predicted_native)
-
-    measured_pct = None
-    if edge is not None and edge.lift is not None and denom:
-        measured_pct = edge.lift / abs(denom) * 100.0
-
+    verdict = (
+        "GATHERING"
+        if inputs.resume_at
+        else "UNRESOLVABLE"
+        if inputs.refusal
+        else "INCONCLUSIVE"
+    )
+    edge = (
+        _load_edge_state(conn, scope_id, "ACTION", inputs.primary_action, metric_id)
+        if inputs.primary_action
+        else None
+    )
+    plan = inputs.manifest["plan"]
+    baseline = [
+        float(v)
+        for d, v in inputs.observations
+        if v is not None and plan and d.isoformat() < plan["exposure_start"]
+    ]
+    denominator = sum(baseline) / len(baseline) if baseline else None
     memory_tuple = {
-        **tuple_base,
-        "predicted_native": predicted_native,
-        "pre_window_mean": denom,
-        "measured_direction": edge.direction if edge else None,
+        "decision_id": str(decision_id),
+        "metric_id": str(metric_id),
+        "activation_id": str(activation[0]) if activation else None,
+        "evaluation_id": str(evaluation_id),
+        "input_hash": inputs.input_hash,
+        "interpretation": interpretation,
+        "refusal_reason": inputs.refusal,
+        "estimand": "immediate_level_change",
+        "individual_attribution": False,
+        "ai_attribution": False,
+        "predicted_direction": predicted_direction,
+        "predicted_magnitude_pct": float(magnitude_pct_mean),
+        "pre_window_mean": denominator,
         "measured_lift": edge.lift if edge else None,
-        "measured_pct": measured_pct,
+        "measured_pct": edge.lift / abs(denominator) * 100
+        if edge and edge.lift is not None and denominator
+        else None,
         "ci_low": edge.ci_low if edge else None,
         "ci_high": edge.ci_high if edge else None,
-        "belief_score": edge.belief_score if edge else None,
         "belief_reason": edge.belief_reason if edge else None,
         "verdict": verdict,
+        "exposure_start": plan["exposure_start"] if plan else None,
+        "window_end": plan["window_end"] if plan else None,
     }
     edge_id = edge.edge_id if edge else None
-
-    if verdict == "GATHERING":
-        extended = today + timedelta(days=GATHERING_EXTENSION_DAYS)
+    if inputs.resume_at:
         conn.execute(
-            "update public.predictions set resolved_verdict = 'GATHERING', "
-            "resolution_date = %s, resolved_edge_id = %s, resolution_tuple = %s "
-            "where prediction_id = %s",
-            (extended, edge_id, json.dumps(memory_tuple), pid),
+            "update public.predictions set resolved_verdict='GATHERING',resolution_date=%s, "
+            "resolved_edge_id=%s,resolution_tuple=%s where prediction_id=%s",
+            (inputs.resume_at, edge_id, json.dumps(memory_tuple), pid),
         )
-        conn.commit()
-        return ResolutionResult(
-            pid, "GATHERING", "GATHERING",
-            f"not yet measurable — resolution_date extended to {extended.isoformat()}",
-        )
-
-    _write_terminal(conn, pid, edge_id, verdict, memory_tuple)
+    else:
+        _write_terminal(conn, pid, edge_id, verdict, memory_tuple)
     conn.commit()
-    return ResolutionResult(pid, "RESOLVED", verdict, f"edge {edge_id}")
+    return ResolutionResult(
+        pid,
+        "GATHERING" if inputs.resume_at else "RESOLVED",
+        verdict,
+        inputs.refusal
+        or "Observational change only; work and AI attribution are unidentified",
+    )
 
 
 def _write_terminal(

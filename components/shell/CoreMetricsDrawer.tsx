@@ -36,7 +36,8 @@ function formatRate(value: number | null): string {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
-function rateTone(value: number | null, higherIsBetter: boolean): string {
+function rateTone(value: number | null, higherIsBetter: boolean, desiredDirection?: string): string {
+  if (desiredDirection === "unknown" || desiredDirection === "neutral") return "text-[var(--neutral)]";
   if (value === null || Math.abs(value) < 0.0001) return "text-[var(--text-subtle)]";
   return (value > 0) === higherIsBetter
     ? "text-[var(--pos)]"
@@ -260,6 +261,7 @@ export function CoreMetricsDrawer({
                           view={view}
                           color={m.color}
                           format={m.format}
+                          percentScale={m.percentScale}
                           flags={selectedChoice?.role === "report" ? flagsForMetric(m.color, flagWindow) : []}
                         />
                       </div>
@@ -310,12 +312,12 @@ export function CoreMetricsDrawer({
                             ) : null}
                           </div>
                           <span className={`text-right font-semibold tabular-nums text-[var(--text)] ${selected ? "text-[15px]" : "text-[12px]"}`}>
-                            {current === undefined ? "—" : formatMetricValue(current, m.format)}
+                            {current === undefined ? "—" : formatMetricValue(current, m.format, m.percentScale)}
                           </span>
-                          <span className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(wow, m.higherIsBetter)}`}>
+                          <span className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(wow, m.higherIsBetter, m.beneficialDirection)}`}>
                             {formatRate(wow)}
                           </span>
-                          <span className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(mom, m.higherIsBetter)}`}>
+                          <span className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(mom, m.higherIsBetter, m.beneficialDirection)}`}>
                             {formatRate(mom)}
                           </span>
                         </div>

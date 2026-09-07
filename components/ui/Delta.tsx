@@ -20,7 +20,7 @@ export function Delta({
 }: {
   direction: Direction;
   label: string;
-  good: boolean;
+  good: boolean | null;
   size?: "xs" | "sm" | "md";
   className?: string;
   // "neutral" forces the neutral/slate color while keeping the directional glyph
@@ -28,7 +28,7 @@ export function Delta({
   // glyph + label still carry the direction; only the hue is held neutral.
   tone?: "auto" | "neutral";
 }) {
-  const isNeutral = direction === "neutral" || tone === "neutral";
+  const isNeutral = direction === "neutral" || tone === "neutral" || good === null;
   const color = isNeutral
     ? "text-[var(--neutral)]"
     : good

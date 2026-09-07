@@ -79,7 +79,7 @@ export function MetricHistoryExplorer({
   const hasObservations = context.totalObservations > 0;
   const currentValue = context.latestValue === null
     ? "—"
-    : formatMetricValue(context.latestValue, metric.format);
+    : formatMetricValue(context.latestValue, metric.format, metric.percentScale);
   const currentDate = context.latestDate
     ? formatLongDate(context.latestDate)
     : "No observations connected";
@@ -234,6 +234,7 @@ export function MetricHistoryExplorer({
                   series={view.levels}
                   color={metric.color}
                   format={metric.format}
+                  percentScale={metric.percentScale}
                   flags={flags}
                   height={180}
                   xTicks={4}
@@ -243,6 +244,7 @@ export function MetricHistoryExplorer({
                   view={view}
                   color={metric.color}
                   format={metric.format}
+                  percentScale={metric.percentScale}
                   flags={flags}
                 />
               )}

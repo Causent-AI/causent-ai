@@ -82,6 +82,7 @@ cp "$REPO/api/drift.py" "$STAGE/api/"
 PERSISTENCE_MODULES=(
   __init__.py
   bridge.py
+  measurement.py
   drift_materialization.py
   drift_read.py
   worker_runtime.py

@@ -20,21 +20,16 @@ export function deriveCurrentReportImpact(
   metrics: Metric[],
   primaryActionId: string | null,
 ): Pick<ReportProjectView, "aggregatedImpact" | "impactByMetric"> {
-  const packageInterventionActionId = actions.find(
-    (action) =>
-      action.reportContext?.causalObject === "decision_package" &&
-      action.reportContext.isPackageIntervention,
-  )?.id ?? null;
-  const causalActionId = packageInterventionActionId ?? primaryActionId;
+  const causalActionId = primaryActionId;
   const causalCells = actions
     .filter((action) => action.id === causalActionId)
     .flatMap((action) =>
       action.impact.filter(
-        (cell) => cell.evidence === "causal" && cell.value !== null,
+        (cell) => (cell.evidence === "observational" || cell.evidence === "causal") && cell.value !== null,
       ),
     );
   const confidentGood = causalCells.filter((cell) => cell.good).length;
-  const confident = causalCells.length;
+  const confident = causalCells.filter((cell) => cell.good !== null).length;
 
   const impactByMetric = metrics.map((metric): MetricImpact => {
     const value = causalCells
@@ -49,7 +44,7 @@ export function deriveCurrentReportImpact(
         ? formatImpactMagnitude(value, metric.format)
         : "—",
       direction,
-      good:
+      good: metric.beneficialDirection === "unknown" || metric.beneficialDirection === "neutral" ? null :
         direction === "neutral" ||
         (direction === "up") === metric.higherIsBetter,
     };
@@ -60,9 +55,9 @@ export function deriveCurrentReportImpact(
     : null;
   return {
     aggregatedImpact: [{
-      label: "Improvement Rate",
+      label: "Observed improvement",
       value: winRate === null ? "—" : `${winRate}%`,
-      comparison: `${confidentGood} / ${confident} confident readouts for this report`,
+      comparison: `${confidentGood} / ${confident} observational readouts with a defined desired direction`,
       tone: winRate === null ? "plain" : winRate >= 50 ? "positive" : "negative",
     }],
     impactByMetric,

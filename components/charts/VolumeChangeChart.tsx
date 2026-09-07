@@ -60,11 +60,13 @@ export function VolumeChangeChart({
   view,
   color,
   format,
+  percentScale = "points",
   flags = [],
 }: {
   view: PreparedSeriesView;
   color: string;
   format: MetricFormat;
+  percentScale?: "ratio" | "points" | "unknown";
   flags?: SeriesFlag[];
 }) {
   const rateValues = [...view.wow, ...view.mom].flatMap(({ value }) =>
@@ -150,7 +152,7 @@ export function VolumeChangeChart({
       <div className="mt-1 flex items-center justify-between border-t border-[var(--border)] pt-1.5 text-[10px]">
         <span className="font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Metric level</span>
         <span className="tabular-nums text-[var(--text-muted)]">
-          Current <strong className="text-[var(--text)]">{latestLevel === undefined ? "—" : formatMetricValue(latestLevel, format)}</strong>
+          Current <strong className="text-[var(--text)]">{latestLevel === undefined ? "—" : formatMetricValue(latestLevel, format, percentScale)}</strong>
         </span>
       </div>
       <svg

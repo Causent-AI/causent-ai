@@ -5,6 +5,7 @@
 import type { ImpactCell, Metric, MetricFormat } from "../types.ts";
 import { formatCount, formatCurrencyDelta, formatPpDelta } from "../format.ts";
 import { directionFromEdge, isConfident, isGoodOutcome } from "./config.ts";
+import { measurementReason } from "../metrics/measurement.ts";
 import type { EdgeReadout } from "./graph.ts";
 
 /** Signed magnitude label per metric format. Mirrors lib/derive.ts. */
@@ -25,14 +26,10 @@ function directionFromValue(value: number): "up" | "down" | "neutral" {
   return "neutral";
 }
 
-/** CSV percentages commonly arrive as ratios (0.31 = 31%). Existing seeded
- * percentage metrics use points (31 = 31%), so infer the display scale from the
- * connected series rather than silently rounding a real 3.1pp shift to 0.0pp. */
+/** Convert only an explicitly declared ratio; observed magnitude is not a unit. */
 function displayValue(value: number, metric: Metric): number {
   if (
-    metric.format === "percent" &&
-    metric.series.length > 0 &&
-    metric.series.every((observation) => Math.abs(observation.value) <= 1)
+    metric.format === "percent" && metric.percentScale === "ratio"
   ) {
     return value * 100;
   }
@@ -52,6 +49,10 @@ function displayOptionalValue(
  * mean shift may appear only as an explicitly descriptive preliminary readout.
  */
 export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): ImpactCell {
+  if (metric.definitionId === null || metric.percentScale === "unknown") {
+    return { ...neutralCell(metric.id), good: null,
+      detail: "Confirm this metric's definition before interpreting its effect." };
+  }
   const provenance = edge?.provenance === undefined ? {} : {
     evaluationId: edge.evaluationId,
     provenance: edge.provenance,
@@ -64,6 +65,12 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
     }[edge.provenance];
     return { ...neutralCell(metric.id), detail };
   }
+  if (edge?.interpretation === "cannot_attribute" || edge?.interpretation === "waiting") {
+    return { ...neutralCell(metric.id), good: null, detail: measurementReason(edge.refusalReason) };
+  }
+  if (edge?.interpretation === "legacy_unverified") {
+    return { ...neutralCell(metric.id), good: null, detail: "Historical result has no registered measurement contract." };
+  }
   if (edge && isConfident(edge.dbDirection, edge.beliefScore) && edge.lift != null) {
     const direction = directionFromEdge(edge.dbDirection);
     const value = displayValue(edge.lift, metric);
@@ -72,8 +79,10 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
       direction,
       value,
       label: formatImpactMagnitude(value, metric.format),
-      good: isGoodOutcome(direction, metric.higherIsBetter),
-      evidence: "causal",
+      good: metric.beneficialDirection === "neutral" || metric.beneficialDirection === "unknown"
+        ? null : isGoodOutcome(direction, metric.higherIsBetter),
+      evidence: "observational",
+      detail: "Observed level change around registered exposure. Work and AI contribution are not identified.",
       readout: {
         ...provenance,
         methodology: "ITS",
@@ -103,9 +112,10 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
       direction,
       value,
       label: formatImpactMagnitude(value, metric.format),
-      good: isGoodOutcome(direction, metric.higherIsBetter),
+      good: metric.beneficialDirection === "neutral" || metric.beneficialDirection === "unknown"
+        ? null : isGoodOutcome(direction, metric.higherIsBetter),
       evidence: "descriptive",
-      detail: `Preliminary 14-day before/after mean shift. Not a causal claim; gathering data for ITS.${overlap}`,
+      detail: `Preliminary 14-day before/after mean shift. Not an attribution claim; statistical confidence is limited.${overlap}`,
       readout: {
         ...provenance,
         methodology: "BEFORE_AFTER_14D",

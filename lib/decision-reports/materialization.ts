@@ -9,6 +9,7 @@ import type { MetricFormat } from "../types.ts";
 import { UUID_PATTERN } from "./persistence.ts";
 
 export type ReportMetricReadiness =
+  | "Confirm metric definition"
   | "Ready to monitor"
   | "Needs data"
   | "Causal window not ready";
@@ -19,7 +20,7 @@ export type ReportActivationMetric = {
   source: string;
   unit: string | null;
   format: MetricFormat;
-  percentScale: "ratio" | "points";
+  percentScale: "ratio" | "points" | "unknown";
   hasObservations: boolean;
   lastObservationDate: string | null;
   lastObservationValue: number | null;
@@ -88,7 +89,7 @@ type MetricRow = {
   pre_history_days: number;
   readiness: ReportMetricReadiness;
   earliest_confident_review_date: string;
-  percent_scale: "ratio" | "points";
+  percent_scale: "ratio" | "points" | "unknown";
 };
 
 function validUuid(value: unknown): value is string {
@@ -314,7 +315,7 @@ export async function loadReportActivationMetrics(
       source: row.source,
       unit: row.unit,
       format: formatFromUnit(row.unit),
-      percentScale: row.percent_scale === "ratio" ? "ratio" : "points",
+      percentScale: row.percent_scale === "ratio" || row.percent_scale === "points" ? row.percent_scale : "unknown",
       hasObservations: row.has_observations === true,
       lastObservationDate: row.last_observation_date,
       lastObservationValue:
@@ -328,6 +329,7 @@ export async function loadReportActivationMetrics(
       ),
       preHistoryDays: Math.max(0, Math.floor(Number(row.pre_history_days) || 0)),
       readiness: [
+        "Confirm metric definition",
         "Ready to monitor",
         "Needs data",
         "Causal window not ready",

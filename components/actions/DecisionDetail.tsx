@@ -28,7 +28,6 @@ import { CheckIcon, ChevronIcon } from "@/components/ui/icons";
 import type { Claim, DecisionReportV1, DraftAction } from "@/lib/decision-reports/schema";
 import { calculateNativePredictionTarget } from "@/lib/decision-reports/prediction-calibration";
 import {
-  inferMetricPercentScale,
   latestMetricValueAt,
   reportExecutionState,
   signedCommitmentLabel,
@@ -290,11 +289,11 @@ function ReportCommitmentHeader({
   const baselineNative = prediction && metric
     ? latestMetricValueAt(metric.series, prediction.committedAt)
     : null;
-  const nativeTarget = prediction && metric
+  const nativeTarget = prediction && metric && metric.definitionId !== null
     ? calculateNativePredictionTarget({
         baselineNative,
         format: metric.format,
-        percentScale: inferMetricPercentScale(metric.format, metric.series),
+        percentScale: metric.percentScale ?? "unknown",
         direction: prediction.direction,
         magnitudePctMean: prediction.magnitudePctMean,
       })

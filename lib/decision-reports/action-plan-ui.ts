@@ -59,11 +59,8 @@ export function formatMetricReadinessDetail(metric: MetricReadinessDetail): stri
       metric.lastObservationValue !== null &&
       Number.isFinite(metric.lastObservationValue)
     ) {
-      const displayValue = metric.format === "percent" && metric.percentScale === "ratio"
-        ? metric.lastObservationValue * 100
-        : metric.lastObservationValue;
       latestObservation =
-        `Last ${formatMetricValue(displayValue, metric.format)} on ${metric.lastObservationDate}`;
+        `Last ${formatMetricValue(metric.lastObservationValue, metric.format, metric.percentScale)} on ${metric.lastObservationDate}`;
     } else {
       latestObservation = `Last ${metric.lastObservationDate}`;
     }

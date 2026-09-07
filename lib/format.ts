@@ -44,12 +44,12 @@ export function formatCount(value: number): string {
 }
 
 /** Render a metric's absolute value per its format. */
-export function formatMetricValue(value: number, format: MetricFormat): string {
+export function formatMetricValue(value: number, format: MetricFormat, percentScale: "ratio" | "points" | "unknown" = "points"): string {
   switch (format) {
     case "currency":
       return formatCurrencyCompact(value);
     case "percent":
-      return formatPercent(value);
+      return percentScale === "unknown" ? `${value} (scale unconfirmed)` : formatPercent(percentScale === "ratio" ? value * 100 : value);
     case "count":
       return formatCount(value);
   }

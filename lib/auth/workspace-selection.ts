@@ -5,10 +5,31 @@ import {
 } from "../data/config.ts";
 
 export type AccessibleWorkspace = {
-  id: DemoWorkspaceId;
+  id: string;
   project: string;
   workspace: string;
 };
+
+/** Rows have already passed request-scoped RLS; names never determine access. */
+export function mapAccessibleWorkspaces(
+  rows: readonly AccessibleWorkspaceRow[],
+): AccessibleWorkspace[] {
+  return rows.map((row) => ({
+    id: row.workspace_id,
+    project: row.projects?.name ?? "Project",
+    workspace: row.name,
+  })).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+export function selectAccessibleWorkspaceId(
+  requestedWorkspaceId: unknown,
+  accessibleWorkspaceIds: readonly string[],
+): string | null {
+  if (typeof requestedWorkspaceId === "string" && accessibleWorkspaceIds.includes(requestedWorkspaceId)) {
+    return requestedWorkspaceId;
+  }
+  return [...accessibleWorkspaceIds].sort()[0] ?? null;
+}
 
 export type AccessibleWorkspaceRow = {
   workspace_id: string;

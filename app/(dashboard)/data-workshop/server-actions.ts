@@ -147,6 +147,12 @@ export async function importWorkspaceMetricCsvAction(
     scopeId: session.workspaceId,
     name,
     unit,
+    definition: {
+      numericScale: formData.get("numericScale"),
+      beneficialDirection: formData.get("beneficialDirection"),
+      aggregation: formData.get("aggregation"),
+      denominator: formData.get("denominator"),
+    },
     observations: parsed.observations,
     authoredBy: session.userId,
   });

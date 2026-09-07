@@ -33,6 +33,9 @@ export type Metric = {
   series: Observation[];
   /** For a metric, is "up" good? churn/support-tickets are inverted. */
   higherIsBetter: boolean;
+  beneficialDirection?: "higher" | "lower" | "neutral" | "unknown";
+  percentScale?: "ratio" | "points" | "unknown";
+  definitionId?: string | null;
 };
 
 /**
@@ -63,9 +66,9 @@ export type ImpactCell = {
   /** Pre-formatted display label, e.g. "+$120K", "+3.1pp", "—". */
   label: string;
   /** Whether this cell is a positive business outcome (accounts for inverted metrics). */
-  good: boolean;
+  good: boolean | null;
   /** Causal is authoritative ITS; descriptive is the preliminary 14-day cross-check. */
-  evidence?: "causal" | "descriptive";
+  evidence?: "causal" | "descriptive" | "observational";
   /** Honest UI qualifier for preliminary or otherwise non-authoritative readouts. */
   detail?: string;
   /** Evidence-window detail for honest confidence and sample-size presentation. */
@@ -135,6 +138,13 @@ export type PredictionVerdict =
  *  Written by engine/persistence/resolve.py; all fields optional because a
  *  GATHERING / UNMEASURABLE_NO_METRIC tuple carries no measured side. */
 export type ResolutionTuple = {
+  interpretation?: "observational" | "cannot_attribute" | "waiting" | "legacy_unverified";
+  refusal_reason?: string | null;
+  ai_attribution?: false;
+  evaluation_id?: string;
+  input_hash?: string;
+  exposure_start?: string | null;
+  window_end?: string | null;
   causal_object?: "decision_package" | null;
   intervention_rule?: "latest_effective_included_action" | null;
   individual_attribution?: false | null;
@@ -321,5 +331,5 @@ export type MetricImpact = {
   /** Display label, e.g. "+$212K" or "+6.3pp". */
   label: string;
   direction: Direction;
-  good: boolean;
+  good: boolean | null;
 };

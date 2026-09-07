@@ -21,6 +21,12 @@ type MetricRow = {
   granularity: string;
   is_core: boolean;
 };
+type DefinitionRow = {
+  definition_id: string;
+  metric_id: string;
+  numeric_scale: "native" | "ratio" | "points";
+  beneficial_direction: "higher" | "lower" | "neutral";
+};
 /**
  * A UI Metric paired with its DB metric_id (UUID). The UI Metric.id is the stable
  * slug; the graph (nodes/edges) keys by metric_id, so callers that join readouts
@@ -51,6 +57,15 @@ export const getMetricRecords = cache(async function getMetricRecords(scopeId: s
   }, (row) => row.metric_id, 100);
   if (metricRows.length === 0) return [];
 
+  const definitions = await collectKeyset<DefinitionRow>((after, size) => {
+    let query = sb.from("metric_definitions")
+      .select("definition_id, metric_id, numeric_scale, beneficial_direction")
+      .eq("scope_id", scopeId).order("metric_id").limit(size);
+    if (after) query = query.gt("metric_id", after);
+    return query;
+  }, (row) => row.metric_id, 100);
+  const definitionByMetric = new Map(definitions.rows.map((row) => [row.metric_id, row]));
+
   const obsResults: Awaited<ReturnType<typeof readMetricHistory>>[] = [];
   for (let i = 0; i < metricRows.length; i += 4) {
     obsResults.push(...await Promise.all(metricRows.slice(i, i + 4)
@@ -78,9 +93,9 @@ export const getMetricRecords = cache(async function getMetricRecords(scopeId: s
     const cfg = configured ?? {
       id: `metric-${row.metric_id}`,
       color: "#00A29C",
-      higherIsBetter: true,
     };
     const series = seriesByMetric.get(row.metric_id) ?? [];
+    const definition = definitionByMetric.get(row.metric_id);
     const lastDate = lastDateByMetric.get(row.metric_id);
     records.push({
       metricId: row.metric_id,
@@ -98,7 +113,12 @@ export const getMetricRecords = cache(async function getMetricRecords(scopeId: s
         // timestamp is stored). Midnight UTC of that day.
         lastUpdated: lastDate ? `${lastDate}T00:00:00Z` : new Date(0).toISOString(),
         rows: series.length,
-        higherIsBetter: cfg.higherIsBetter,
+        higherIsBetter: definition?.beneficial_direction === "higher",
+        beneficialDirection: definition?.beneficial_direction ?? "unknown",
+        percentScale: row.unit === "percent"
+          ? definition?.numeric_scale === "ratio" ? "ratio" : definition?.numeric_scale === "points" ? "points" : "unknown"
+          : "points",
+        definitionId: definition?.definition_id ?? null,
         series,
       },
     });

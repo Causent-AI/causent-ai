@@ -1,7 +1,7 @@
 import { formatMetricValue } from "../format.ts";
 import type { MetricFormat, PredictionDirection } from "../types.ts";
 
-export type PercentStorageScale = "ratio" | "points";
+export type PercentStorageScale = "ratio" | "points" | "unknown";
 
 export type NativePredictionTarget =
   | {
@@ -16,7 +16,7 @@ export type NativePredictionTarget =
     }
   | {
       available: false;
-      reason: "missing-baseline" | "zero-baseline" | "invalid-commitment";
+      reason: "missing-baseline" | "zero-baseline" | "invalid-commitment" | "unconfirmed-scale";
     };
 
 function displayValue(
@@ -39,6 +39,9 @@ export function calculateNativePredictionTarget(input: {
   direction: PredictionDirection;
   magnitudePctMean: number | null;
 }): NativePredictionTarget {
+  if (input.format === "percent" && input.percentScale === "unknown") {
+    return { available: false, reason: "unconfirmed-scale" };
+  }
   const baseline = input.baselineNative;
   if (baseline === null || !Number.isFinite(baseline)) {
     return { available: false, reason: "missing-baseline" };

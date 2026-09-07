@@ -154,6 +154,11 @@ export function buildPredictionOutcomeViewModel(input: {
       ?? "The engine did not produce a numeric result. No zero has been substituted.";
   }
 
+  if (prediction.resolutionTuple?.interpretation) {
+    statusTitle = scorecard?.presentation.label ?? statusTitle;
+    statusDetail = scorecard?.presentation.caveat ?? statusDetail;
+  }
+
   const axis = outcomeAxis([
     plannedPct,
     measuredPct,

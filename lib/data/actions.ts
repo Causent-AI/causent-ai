@@ -92,7 +92,7 @@ export async function getActions(scopeId: string): Promise<Action[]> {
     // Impact cells in canonical metric order; look up this action's edge per metric.
     const reportBinding = bindingByActionId.get(row.action_id) ?? null;
     const reportCreated = doc?.meta?.source_item_id !== undefined;
-    const causalTargetActionId = activationContract?.interventionActionId ?? null;
+    const causalTargetActionId = activationContract?.registeredPrimaryActionId ?? null;
     const impact: ImpactCell[] = records.map((rec) => {
       const edge = edges.get(edgeKey(row.action_id, rec.metricId));
       if (

@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { collectKeyset } from "./keyset.ts";
 
 export type ReadoutRow = {
+  interpretation?: "legacy_unverified" | "observational" | "cannot_attribute" | "waiting";
+  refusal_reason?: string | null;
   edge_id: string;
   action_id: string;
   metric_id: string;

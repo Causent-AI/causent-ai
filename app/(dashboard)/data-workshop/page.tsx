@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MeasurementPlan } from "@/components/data-workshop/MeasurementPlan";
 import { loadDashboardData } from "@/lib/data/dashboard";
 import { Panel } from "@/components/ui/Panel";
 import { ConnectedMetrics } from "@/components/data-workshop/ConnectedMetrics";
@@ -29,6 +30,28 @@ export default async function DataWorkshopPage({
     getServerSupabase(),
   ]);
   const workspaceMetrics = await loadReportActivationMetrics(sb, session.workspaceId);
+  const activationId = activeDecisionReport?.activeActivationId;
+  const planResponse = activationId ? await sb.from("measurement_plans")
+    .select("plan_id,exposure_start,window_start,window_end,lag_days,population,decision_threshold,concurrent_change_status")
+    .eq("activation_id", activationId).eq("scope_id", session.workspaceId).maybeSingle() : null;
+  if (planResponse?.error) throw new Error("Measurement plan unavailable");
+  const registered = planResponse?.data;
+  const exposureResponse = registered ? await sb.from("measurement_exposures")
+    .select("action_id,first_exposure,fully_exposed").eq("plan_id", registered.plan_id)
+    .eq("scope_id", session.workspaceId) : null;
+  if (exposureResponse?.error) throw new Error("Exposure records unavailable");
+  const exposureByAction = new Map((exposureResponse?.data ?? []).map((row) => [row.action_id, row]));
+  const included = activationId ? await sb.from("decision_report_activations").select("action_ids")
+    .eq("activation_id", activationId).eq("scope_id", session.workspaceId).single() : null;
+  if (included?.error) throw new Error("Included actions unavailable");
+  const actionResponse = included?.data ? await sb.from("actions").select("action_id,rationale_richtext,external_ref,source")
+    .eq("scope_id", session.workspaceId).in("action_id", included.data.action_ids) : null;
+  if (actionResponse?.error) throw new Error("Included action labels unavailable");
+  const measurementActions = (actionResponse?.data ?? []).map((row) => {
+    const exposure = exposureByAction.get(row.action_id);
+    return { id: row.action_id, label: row.rationale_richtext?.title || row.external_ref || row.source,
+      exposure: exposure ? { first: exposure.first_exposure, full: exposure.fully_exposed } : null };
+  });
   const activeMetric = workspaceMetrics.find(
     (metric) => metric.metricId === activeDecisionReport?.metricId,
   ) ?? null;
@@ -58,6 +81,11 @@ export default async function DataWorkshopPage({
       {activeDecisionReport && causalRecomputeStatus ? (
         <CausalRecomputeStatus status={causalRecomputeStatus} />
       ) : null}
+      {activationId ? <Panel><MeasurementPlan activationId={activationId} actions={measurementActions} plan={registered ? {
+        planId: registered.plan_id, exposureStart: registered.exposure_start, windowStart: registered.window_start,
+        windowEnd: registered.window_end, lagDays: registered.lag_days, population: registered.population,
+        threshold: Number(registered.decision_threshold), concurrentStatus: registered.concurrent_change_status,
+      } : null} /></Panel> : null}
       <div className="space-y-4">
           <Panel>
             <WorkspaceMetricCsvDropzone

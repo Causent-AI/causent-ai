@@ -2,25 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  inferMetricPercentScale,
   reportExecutionState,
   reportLifecyclePresentation,
   latestMetricObservationAt,
   latestMetricValueAt,
   signedCommitmentLabel,
 } from "./product-continuity.ts";
-
-test("percent scale follows the connected metric's stored values", () => {
-  assert.equal(
-    inferMetricPercentScale("percent", [{ value: 0.4 }, { value: 0.55 }]),
-    "ratio",
-  );
-  assert.equal(
-    inferMetricPercentScale("percent", [{ value: 40 }, { value: 55 }]),
-    "points",
-  );
-  assert.equal(inferMetricPercentScale("count", [{ value: 0.4 }]), "points");
-});
 
 test("the report lifecycle advances without adding a second activation action", () => {
   assert.deepEqual(

@@ -15,6 +15,7 @@
 //   no-signal    INCONCLUSIVE / UNRESOLVABLE — measured, but no confident number
 //   no-lever     VOIDED / UNATTRIBUTED — nothing shipped/mapped to measure
 
+import { measurementReason } from "./metrics/measurement.ts";
 import type {
   Direction,
   PredictionDirection,
@@ -102,7 +103,16 @@ export function shapeScorecard(input: {
 }): ScorecardData {
   const { verdict, committedDirection, committedMagnitudePct, tuple } = input;
   const kind = scorecardKind(verdict);
-  const presentation = presentVerdict(verdict);
+  const standard = presentVerdict(verdict);
+  const interpretation = tuple?.interpretation;
+  const presentation: VerdictPresentation = interpretation ? {
+    ...standard, tone: "neutral",
+    label: interpretation === "observational" ? "Observational estimate"
+      : interpretation === "waiting" ? "Waiting for fixed horizon" : "Cannot attribute",
+    caveat: interpretation === "observational"
+      ? "Observed level change around registered exposure. Individual work and AI contribution are not identified."
+      : measurementReason(tuple?.refusal_reason),
+  } : standard;
 
   const predicted = {
     direction: committedDirection,

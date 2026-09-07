@@ -976,7 +976,7 @@ export function ActionPlanCanvas({
             ? "Commitment baseline unavailable here"
             : undefined,
           format: primaryMetric?.format ?? "percent",
-          percentScale: primaryMetric?.percentScale ?? "ratio",
+          percentScale: primaryMetric?.percentScale ?? "unknown",
           direction,
           magnitudePctMean,
         }}

@@ -107,18 +107,15 @@ function LiveCommitmentChart({
     direction: commitment.direction,
     magnitudePctMean: commitment.magnitudePctMean,
   });
-  const baselineDisplay = commitment.baselineNative === null
+  const baselineLabel = commitment.baselineNative === null
     ? null
-    : commitment.format === "percent" && commitment.percentScale === "ratio"
-      ? commitment.baselineNative * 100
-      : commitment.baselineNative;
-  const baselineLabel = baselineDisplay === null
-    ? null
-    : formatMetricValue(baselineDisplay, commitment.format);
+    : formatMetricValue(commitment.baselineNative, commitment.format, commitment.percentScale);
 
   if (!target.available) {
     const emptyLabel = !commitment.metricSelected
       ? "Choose an outcome metric"
+      : target.reason === "unconfirmed-scale"
+        ? "Confirm the metric's percentage scale"
       : target.reason === "invalid-commitment"
         ? "Set the expected change"
         : commitment.baselineUnavailableLabel ?? "Connect a baseline";

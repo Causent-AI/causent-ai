@@ -18,6 +18,7 @@ from uuid import UUID
 from psycopg import Connection
 
 from persistence.bridge import persist_metric_readouts
+from persistence.measurement import load_measurement_input, runtime_identity
 
 MAX_ATTEMPTS = 8
 MAX_BATCH = 20
@@ -71,6 +72,7 @@ def canonical_input_hash(
         return str(value)
 
     payload = {
+        "runtime": runtime_identity(),
         "activation_id": str(activation_id),
         "report_id": str(report_id),
         "metric_id": str(metric_id),
@@ -155,7 +157,7 @@ def _resolve_current_target(conn: Connection, job: _ClaimedJob) -> _ResolvedTarg
 
     workspace = conn.execute(
         "select project_id from public.workspaces "
-        "where workspace_id = %s and current_decision_report_series_id = %s "
+        "where workspace_id = %s and archived_at is null and current_decision_report_series_id = %s "
         "for update",
         (job.scope_id, series_id),
     ).fetchone()
@@ -176,37 +178,13 @@ def _resolve_current_target(conn: Connection, job: _ClaimedJob) -> _ResolvedTarg
     package_context: dict[str, object] | None = None
     target_action_ids = list(action_ids)
     if contract_version == 2:
-        package = conn.execute(
-            "select intervention_action_id, intervention_date, included_action_ids, "
-            "registered_primary_action_id, package_hash, completed_at "
-            "from public.decision_report_package_interventions "
-            "where activation_id = %s and scope_id = %s and report_id = %s",
-            (job.activation_id, job.scope_id, job.report_id),
-        ).fetchone()
-        # A v2 report has no valid causal breakpoint until the entire decision
-        # package is complete. Pre-completion jobs are consumed without a model run.
-        if package is None:
-            return None
-        (intervention_action_id, intervention_date, included_action_ids,
-         package_primary_action_id, package_hash, completed_at) = package
-        if (
-            list(included_action_ids) != list(action_ids)
-            or package_primary_action_id != registered_primary_action_id
-            or intervention_action_id not in action_ids
-        ):
+        if registered_primary_action_id not in action_ids:
             raise RuntimeError("DECISION_PACKAGE_CONTRACT_MISMATCH")
-        target_action_ids = [intervention_action_id]
-        package_context = {
-            "causal_object": "decision_package",
-            "intervention_rule": "latest_effective_included_action",
-            "registered_primary_action_id": registered_primary_action_id,
-            "intervention_action_id": intervention_action_id,
-            "intervention_date": intervention_date,
-            "included_action_ids": list(included_action_ids),
-            "package_hash": package_hash,
-            "completed_at": completed_at,
-            "individual_attribution": False,
-        }
+        # Completion remains execution history. Only the registered plan and
+        # observed exposure may supply measurement timing.
+        target_action_ids = [registered_primary_action_id]
+        package_context = {"included_action_ids": list(action_ids),
+                           "registered_primary_action_id": registered_primary_action_id}
     actor_id = job.requested_by or activated_by
     if actor_id is None:
         actor = conn.execute(
@@ -231,53 +209,8 @@ def _load_input_hash(
     action_ids: list[UUID],
     package_context: dict[str, object] | None = None,
 ) -> str:
-    observations = conn.execute(
-        "select obs_date, value from public.metric_observations "
-        "where metric_id = %s order by obs_date",
-        (job.metric_id,),
-    ).fetchall()
-    target_actions = conn.execute(
-        "select action_id, source, external_ref, effective_date, status "
-        "from public.actions where scope_id = %s and action_id = any(%s) "
-        "order by action_id",
-        (job.scope_id, action_ids),
-    ).fetchall()
-    if {str(row[0]) for row in target_actions} != {
-        str(action_id) for action_id in action_ids
-    }:
-        raise RuntimeError("ACTIVATION_ACTION_SET_UNAVAILABLE")
-
-    # The persistence bridge applies BH-FDR across every effective action in the
-    # metric's observed date range before filtering outputs to this activation.
-    # Hash that same family so a changed non-target hypothesis cannot be mistaken
-    # for an exact retry of an older statistical result.
-    family_actions: list[tuple[object, object, object, object, object]] = []
-    if observations:
-        family_actions = conn.execute(
-            "select action_id, source, external_ref, effective_date, status "
-            "from public.actions where scope_id = %s and effective_date is not null "
-            "and effective_date between %s and %s order by action_id",
-            (job.scope_id, observations[0][0], observations[-1][0]),
-        ).fetchall()
-    actions_by_id = {str(row[0]): row for row in family_actions}
-    actions_by_id.update({str(row[0]): row for row in target_actions})
-    actions = [actions_by_id[action_id] for action_id in sorted(actions_by_id)]
-    levers = conn.execute(
-        "select action_id, status, target_source from public.levers "
-        "where scope_id = %s and metric_id = %s and action_id = any(%s) "
-        "order by action_id, lever_id",
-        (job.scope_id, job.metric_id, action_ids),
-    ).fetchall()
-    return canonical_input_hash(
-        activation_id=job.activation_id,
-        report_id=job.report_id,
-        metric_id=job.metric_id,
-        action_ids=action_ids,
-        observations=observations,
-        actions=actions,
-        lever_rows=levers,
-        package_context=package_context,
-    )
+    return load_measurement_input(conn, job.scope_id, job.metric_id,
+                                  job.activation_id, action_ids).input_hash
 
 
 def _set_actor(conn: Connection, actor_id: UUID) -> None:
@@ -292,6 +225,7 @@ def _finish(
     *,
     input_hash: str | None,
     error_code: str | None,
+    resume_at=None,
 ) -> None:
     conn.execute("reset role")
     conn.execute(
@@ -301,6 +235,12 @@ def _finish(
         "where activation_id = %s",
         (job.generation, input_hash, error_code, job.activation_id),
     )
+    if resume_at is not None:
+        conn.execute(
+            "update private.causal_recompute_jobs set requested_generation=requested_generation+1, "
+            "next_attempt_at=(%s::date::timestamp at time zone 'UTC') where activation_id=%s",
+            (resume_at, job.activation_id),
+        )
     conn.commit()
 
 
@@ -375,16 +315,23 @@ def process_next_recompute_job(
                 job.activation_id, job.generation, "SUPERSEDED", "current pointer moved"
             )
         _set_actor(conn, target.actor_id)
-        input_hash = _load_input_hash(
-            conn,
-            job,
-            target.action_ids,
-            target.package_context,
+        measurement = load_measurement_input(
+            conn, job.scope_id, job.metric_id, job.activation_id, target.action_ids
         )
+        input_hash = measurement.input_hash
         if input_hash == job.last_input_hash:
-            _finish(conn, job, input_hash=input_hash, error_code=None)
+            _finish(
+                conn,
+                job,
+                input_hash=input_hash,
+                error_code=measurement.refusal,
+                resume_at=measurement.resume_at,
+            )
             return RecomputeResult(
-                job.activation_id, job.generation, "UNCHANGED", "input hash already processed"
+                job.activation_id,
+                job.generation,
+                "UNCHANGED",
+                "input hash already processed",
             )
 
         persist_metric_readouts(
@@ -392,9 +339,16 @@ def process_next_recompute_job(
             job.scope_id,
             job.metric_id,
             action_ids=target.action_ids,
+            activation_id=job.activation_id,
             commit=False,
         )
-        _finish(conn, job, input_hash=input_hash, error_code=None)
+        _finish(
+            conn,
+            job,
+            input_hash=input_hash,
+            error_code=measurement.refusal,
+            resume_at=measurement.resume_at,
+        )
         return RecomputeResult(
             job.activation_id, job.generation, "PROCESSED", "graph materialized"
         )

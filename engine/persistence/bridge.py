@@ -303,7 +303,7 @@ def _assert_actions_in_scope(
     return distinct
 
 
-def persist_metric_readouts(
+def persist_legacy_metric_readouts(
     conn: Connection,
     scope_id: Id,
     metric_id: Id,
@@ -500,3 +500,95 @@ def persist_lever_cluster_readout(
     if commit:
         conn.commit()
     return cluster_ids[0]
+
+
+def persist_metric_readouts(
+    conn: Connection,
+    scope_id: Id,
+    metric_id: Id,
+    *,
+    action_ids: Sequence[Id] | None = None,
+    activation_id: Id | None = None,
+    today: date | None = None,
+    commit: bool = True,
+):
+    """Evaluate exactly one registered family; absent contracts produce refusals.
+
+    The legacy sweep above remains an explicit demo/backward-audit utility. Live
+    recompute and resolution call this function and cannot select its behavior.
+    """
+    from persistence.measurement import load_measurement_input, canonical_json
+
+    inputs = load_measurement_input(
+        conn, scope_id, metric_id, activation_id, action_ids, today=today
+    )
+    interpretation = (
+        "waiting"
+        if inputs.resume_at
+        else "cannot_attribute"
+        if inputs.refusal
+        else "observational"
+    )
+    runtime = inputs.manifest["runtime"]
+    model_version = (
+        f"observational:{runtime['code_sha256']}:numpy:{runtime['numpy_version']}"
+    )
+    evaluation_id = conn.execute(
+        "insert into public.evaluation_runs(scope_id,metric_id,actor_id,input_manifest,input_hash,model_version,interpretation,refusal_reason) "
+        "values(%s,%s,auth.uid(),%s,%s,%s,%s,%s) returning evaluation_id",
+        (
+            scope_id,
+            metric_id,
+            Jsonb(json.loads(canonical_json(inputs.manifest))),
+            inputs.input_hash,
+            model_version,
+            interpretation,
+            inputs.refusal,
+        ),
+    ).fetchone()[0]
+    target = inputs.primary_action
+    # A refusal on an unregistered legacy request stays visible on its exact
+    # requested actions; it does not expand to every historical action.
+    targets = [target] if target else list(action_ids or [])
+    if inputs.refusal:
+        its = ITSResult(
+            "ITS", "INSUFFICIENT", None, None, None, "INCONCLUSIVE", 0, 0, None, None
+        )
+        placebo = PlaceboResult("INSUFFICIENT", None, False)
+        before = BeforeAfterResult("BEFORE_AFTER_14D", "INSUFFICIENT", None, None, None)
+        belief = Belief(None, "INCONCLUSIVE", None)
+    else:
+        ordinals = [d.toordinal() for d, _ in inputs.observations]
+        series = Series(
+            np.array(ordinals, dtype=np.int64),
+            np.array([float(v) for _, v in inputs.observations]),
+            0,
+        )
+        split = bisect_left(ordinals, inputs.exposure_date.toordinal())
+        result = batch_readout(series, [(target, split)], q=runtime["policy"]["q"])[0]
+        its, placebo, before, belief = (
+            result.its,
+            result.placebo,
+            result.before_after,
+            result.belief,
+        )
+    name = conn.execute(
+        "select name from public.metrics where metric_id=%s", (metric_id,)
+    ).fetchone()[0]
+    metric_node = _upsert_node(conn, scope_id, "METRIC", metric_id, name)
+    for action in targets:
+        label = conn.execute(
+            "select coalesce(external_ref,source) from public.actions where scope_id=%s and action_id=%s",
+            (scope_id, action),
+        ).fetchone()
+        if label is None:
+            raise ValueError("Action unavailable in the requested workspace")
+        action_node = _upsert_node(conn, scope_id, "ACTION", action, label[0])
+        edge = _upsert_edge(
+            conn, scope_id, action_node, metric_node, belief, evaluation_id
+        )
+        _append_its_evidence(conn, scope_id, edge, action, None, its, placebo, False)
+        _append_before_after_evidence(conn, scope_id, edge, action, None, before, False)
+    if commit:
+        conn.commit()
+    return inputs, evaluation_id

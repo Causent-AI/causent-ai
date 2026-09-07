@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from persistence.recompute import _ClaimedJob, _load_input_hash, canonical_input_hash
+from persistence.recompute import canonical_input_hash
 
 
 def _hash(*, value=Decimal("10.0"), effective=date(2026, 7, 1)):
@@ -62,63 +62,8 @@ def test_input_hash_binds_the_explicit_decision_package_contract():
     assert first != changed
 
 
-class _Rows:
-    def __init__(self, rows):
-        self._rows = rows
-
-    def fetchall(self):
-        return self._rows
-
-
-class _HashConnection:
-    def __init__(self, unrelated_status: str):
-        target_id = UUID("ca5e0000-0000-0000-0000-000000000004")
-        unrelated_id = UUID("ca5e0000-0000-0000-0000-000000000005")
-        start = date(2026, 6, 1)
-        self.observations = [
-            (start, Decimal("10")),
-            (start + timedelta(days=30), Decimal("11")),
-        ]
-        self.target_actions = [
-            (target_id, "manual", "report-action", start + timedelta(days=5), "complete")
-        ]
-        self.family_actions = [
-            *self.target_actions,
-            (
-                unrelated_id,
-                "github",
-                "historical-action",
-                start + timedelta(days=10),
-                unrelated_status,
-            ),
-        ]
-        self.levers = [(target_id, "SHIPPED", "manual")]
-
-    def execute(self, sql, _params=None):
-        if "from public.metric_observations" in sql:
-            return _Rows(self.observations)
-        if "from public.actions" in sql and "action_id = any" in sql:
-            return _Rows(self.target_actions)
-        if "from public.actions" in sql and "effective_date is not null" in sql:
-            return _Rows(self.family_actions)
-        if "from public.levers" in sql:
-            return _Rows(self.levers)
-        raise AssertionError(f"unexpected SQL: {sql}")
-
-
-def test_worker_input_hash_includes_non_target_fdr_family():
-    job = _ClaimedJob(
-        activation_id=UUID("ca5e0000-0000-0000-0000-000000000001"),
-        scope_id=UUID("ca5e0000-0000-0000-0000-000000000002"),
-        report_id=UUID("ca5e0000-0000-0000-0000-000000000003"),
-        metric_id=UUID("ca5e0000-0000-0000-0000-000000000006"),
-        generation=1,
-        attempts=0,
-        last_input_hash=None,
-        requested_by=None,
-    )
-    target_ids = [UUID("ca5e0000-0000-0000-0000-000000000004")]
-
-    assert _load_input_hash(
-        _HashConnection("complete"), job, target_ids
-    ) != _load_input_hash(_HashConnection("cancelled"), job, target_ids)
+def test_worker_identity_includes_policy_even_when_source_inputs_match(monkeypatch):
+    from persistence.measurement import POLICY
+    before = _hash()
+    monkeypatch.setitem(POLICY, "q", 0.01)
+    assert _hash() != before

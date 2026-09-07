@@ -82,6 +82,7 @@ cp "$REPO/api/recompute.py" "$STAGE/api/"
 PERSISTENCE_MODULES=(
   __init__.py
   bridge.py
+  measurement.py
   recompute.py
   worker_runtime.py
 )

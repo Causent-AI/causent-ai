@@ -2,24 +2,22 @@
 // here and which workspace do they act in". Both funnel and dashboard writes
 // scope to session.workspaceId — unchanged callers.
 //
-// Design-partner demo model: one shared synthetic org with two genuine
-// project/workspace boundaries. The active workspace comes from an HttpOnly
-// cookie, but that untrusted value is intersected with the server-owned fixture
-// registry and the workspaces visible through the request client before use.
+// The untrusted workspace cookie is resolved against current membership through
+// the request's RLS client. Only explicit local-demo mode uses fixture IDs.
 
 import "server-only";
 
-import { DEMO_SCOPE_ID, type DemoWorkspaceId } from "@/lib/data/config";
+import { DEMO_SCOPE_ID } from "@/lib/data/config";
 import {
-  listAccessibleDemoWorkspaces,
+  listAccessibleWorkspaces,
   readRequestedWorkspaceId,
 } from "@/lib/auth/workspace-context";
-import { selectDemoWorkspaceId } from "@/lib/auth/workspace-selection";
+import { selectAccessibleWorkspaceId, selectDemoWorkspaceId } from "@/lib/auth/workspace-selection";
 import { getServerSupabase, isLocalDemo } from "@/lib/supabase-server";
 
 export type CausentSession = {
   /** The verified workspace every read and write is scoped to. */
-  workspaceId: DemoWorkspaceId;
+  workspaceId: string;
   /** The authenticated user id (populates committed_by); null in local demo. */
   userId: string | null;
 };
@@ -32,10 +30,11 @@ export async function getSession(): Promise<CausentSession> {
   const sb = await getServerSupabase();
   const [requestedWorkspaceId, accessibleWorkspaces, authResult] = await Promise.all([
     readRequestedWorkspaceId(),
-    listAccessibleDemoWorkspaces(sb),
+    listAccessibleWorkspaces(sb),
     isLocalDemo() ? Promise.resolve(null) : sb.auth.getUser(),
   ]);
-  const workspaceId = selectDemoWorkspaceId(
+  const selectWorkspace = isLocalDemo() ? selectDemoWorkspaceId : selectAccessibleWorkspaceId;
+  const workspaceId = selectWorkspace(
     requestedWorkspaceId,
     accessibleWorkspaces.map((workspace) => workspace.id),
   );

@@ -145,3 +145,18 @@ test("partial or non-finite confidence bounds are omitted", () => {
   assert.equal(view.ci95Label, null);
   assert.equal(formatSignedPredictionPct(0), "0.0%");
 });
+
+test("observational and refusal states preserve their causal interpretation", () => {
+  const input: Prediction = {
+    id: "registered", metricId: "metric", direction: "POSITIVE", magnitudePctMean: 10,
+    resolutionDate: "2026-09-01", committedAt: "2026-01-01", verdict: "INCONCLUSIVE",
+    resolvedAt: "2026-09-02", measuredPct: 12, revisions: [],
+    resolutionTuple: { interpretation: "observational", measured_pct: 12, measured_lift: 12, pre_window_mean: 100, ci_low: 10, ci_high: 14 },
+  };
+  const observed = buildPredictionOutcomeViewModel({ prediction: input, metricName: "Orders" });
+  assert.equal(observed.statusTitle, "Observational estimate");
+  assert.match(observed.statusDetail, /AI contribution are not identified/);
+  const refused = buildPredictionOutcomeViewModel({ prediction: { ...input, measuredPct: null, verdict: "UNRESOLVABLE", resolutionTuple: { interpretation: "cannot_attribute", refusal_reason: "STAGED_EXPOSURE_UNSUPPORTED" } }, metricName: "Orders" });
+  assert.equal(refused.hasMeasurement, false);
+  assert.match(refused.statusDetail, /Staged exposure/);
+});

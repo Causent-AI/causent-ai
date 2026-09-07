@@ -286,6 +286,7 @@ test("workspace metric import uses the resumable receipt contract", async () => 
     scopeId: IDS.scope,
     name: "AI assistant adoption rate",
     unit: "percent",
+    definition: { numericScale: "ratio", beneficialDirection: "higher", aggregation: "rate", denominator: "eligible users" },
     observations: [{ date: "2026-07-20", value: 0.4 }, { date: "2026-07-21", value: 0.41 }],
     authoredBy: IDS.actor,
   });
@@ -295,7 +296,7 @@ test("workspace metric import uses the resumable receipt contract", async () => 
     assert.equal(result.summary.metricUnit, "percent");
   }
   assert.deepEqual(calls.map((call) => call.name), [
-    "begin_workspace_metric_csv_import_v2",
+    "begin_workspace_metric_csv_import_v3",
     "append_metric_csv_import_chunk_v2",
     "finalize_metric_csv_import_v2",
   ]);

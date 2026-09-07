@@ -19,6 +19,9 @@ type DataClassification =
   DecisionReportV1["implementation"]["governance"]["dataClassification"];
 
 export type DecisionLoopActionMetric = {
+  definitionId?: string | null;
+  percentScale?: "ratio" | "points" | "unknown";
+  beneficialDirection?: "higher" | "lower" | "neutral" | "unknown";
   /** Visible UI identity used only to verify the normalized action assignment. */
   id: string;
   /** Visible metric label; raw observations and database identities stay server-side. */
@@ -518,6 +521,9 @@ export function buildDecisionLoopHandoff(
           ? "Registered primary action for the decision outcome."
           : "Monitoring context only; not an independent causal prediction or causal attribution.",
         metricName: actionMetricName,
+        metricDefinitionConfirmed: Boolean(selection.actionMetric.definitionId),
+        percentStorageScale: selection.actionMetric.percentScale ?? null,
+        beneficialDirection: selection.actionMetric.beneficialDirection ?? "unknown",
         monitoringCheckDate: actionMetricRole === "monitoring_only"
           ? actionReportContext?.monitoringCheckDate ?? null
           : null,
@@ -554,7 +560,11 @@ export function buildDecisionLoopHandoff(
       },
       metricName: boundedSingleLine(metric.metricName, 180),
       readout: {
-        label: "Current Causent measurement readout; not an assistant claim and not causal unless the displayed evidence supports it",
+        label: "Current observational measurement readout; individual work and AI contribution are not identified",
+        interpretation: selection.prediction.resolutionTuple?.interpretation ?? "legacy_unverified",
+        refusalReason: selection.prediction.resolutionTuple?.refusal_reason ?? null,
+        individualAttribution: false,
+        aiAttribution: false,
         measuredPctOfMetricMean: selection.prediction.measuredPct,
         resolvedAt: selection.prediction.resolvedAt,
         verdict: selection.prediction.verdict,

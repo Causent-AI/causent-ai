@@ -84,6 +84,7 @@ cp "$REPO/api/resolve.py" "$STAGE/api/"
 PERSISTENCE_MODULES=(
   __init__.py
   bridge.py
+  measurement.py
   resolve.py
   worker_runtime.py
 )

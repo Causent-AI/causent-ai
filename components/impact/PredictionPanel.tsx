@@ -12,7 +12,6 @@ import { buildPredictionOutcomeViewModel, type PredictionOutcomeViewModel } from
 import type { Decision, Metric } from "@/lib/types";
 import type { MetricProjection } from "@/lib/decision-reports/schema";
 import {
-  inferMetricPercentScale,
   latestMetricObservationAt,
 } from "@/lib/decision-reports/product-continuity";
 
@@ -95,11 +94,11 @@ export function PredictionPanel({
     ? {
         metricSelected: true,
         metricName: metric.name,
-        baselineNative: baselineObservation?.value ?? null,
+        baselineNative: metric.definitionId === null ? null : baselineObservation?.value ?? null,
         baselineDate: baselineObservation?.date ?? null,
         baselineUnavailableLabel: "Commitment baseline unavailable",
         format: metric.format,
-        percentScale: inferMetricPercentScale(metric.format, metric.series),
+        percentScale: metric.percentScale ?? "unknown",
         direction: prediction.direction,
         magnitudePctMean: prediction.magnitudePctMean,
       }

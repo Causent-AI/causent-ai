@@ -27,6 +27,7 @@ export function LineTimeSeries({
   series,
   color,
   format,
+  percentScale = "points",
   height = 120,
   flags = [],
   yTicks = 3,
@@ -35,6 +36,7 @@ export function LineTimeSeries({
   series: Observation[];
   color: string;
   format: MetricFormat;
+  percentScale?: "ratio" | "points" | "unknown";
   height?: number;
   flags?: SeriesFlag[];
   yTicks?: number;
@@ -69,7 +71,7 @@ export function LineTimeSeries({
         aria-hidden="true"
       >
         {yTickValues.map((v, i) => (
-          <span key={i}>{formatMetricValue(v, format)}</span>
+          <span key={i}>{formatMetricValue(v, format, percentScale)}</span>
         ))}
       </div>
 

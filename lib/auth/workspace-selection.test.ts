@@ -7,9 +7,27 @@ import {
 } from "../data/config.ts";
 import {
   mapAccessibleDemoWorkspaces,
+  mapAccessibleWorkspaces,
+  selectAccessibleWorkspaceId,
   selectDemoWorkspaceId,
   staticDemoWorkspaceOption,
 } from "./workspace-selection.ts";
+
+test("customer discovery retains arbitrary RLS-visible workspace identities", () => {
+  const first = "1b7edfe4-a9ab-4cbe-967f-88bb079f1111";
+  const second = "7b7edfe4-a9ab-4cbe-967f-88bb079f2222";
+  assert.deepEqual(mapAccessibleWorkspaces([
+    { workspace_id: second, name: "Support", projects: { name: "Customer B" } },
+    { workspace_id: first, name: "Support", projects: { name: "Customer A" } },
+  ]), [
+    { id: first, project: "Customer A", workspace: "Support" },
+    { id: second, project: "Customer B", workspace: "Support" },
+  ]);
+  assert.equal(selectAccessibleWorkspaceId(second, [first, second]), second);
+  assert.equal(selectAccessibleWorkspaceId(second, [first]), first);
+  assert.equal(selectAccessibleWorkspaceId({ id: second }, [second, first]), first);
+  assert.equal(selectAccessibleWorkspaceId(first, []), null);
+});
 
 test("static seed mode exposes only the Gummy Alpha workspace", () => {
   assert.deepEqual(staticDemoWorkspaceOption(), {

@@ -69,7 +69,7 @@ export async function verifyDataLayer(): Promise<string[]> {
   // Confident landmark: PR #8107 -> ARR is +$ POSITIVE (belief 1.0).
   const pr8107 = actions.find((a) => a.pr === 8107)!;
   const arrCell = pr8107.impact.find((c) => c.metricId === "arr")!;
-  assert(arrCell.direction === "up" && arrCell.good, "PR#8107 ARR cell is up/good");
+  assert(arrCell.direction === "up" && arrCell.good === true, "PR#8107 ARR cell is up/good");
   assert(
     arrCell.value !== null && arrCell.value > 200_000 && arrCell.label.startsWith("+$"),
     `PR#8107 ARR cell shows a real +$ lift (got ${arrCell.label})`,
@@ -77,7 +77,7 @@ export async function verifyDataLayer(): Promise<string[]> {
   // Confident but BAD: PR #8107 -> Gross Profit is NEGATIVE (belief 1.0).
   const gpCell = pr8107.impact.find((c) => c.metricId === "grossProfit")!;
   assert(
-    gpCell.direction === "down" && !gpCell.good && gpCell.value !== null,
+    gpCell.direction === "down" && gpCell.good === false && gpCell.value !== null,
     `PR#8107 Gross Profit cell is a confident down/bad number (got ${gpCell.label})`,
   );
 
@@ -85,7 +85,7 @@ export async function verifyDataLayer(): Promise<string[]> {
   const pr8256 = actions.find((a) => a.pr === 8256)!;
   const actCell = pr8256.impact.find((c) => c.metricId === "activation")!;
   assert(
-    actCell.direction === "up" && actCell.good && actCell.label.endsWith("pp"),
+    actCell.direction === "up" && actCell.good === true && actCell.label.endsWith("pp"),
     `PR#8256 Activation cell is a confident +pp number (got ${actCell.label})`,
   );
 
