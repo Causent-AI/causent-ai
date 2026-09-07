@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="455" viewBox="0 0 1240 455">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#667879"/></marker></defs>
+<rect width="1240" height="455" fill="white"/>
+<text x="40" y="30" font-family="Arial" font-size="22" font-weight="700" fill="#111">Repository identity survives a rename</text>
+<text x="40" y="60" font-family="Arial" font-size="16" fill="#536364">Provider lookup precedes service-only database write</text>
+<path d="M290,147.5 L340,147.5" stroke="#667879" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<text x="315.0" y="137.5" text-anchor="middle" font-family="Arial" font-size="12" fill="#475657">parse</text>
+<path d="M590,147.5 L640,147.5" stroke="#667879" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<text x="615.0" y="137.5" text-anchor="middle" font-family="Arial" font-size="12" fill="#475657">insert</text>
+<path d="M890,147.5 L940,147.5" stroke="#667879" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<text x="915.0" y="137.5" text-anchor="middle" font-family="Arial" font-size="12" fill="#475657">display</text>
+<path d="M290,357.5 L340,357.5" stroke="#667879" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<text x="315.0" y="347.5" text-anchor="middle" font-family="Arial" font-size="12" fill="#475657">review</text>
+<path d="M590,357.5 L640,357.5" stroke="#667879" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<text x="615.0" y="347.5" text-anchor="middle" font-family="Arial" font-size="12" fill="#475657">verified</text>
+<path d="M765.0,300 L765.0,205" stroke="#667879" stroke-width="2" fill="none" marker-end="url(#a)"/>
+<text x="830.0" y="252.5" text-anchor="middle" font-family="Arial" font-size="12" fill="#475657">map</text>
+<rect x="40" y="90" width="250" height="115" rx="9" fill="#f5f9f8" stroke="#82aaa6" stroke-width="1.5"/>
+<text x="165.0" y="137" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">GitHub repository API</text>
+<text x="165.0" y="165" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">stable numeric ID</text>
+<rect x="340" y="90" width="250" height="115" rx="9" fill="#f5f9f8" stroke="#82aaa6" stroke-width="1.5"/>
+<text x="465.0" y="137" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">github:repo:id:123</text>
+<text x="465.0" y="165" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">pr:42 or issue:42</text>
+<rect x="640" y="90" width="250" height="115" rx="9" fill="#f5f9f8" stroke="#82aaa6" stroke-width="1.5"/>
+<text x="765.0" y="137" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">actions unique key</text>
+<text x="765.0" y="165" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">scope + external_ref</text>
+<rect x="940" y="90" width="250" height="115" rx="9" fill="#f5f9f8" stroke="#82aaa6" stroke-width="1.5"/>
+<text x="1065.0" y="137" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">Distinct action UUIDs</text>
+<text x="1065.0" y="165" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">same-number PRs retained</text>
+<rect x="40" y="300" width="250" height="115" rx="9" fill="#f5f9f8" stroke="#82aaa6" stroke-width="1.5"/>
+<text x="165.0" y="347" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">Legacy source URL</text>
+<text x="165.0" y="375" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">action_identity_aliases</text>
+<rect x="340" y="300" width="250" height="115" rx="9" fill="#f5f9f8" stroke="#82aaa6" stroke-width="1.5"/>
+<text x="465.0" y="347" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">Provider verification</text>
+<text x="465.0" y="375" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">collision audit</text>
+<rect x="640" y="300" width="250" height="115" rx="9" fill="#f5f9f8" stroke="#82aaa6" stroke-width="1.5"/>
+<text x="765.0" y="347" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">Reconciliation function</text>
+<text x="765.0" y="375" text-anchor="middle" font-family="Arial" font-size="18" fill="#163e3b">UUID and alias retained</text>
+</svg>

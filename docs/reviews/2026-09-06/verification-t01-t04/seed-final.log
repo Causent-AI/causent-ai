@@ -1,0 +1,95 @@
+=== Causent demo seed — row counts (scope: Causent/Orbit/Gummy Alpha) ===
+  orgs                   1
+  projects               2
+  workspaces             1
+  northstar_workspaces   1
+  memberships            1
+  metrics                7
+  metric_observations    1260
+  actions                13
+  clusters               5
+  nodes                  21
+  causal_edges           60
+  evidence_objects       130
+  northstar_metrics      2
+  northstar_metric_observations 244
+  decisions              8
+  predictions            8
+  prediction_revisions   1
+
+  confident edges (belief=1.0 POSITIVE) : 2
+  INSUFFICIENT_HISTORY edges            : 20
+
+=== ACTION -> METRIC edges (real engine readouts) ===
+  action    metric           direction     belief  reason
+  PR #8107  Activation Rate  INCONCLUSIVE  0.50
+  PR #8107  ARR              POSITIVE      1.00
+  PR #8107  Churn Rate       INCONCLUSIVE  0.00    PLACEBO
+  PR #8107  Gross Profit     NEGATIVE      1.00
+  PR #8107  Support Tickets  INCONCLUSIVE  0.50
+  PR #8256  Activation Rate  POSITIVE      1.00
+  PR #8256  ARR              INCONCLUSIVE  0.50
+  PR #8256  Churn Rate       INCONCLUSIVE  0.50
+  PR #8256  Gross Profit     NEGATIVE      1.00
+  PR #8256  Support Tickets  INCONCLUSIVE  0.00    PLACEBO
+  PR #8290  Activation Rate  INCONCLUSIVE  0.00    PLACEBO
+  PR #8290  ARR              INCONCLUSIVE  0.50
+  PR #8290  Churn Rate       INCONCLUSIVE  0.50
+  PR #8290  Gross Profit     INCONCLUSIVE  0.00    PLACEBO
+  PR #8290  Support Tickets  INCONCLUSIVE  0.50    AUTOCORRELATION
+  PR #8324  Activation Rate  INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8324  ARR              INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8324  Churn Rate       INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8324  Gross Profit     INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8324  Support Tickets  INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8338  Activation Rate  INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8338  ARR              INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8338  Churn Rate       INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8338  Gross Profit     INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8338  Support Tickets  INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8351  Activation Rate  INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8351  ARR              INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8351  Churn Rate       INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8351  Gross Profit     INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8351  Support Tickets  INCONCLUSIVE  —       INSUFFICIENT_HISTORY
+  PR #8367  Activation Rate  INCONCLUSIVE  —
+  PR #8367  ARR              INCONCLUSIVE  —
+  PR #8367  Churn Rate       INCONCLUSIVE  —
+  PR #8367  Gross Profit     INCONCLUSIVE  —
+  PR #8367  Support Tickets  INCONCLUSIVE  —
+  PR #8383  Activation Rate  INCONCLUSIVE  —
+  PR #8383  ARR              INCONCLUSIVE  —
+  PR #8383  Churn Rate       INCONCLUSIVE  —
+  PR #8383  Gross Profit     INCONCLUSIVE  —
+  PR #8383  Support Tickets  INCONCLUSIVE  —
+  PR #8392  Activation Rate  INCONCLUSIVE  —
+  PR #8392  ARR              INCONCLUSIVE  —
+  PR #8392  Churn Rate       INCONCLUSIVE  —
+  PR #8392  Gross Profit     INCONCLUSIVE  —
+  PR #8392  Support Tickets  INCONCLUSIVE  —
+  PR #8410  Activation Rate  INCONCLUSIVE  —
+  PR #8410  ARR              INCONCLUSIVE  —
+  PR #8410  Churn Rate       INCONCLUSIVE  —
+  PR #8410  Gross Profit     INCONCLUSIVE  —
+  PR #8410  Support Tickets  INCONCLUSIVE  —
+  PR #8421  Activation Rate  INCONCLUSIVE  —
+  PR #8421  ARR              INCONCLUSIVE  —
+  PR #8421  Churn Rate       INCONCLUSIVE  —
+  PR #8421  Gross Profit     INCONCLUSIVE  —
+  PR #8421  Support Tickets  INCONCLUSIVE  —
+
+=== Pre-registered predictions (resolved via the verdict machine) ===
+  decision                               metric           dir       pct     verdict
+  Recover involuntary churn revenue      ARR              POSITIVE    13.50 CONFIRMED  (due 2025-05-15)
+  Billing retries refund risk            ARR              NEGATIVE     3.00 REFUTED  (due 2025-05-15)
+  Rebuild the signup funnel              Activation Rate  POSITIVE    32.60 DIRECTION_CONFIRMED  (due 2025-05-15)
+  Save offers at cancellation            Churn Rate       NEGATIVE     5.00 INCONCLUSIVE  (due 2025-05-20)
+  Guide new users in-app                 Activation Rate  POSITIVE     4.00 GATHERING  (due 2025-06-06)
+  Move to usage-based pricing            ARR              POSITIVE     6.00 VOIDED  (due 2025-05-20)
+  Lift new-user activation with an onboarding redesign New-User Activation POSITIVE     3.00 (unresolved)  (due 2025-08-02)
+  Open a public beta waitlist            Beta waitlist signups POSITIVE    20.00 UNMEASURABLE_NO_METRIC  (due 2025-05-20)
+
+=== Baseline-drift beat (New-User Activation) ===
+  FIRED — baseline moved 20.0% -> 11.9% (-40%), CI [-8.35, -7.76]
+
+RESULT: PASS — confident, gathering-data, all 7 target verdicts, and a firing baseline-drift beat

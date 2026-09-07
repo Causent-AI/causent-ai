@@ -42,6 +42,7 @@ const DAY_MS = 86_400_000;
 // ---------------------------------------------------------------------------
 
 export interface GitHubPullRequest {
+  base?: { repo: { id: number } };
   number: number;
   title: string;
   body: string | null;
@@ -55,6 +56,7 @@ export interface GitHubPullRequest {
 }
 
 export interface GitHubIssue {
+  repository?: { id: number };
   number: number;
   title: string;
   body: string | null;
@@ -89,7 +91,7 @@ export interface RationaleDoc {
 export interface ActionRow {
   scope_id: string;
   source: "github_pr" | "github_issue";
-  /** Stable dedup key, e.g. "github:pr:8107" / "github:issue:412". */
+  /** Stable dedup key, e.g. "github:repo:id:123:pr:8107". */
   external_ref: string;
   /** ISO-8601 UTC timestamptz of the ship event (merged_at / closed_at). */
   ship_ts: string;
@@ -155,7 +157,10 @@ export interface IngestResult {
   capped: number;
   /** Rows newly inserted this run. */
   inserted: number;
-  /** Rows skipped because their external_ref already existed (idempotency). */
+  duplicates: number;
+  /** Invalid batches throw atomically; successful batches have no rejected rows. */
+  rejected: number;
+  /** Compatibility alias for duplicates, including concurrent conflicts. */
   skipped: number;
 }
 
@@ -260,15 +265,27 @@ function buildRationale(
   };
 }
 
+export function githubIdentity(kind: "pr" | "issue", number: number, url: string, repositoryId: number | undefined): string {
+  if (!Number.isSafeInteger(number) || number < 1) throw new Error("Invalid GitHub number");
+  if (!Number.isSafeInteger(repositoryId) || repositoryId! < 1) throw new Error("Verified GitHub repository ID required");
+  const parsed = new URL(url);
+  const match = /^\/([^/]+)\/([^/]+)\/(pull|issues)\/([1-9][0-9]*)\/?$/.exec(parsed.pathname);
+  if (parsed.origin !== "https://github.com" || parsed.username || parsed.password || !match ||
+      Number(match[4]) !== number || match[3] !== (kind === "pr" ? "pull" : "issues")) {
+    throw new Error("Invalid GitHub entity URL");
+  }
+  return `github:repo:id:${repositoryId}:${kind}:${number}`;
+}
+
 /** A merged PR becomes an action; an unmerged (closed-without-merge) PR does not. */
-export function parsePullRequestToAction(pr: GitHubPullRequest, scopeId: string): ActionRow | null {
+export function parsePullRequestToAction(pr: GitHubPullRequest, scopeId: string, repositoryId = pr.base?.repo.id): ActionRow | null {
   if (pr.merged_at == null) return null;
   const effective_date = utcDateOrNull(pr.merged_at);
   if (effective_date == null) return null; // unparseable merged_at — skip, don't crash
   return {
     scope_id: scopeId,
     source: "github_pr",
-    external_ref: `github:pr:${pr.number}`,
+    external_ref: githubIdentity("pr", pr.number, pr.html_url, repositoryId),
     ship_ts: pr.merged_at,
     effective_date,
     status: "merged",
@@ -279,7 +296,7 @@ export function parsePullRequestToAction(pr: GitHubPullRequest, scopeId: string)
 /** A RESOLVED issue (closed with state_reason "completed") becomes an action.
  *  Skips: still-open issues, "not_planned" closures, and issue objects that are
  *  actually PRs (the issues endpoint returns both — the `pull_request` field). */
-export function parseIssueToAction(issue: GitHubIssue, scopeId: string): ActionRow | null {
+export function parseIssueToAction(issue: GitHubIssue, scopeId: string, repositoryId = issue.repository?.id): ActionRow | null {
   if (issue.pull_request != null) return null; // it's a PR in disguise
   if (issue.state !== "closed") return null;
   if (issue.state_reason !== "completed") return null;
@@ -289,7 +306,7 @@ export function parseIssueToAction(issue: GitHubIssue, scopeId: string): ActionR
   return {
     scope_id: scopeId,
     source: "github_issue",
-    external_ref: `github:issue:${issue.number}`,
+    external_ref: githubIdentity("issue", issue.number, issue.html_url, repositoryId),
     ship_ts: issue.closed_at,
     effective_date,
     status: "completed",
@@ -352,10 +369,9 @@ export async function upsertActions(
   rows: ActionRow[],
   scopeId: string,
 ): Promise<{ inserted: number; skipped: number }> {
+  if (rows.some((row) => row.scope_id !== scopeId)) throw new Error("Import scope mismatch");
   if (rows.length === 0) return { inserted: 0, skipped: 0 };
-  // Within-run dedup first: a duplicate external_ref inside one batch would
-  // trip the (scope_id, external_ref) unique index and poison the whole
-  // insert. Keep the first occurrence (rows arrive newest-first).
+  // Avoid redundant work; the database remains authoritative for concurrent conflicts.
   const seen = new Set<string>();
   const unique = rows.filter((r) =>
     seen.has(r.external_ref) ? false : (seen.add(r.external_ref), true),
@@ -363,7 +379,8 @@ export async function upsertActions(
   const existing = await store.existingRefs(scopeId, unique.map((r) => r.external_ref));
   const fresh = unique.filter((r) => !existing.has(r.external_ref));
   const inserted = fresh.length > 0 ? await store.insert(fresh) : 0;
-  return { inserted, skipped: rows.length - fresh.length };
+  if (!Number.isSafeInteger(inserted) || inserted < 0 || inserted > fresh.length) throw new Error("Invalid insertion receipt");
+  return { inserted, skipped: rows.length - inserted };
 }
 
 // ---------------------------------------------------------------------------
@@ -383,6 +400,10 @@ export async function ingestActions(
   const nowMs = (opts.now ? opts.now() : new Date()).getTime();
   const cutoffMs = nowMs - windowDays * DAY_MS;
   const { owner, repo, scopeId } = opts;
+  if (!Number.isSafeInteger(maxItems) || maxItems < 1 || maxItems > DEFAULT_MAX_ITEMS) throw new Error("Invalid import item limit");
+  const repository = await requestWithBackoff(transport, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, opts.backoff) as { id?: number } | null;
+  if (!Number.isSafeInteger(repository?.id) || repository!.id! < 1) throw new Error("Repository identity unavailable");
+  const repositoryId = repository!.id!;
 
   // Paginate by recency (updated_at) so a non-keeper never truncates the scan.
   const pulls = await collectWindowed<GitHubPullRequest>(
@@ -408,11 +429,13 @@ export async function ingestActions(
   // touched PR may have merged long before the window — its ship event is stale.
   const rows: ActionRow[] = [];
   for (const pr of pulls) {
-    const row = parsePullRequestToAction(pr, scopeId);
+    if (pr.base && pr.base.repo.id !== repositoryId) throw new Error("GitHub repository changed during import");
+    const row = parsePullRequestToAction(pr, scopeId, repositoryId);
     if (row && Date.parse(row.ship_ts) >= cutoffMs) rows.push(row);
   }
   for (const issue of issues) {
-    const row = parseIssueToAction(issue, scopeId);
+    if (issue.repository && issue.repository.id !== repositoryId) throw new Error("GitHub repository changed during import");
+    const row = parseIssueToAction(issue, scopeId, repositoryId);
     if (row && Date.parse(row.ship_ts) >= cutoffMs) rows.push(row);
   }
 
@@ -421,5 +444,5 @@ export async function ingestActions(
   const capped = rows.slice(0, maxItems);
 
   const { inserted, skipped } = await upsertActions(store, capped, scopeId);
-  return { fetched: pulls.length + issues.length, capped: capped.length, inserted, skipped };
+  return { fetched: pulls.length + issues.length, capped: capped.length, inserted, skipped, duplicates: skipped, rejected: 0 };
 }

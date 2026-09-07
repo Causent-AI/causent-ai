@@ -1,0 +1,100 @@
+PAGE 500
+Limit  (cost=39.22..39.23 rows=1 width=271) (actual time=37698.350..37698.383 rows=500 loops=1)
+  Buffers: shared hit=2025711
+  ->  Sort  (cost=39.22..39.23 rows=1 width=271) (actual time=37698.350..37698.363 rows=500 loops=1)
+        Sort Key: e.edge_id
+        Sort Method: top-N heapsort  Memory: 138kB
+        Buffers: shared hit=2025711
+        ->  Nested Loop Left Join  (cost=1.51..39.21 rows=1 width=271) (actual time=0.804..37697.444 rows=1001 loops=1)
+              Join Filter: (i.evidence_id IS NOT NULL)
+              Buffers: shared hit=2025708
+              ->  Nested Loop Left Join  (cost=1.24..30.65 rows=1 width=234) (actual time=0.803..37696.171 rows=1001 loops=1)
+                    Buffers: shared hit=2025708
+                    ->  Nested Loop Left Join  (cost=0.97..22.08 rows=1 width=164) (actual time=0.802..37694.765 rows=1001 loops=1)
+                          Join Filter: (r.metric_id = t.semantic_ref)
+                          Buffers: shared hit=2025708
+                          ->  Nested Loop  (cost=0.82..13.65 rows=1 width=84) (actual time=0.800..37693.779 rows=1001 loops=1)
+                                Join Filter: (e.target_node_id = t.node_id)
+                                Buffers: shared hit=2025708
+                                ->  Nested Loop  (cost=0.55..9.10 rows=1 width=84) (actual time=0.666..37614.915 rows=1001 loops=1)
+                                      Join Filter: (e.source_node_id = s.node_id)
+                                      Rows Removed by Join Filter: 500500
+                                      Buffers: shared hit=2018692
+                                      ->  Index Scan using causal_edges_scope_id_idx on causal_edges e  (cost=0.28..4.54 rows=1 width=84) (actual time=0.516..76.084 rows=1001 loops=1)
+                                            Index Cond: (scope_id = '36e46338-38bb-4bfd-ace7-ae8b79b28133'::uuid)
+                                            Filter: has_scope_access(scope_id, 'viewer'::text)
+                                            Buffers: shared hit=4353
+                                      ->  Index Scan using nodes_scope_id_idx on nodes s  (cost=0.27..4.54 rows=1 width=48) (actual time=0.076..37.458 rows=501 loops=1001)
+                                            Index Cond: (scope_id = '36e46338-38bb-4bfd-ace7-ae8b79b28133'::uuid)
+                                            Filter: ((type = 'ACTION'::text) AND has_scope_access(scope_id, 'viewer'::text))
+                                            Rows Removed by Filter: 1
+                                            Buffers: shared hit=2014339
+                                ->  Index Scan using nodes_scope_id_idx on nodes t  (cost=0.27..4.54 rows=1 width=48) (actual time=0.078..0.078 rows=1 loops=1001)
+                                      Index Cond: (scope_id = '36e46338-38bb-4bfd-ace7-ae8b79b28133'::uuid)
+                                      Filter: ((type = 'METRIC'::text) AND has_scope_access(scope_id, 'viewer'::text))
+                                      Buffers: shared hit=7016
+                          ->  Index Scan using evaluation_runs_evaluation_id_scope_id_key on evaluation_runs r  (cost=0.15..8.42 rows=1 width=112) (actual time=0.000..0.000 rows=0 loops=1001)
+                                Index Cond: ((evaluation_id = e.evaluation_id) AND (scope_id = '36e46338-38bb-4bfd-ace7-ae8b79b28133'::uuid))
+                                Filter: has_scope_access(scope_id, 'viewer'::text)
+                    ->  Limit  (cost=0.27..8.54 rows=1 width=357) (actual time=0.001..0.001 rows=0 loops=1001)
+                          ->  Index Scan using evidence_evaluation_method_latest_idx on evidence_objects i  (cost=0.27..8.54 rows=1 width=357) (actual time=0.000..0.000 rows=0 loops=1001)
+                                Index Cond: ((edge_id = e.edge_id) AND (evaluation_id = r.evaluation_id) AND (methodology = 'ITS'::text))
+                                Filter: ((scope_id = e.scope_id) AND has_scope_access(scope_id, 'viewer'::text))
+              ->  Limit  (cost=0.27..8.54 rows=1 width=391) (actual time=0.000..0.000 rows=0 loops=1001)
+                    ->  Index Scan using evidence_evaluation_method_latest_idx on evidence_objects d  (cost=0.27..8.54 rows=1 width=391) (actual time=0.000..0.000 rows=0 loops=1001)
+                          Index Cond: ((edge_id = e.edge_id) AND (evaluation_id = r.evaluation_id) AND (methodology = 'BEFORE_AFTER_14D'::text))
+                          Filter: ((scope_id = e.scope_id) AND has_scope_access(scope_id, 'viewer'::text))
+Planning:
+  Buffers: shared hit=572
+Planning Time: 0.747 ms
+Execution Time: 37701.778 ms
+PAGE 1000
+Limit  (cost=209.89..209.89 rows=1 width=271) (actual time=138.711..138.773 rows=1000 loops=1)
+  Buffers: shared hit=11061
+  ->  Sort  (cost=209.89..209.89 rows=1 width=271) (actual time=138.710..138.735 rows=1000 loops=1)
+        Sort Key: e.edge_id
+        Sort Method: quicksort  Memory: 157kB
+        Buffers: shared hit=11061
+        ->  Nested Loop Left Join  (cost=6.86..209.88 rows=1 width=271) (actual time=0.427..138.430 rows=1001 loops=1)
+              Join Filter: (i.evidence_id IS NOT NULL)
+              Buffers: shared hit=11061
+              ->  Nested Loop Left Join  (cost=6.59..201.31 rows=1 width=236) (actual time=0.426..138.027 rows=1001 loops=1)
+                    Buffers: shared hit=11061
+                    ->  Nested Loop Left Join  (cost=6.32..192.75 rows=1 width=166) (actual time=0.425..137.628 rows=1001 loops=1)
+                          Join Filter: (r.metric_id = t.semantic_ref)
+                          Buffers: shared hit=11061
+                          ->  Nested Loop  (cost=6.17..192.17 rows=1 width=86) (actual time=0.423..137.333 rows=1001 loops=1)
+                                Buffers: shared hit=11061
+                                ->  Nested Loop  (cost=5.89..191.24 rows=1 width=86) (actual time=0.303..68.443 rows=1001 loops=1)
+                                      Buffers: shared hit=4046
+                                      ->  Index Scan using nodes_scope_type_ref_key on nodes t  (cost=0.28..21.20 rows=2 width=48) (actual time=0.174..0.175 rows=1 loops=1)
+                                            Index Cond: ((scope_id = '36e46338-38bb-4bfd-ace7-ae8b79b28133'::uuid) AND (type = 'METRIC'::text))
+                                            Filter: has_scope_access(scope_id, 'viewer'::text)
+                                            Buffers: shared hit=15
+                                      ->  Bitmap Heap Scan on causal_edges e  (cost=5.62..84.46 rows=56 width=86) (actual time=0.127..68.123 rows=1001 loops=1)
+                                            Recheck Cond: (target_node_id = t.node_id)
+                                            Filter: ((scope_id = '36e46338-38bb-4bfd-ace7-ae8b79b28133'::uuid) AND has_scope_access(scope_id, 'viewer'::text))
+                                            Heap Blocks: exact=17
+                                            Buffers: shared hit=4031
+                                            ->  Bitmap Index Scan on causal_edges_target_node_id_idx  (cost=0.00..5.60 rows=177 width=0) (actual time=0.011..0.011 rows=1001 loops=1)
+                                                  Index Cond: (target_node_id = t.node_id)
+                                                  Buffers: shared hit=2
+                                ->  Index Scan using nodes_pkey on nodes s  (cost=0.28..0.93 rows=1 width=48) (actual time=0.069..0.069 rows=1 loops=1001)
+                                      Index Cond: (node_id = e.source_node_id)
+                                      Filter: ((scope_id = '36e46338-38bb-4bfd-ace7-ae8b79b28133'::uuid) AND (type = 'ACTION'::text) AND has_scope_access(scope_id, 'viewer'::text))
+                                      Buffers: shared hit=7015
+                          ->  Index Scan using evaluation_runs_evaluation_id_scope_id_key on evaluation_runs r  (cost=0.15..0.56 rows=1 width=112) (actual time=0.000..0.000 rows=0 loops=1001)
+                                Index Cond: ((evaluation_id = e.evaluation_id) AND (scope_id = '36e46338-38bb-4bfd-ace7-ae8b79b28133'::uuid))
+                                Filter: has_scope_access(scope_id, 'viewer'::text)
+                    ->  Limit  (cost=0.27..8.54 rows=1 width=357) (actual time=0.000..0.000 rows=0 loops=1001)
+                          ->  Index Scan using evidence_evaluation_method_latest_idx on evidence_objects i  (cost=0.27..8.54 rows=1 width=357) (actual time=0.000..0.000 rows=0 loops=1001)
+                                Index Cond: ((edge_id = e.edge_id) AND (evaluation_id = r.evaluation_id) AND (methodology = 'ITS'::text))
+                                Filter: ((scope_id = e.scope_id) AND has_scope_access(scope_id, 'viewer'::text))
+              ->  Limit  (cost=0.27..8.54 rows=1 width=391) (actual time=0.000..0.000 rows=0 loops=1001)
+                    ->  Index Scan using evidence_evaluation_method_latest_idx on evidence_objects d  (cost=0.27..8.54 rows=1 width=391) (actual time=0.000..0.000 rows=0 loops=1001)
+                          Index Cond: ((edge_id = e.edge_id) AND (evaluation_id = r.evaluation_id) AND (methodology = 'BEFORE_AFTER_14D'::text))
+                          Filter: ((scope_id = e.scope_id) AND has_scope_access(scope_id, 'viewer'::text))
+Planning:
+  Buffers: shared hit=126
+Planning Time: 0.458 ms
+Execution Time: 138.828 ms

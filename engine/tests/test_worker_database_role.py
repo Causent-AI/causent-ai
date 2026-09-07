@@ -8,9 +8,11 @@ an inherited service-role grant or access to a second private queue fails closed
 
 from __future__ import annotations
 
+import os
+
 import psycopg
 
-DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+DSN = os.environ.get("CAUSENT_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres")
 
 WORKER_ROLES = (
     "causent_drift_worker",

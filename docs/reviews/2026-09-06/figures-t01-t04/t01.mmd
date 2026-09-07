@@ -1,0 +1,14 @@
+flowchart LR
+  request["Data and Impact<br/>request a workspace"]
+  page["TypeScript readers<br/>≤ 500 rows per page"]
+  db["metric_observations<br/>current_edge_readouts"]
+  output["Complete history<br/>coherent readout"]
+  limit["Empty page proves done<br/>Over limit raises error"]
+  run["evaluation_id joins<br/>direction and interval"]
+  request -->|scope| page
+  page -->|keyset| db
+  db -->|rows| output
+  page -->|bound| limit
+  run -->|same run| db
+  classDef changed fill:#f5f9f8,stroke:#82aaa6,color:#163e3b;
+  class request,page,db,output,limit,run changed;

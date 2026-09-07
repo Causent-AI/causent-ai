@@ -36,10 +36,15 @@ from bisect import bisect_left
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
+from functools import lru_cache
+import hashlib
+import json
+from pathlib import Path
 from uuid import UUID
 
 import numpy as np
 from psycopg import Connection
+from psycopg.types.json import Jsonb
 
 from causal.batch_readout import batch_readout
 from causal.types import (
@@ -170,21 +175,22 @@ def _upsert_node(conn: Connection, scope_id: Id, node_type: str,
 
 
 def _upsert_edge(conn: Connection, scope_id: Id, source_node_id: UUID,
-                 target_node_id: UUID, belief: Belief) -> UUID:
+                 target_node_id: UUID, belief: Belief, evaluation_id: UUID) -> UUID:
     """Materialize the edge. belief is projected from the authoritative ITS
     readout; a re-run recomputes it here from the latest run's ITS result."""
     return conn.execute(
         "insert into public.causal_edges "
         "(scope_id, source_node_id, target_node_id, direction, belief_score, "
-        " authoritative_method, belief_reason, last_updated) "
-        "values (%s, %s, %s, %s, %s, 'ITS', %s, now()) "
+        " authoritative_method, belief_reason, last_updated, evaluation_id) "
+        "values (%s, %s, %s, %s, %s, 'ITS', %s, now(), %s) "
         "on conflict (source_node_id, target_node_id) do update set "
         "direction = excluded.direction, belief_score = excluded.belief_score, "
         "authoritative_method = excluded.authoritative_method, "
-        "belief_reason = excluded.belief_reason, last_updated = now() "
+        "belief_reason = excluded.belief_reason, last_updated = now(), "
+        "evaluation_id = excluded.evaluation_id "
         "returning edge_id",
         (scope_id, source_node_id, target_node_id, belief.direction,
-         belief.belief_score, belief.reason),
+         belief.belief_score, belief.reason, evaluation_id),
     ).fetchone()[0]
 
 
@@ -243,6 +249,42 @@ def _upsert_cluster(conn: Connection, scope_id: Id, metric_id: Id, cluster: _Clu
 # ---------------------------------------------------------------------------
 # Orchestration.
 # ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _model_version() -> str:
+    root = Path(__file__).resolve().parents[1]
+    digest = hashlib.sha256()
+    for path in [*sorted((root / "causal").glob("*.py")), Path(__file__)]:
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+    return f"its:{digest.hexdigest()}:numpy:{np.__version__}"
+
+
+def _record_evaluation(conn: Connection, scope_id: Id, metric_id: Id,
+                       metric: _LoadedMetric, actions: list[_Action],
+                       targets: Sequence[Id], kind: str,
+                       hypotheses: Sequence[tuple[str, int]] | None = None) -> UUID:
+    manifest = {
+        "contract": "computed-evidence-v1", "scope_id": str(scope_id),
+        "metric_id": str(metric_id), "kind": kind,
+        "observations": [
+            [date.fromordinal(day).isoformat(), float(value).hex()]
+            for day, value in zip(metric.ordinals, metric.series.values)
+        ],
+        "actions": [[str(a.action_id), a.effective_date.isoformat(), a.split] for a in actions],
+        "targets": sorted(str(target) for target in targets),
+        "hypotheses": list(hypotheses) if hypotheses is not None else [
+            (str(action.action_id), action.split) for action in actions
+        ],
+    }
+    digest = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return conn.execute(
+        "insert into public.evaluation_runs "
+        "(scope_id, metric_id, actor_id, input_manifest, input_hash, model_version) "
+        "values (%s, %s, auth.uid(), %s, %s, %s) returning evaluation_id",
+        (scope_id, metric_id, Jsonb(manifest), digest, _model_version()),
+    ).fetchone()[0]
 
 
 def _assert_actions_in_scope(
@@ -336,10 +378,14 @@ def persist_metric_readouts(
             [(str(action.action_id), action.split) for action in family_actions],
         )
         by_ref = {r.action_ref: r for r in readouts}
+        evaluation_id = _record_evaluation(
+            conn, scope_id, metric_id, metric, family_actions,
+            [a.action_id for a in target_actions], "metric-family",
+        )
         for action in target_actions:
             readout = by_ref[str(action.action_id)]
             action_node_id = _upsert_node(conn, scope_id, "ACTION", action.action_id, action.ref)
-            edge_id = _upsert_edge(conn, scope_id, action_node_id, metric_node_id, readout.belief)
+            edge_id = _upsert_edge(conn, scope_id, action_node_id, metric_node_id, readout.belief, evaluation_id)
             clustered = action.action_id in clustered_action_ids
             _append_its_evidence(
                 conn, scope_id, edge_id, action.action_id, None,
@@ -369,6 +415,11 @@ def _persist_clusters(conn: Connection, scope_id: Id, metric_id: Id, metric_node
     readouts = batch_readout(
         metric.series, [(f"cluster:{i}", c.split) for i, c in enumerate(clusters)]
     )
+    members = [a for cluster in clusters for a in cluster.members]
+    evaluation_id = _record_evaluation(
+        conn, scope_id, metric_id, metric, members, [a.action_id for a in members], "cluster-overlay",
+        [(f"cluster:{i}", cluster.split) for i, cluster in enumerate(clusters)],
+    )
     for readout, cluster in zip(readouts, clusters):
         cluster_id = _upsert_cluster(conn, scope_id, metric_id, cluster)
         cluster_ids.append(cluster_id)
@@ -379,7 +430,7 @@ def _persist_clusters(conn: Connection, scope_id: Id, metric_id: Id, metric_node
         cluster_node_id = _upsert_node(
             conn, scope_id, "CLUSTER", cluster_id, f"Cluster of {len(cluster.members)} actions"
         )
-        edge_id = _upsert_edge(conn, scope_id, cluster_node_id, metric_node_id, readout.belief)
+        edge_id = _upsert_edge(conn, scope_id, cluster_node_id, metric_node_id, readout.belief, evaluation_id)
         _append_its_evidence(
             conn, scope_id, edge_id, None, cluster_id, readout.its, readout.placebo, True
         )

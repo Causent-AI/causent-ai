@@ -23,6 +23,8 @@ swap. Nothing here is weakened to pass; a real regression fails the gate.
 
 from __future__ import annotations
 
+import os
+
 import contextlib
 import json
 import uuid
@@ -30,7 +32,7 @@ import uuid
 import psycopg
 import pytest
 
-DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+DSN = os.environ.get("CAUSENT_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres")
 
 # --- Scratch tenant (namespaced 'a11c' = allowlist; teardown is exact) ---------
 ORG = uuid.UUID("a11c0000-0000-0000-0000-0000000000a0")

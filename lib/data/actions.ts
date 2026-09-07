@@ -5,6 +5,7 @@
 
 import type { Action, ImpactCell } from "@/lib/types";
 import { getServerSupabase } from "@/lib/supabase-server";
+import { collectKeyset } from "./keyset.ts";
 import { METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
 import { getMetricRecords } from "@/lib/data/metrics";
 import { edgeKey, loadEdgeReadouts } from "@/lib/data/graph";
@@ -61,17 +62,19 @@ export async function getActions(scopeId: string): Promise<Action[]> {
   const sb = await getServerSupabase();
 
   const [actionsRes, records, edges, activationContract] = await Promise.all([
-    sb
-      .from("actions")
-      .select("action_id, source, external_ref, ship_ts, effective_date, status, rationale_richtext")
-      .eq("scope_id", scopeId)
-      .order("effective_date", { ascending: false }),
+    collectKeyset<ActionRow>((after, size) => {
+      let query = sb.from("actions")
+        .select("action_id, source, external_ref, ship_ts, effective_date, status, rationale_richtext")
+        .eq("scope_id", scopeId).order("action_id").limit(size);
+      if (after) query = query.gt("action_id", after);
+      return query;
+    }, (row) => row.action_id),
     getMetricRecords(scopeId),
     loadEdgeReadouts(scopeId),
     loadCurrentDecisionReportActivationContract(scopeId),
   ]);
-  if (actionsRes.error) throw actionsRes.error;
-  const actionRows = (actionsRes.data ?? []) as ActionRow[];
+  const actionRows = actionsRes.rows.sort((a, b) =>
+    (b.effective_date ?? "9999").localeCompare(a.effective_date ?? "9999") || a.action_id.localeCompare(b.action_id));
 
   const firstMetricSlug = records[0]?.metric.id ?? "arr";
   const metricUiIdByDbId = new Map(

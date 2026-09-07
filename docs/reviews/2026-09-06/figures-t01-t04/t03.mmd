@@ -1,0 +1,16 @@
+flowchart LR
+  github["GitHub repository API<br/>stable numeric ID"]
+  key["github:repo:id:123<br/>pr:42 or issue:42"]
+  actions["actions unique key<br/>scope + external_ref"]
+  output["Distinct action UUIDs<br/>same-number PRs retained"]
+  alias["Legacy source URL<br/>action_identity_aliases"]
+  verify["Provider verification<br/>collision audit"]
+  reconcile["Reconciliation function<br/>UUID and alias retained"]
+  github -->|parse| key
+  key -->|insert| actions
+  actions -->|display| output
+  alias -->|review| verify
+  verify -->|verified| reconcile
+  reconcile -->|map| actions
+  classDef changed fill:#f5f9f8,stroke:#82aaa6,color:#163e3b;
+  class github,key,actions,output,alias,verify,reconcile changed;

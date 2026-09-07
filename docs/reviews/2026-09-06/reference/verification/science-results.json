@@ -1,0 +1,16 @@
+{
+  "external_shock_with_zero_true_PR_effect": {
+    "lift": 20.064035133610833,
+    "belief": 1.0,
+    "reason": null,
+    "direction": "POSITIVE"
+  },
+  "staggered_package_true_total_effect_30_last_action_effect_10": {
+    "lift": 11.62343453061605,
+    "belief": 0.5,
+    "reason": "AUTOCORRELATION",
+    "direction": "INCONCLUSIVE"
+  },
+  "201_action_family": "201 actions exceeds max_actions=200",
+  "caution": "Synthetic counterexamples; not a benchmark of population false positives."
+}

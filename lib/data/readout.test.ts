@@ -86,3 +86,23 @@ test("does not promote descriptive evidence for a falsified causal readout", () 
   assert.equal(cell.readout?.methodology, "ITS");
   assert.equal(cell.readout?.beliefReason, "PLACEBO");
 });
+
+test("computed provenance stays attached to the displayed direction and interval", () => {
+  const cell = toImpactCell(metric, edge({
+    evaluationId: "evaluation-1", provenance: "computed", dbDirection: "POSITIVE",
+    beliefScore: 1, beliefReason: null, lift: 0.05, ciLow: 0.04, ciHigh: 0.06,
+  }));
+  assert.equal(cell.direction, "up");
+  assert.equal(cell.readout?.evaluationId, "evaluation-1");
+  assert.equal(cell.readout?.provenance, "computed");
+  assert.equal(cell.readout?.ciLow, 4);
+});
+
+for (const provenance of ["legacy_unverified", "manual", "incomplete"] as const) {
+  test(`${provenance} never becomes a computed impact even if stale fields are confident`, () => {
+    const cell = toImpactCell(metric, edge({ provenance, dbDirection: "POSITIVE", beliefScore: 1, lift: 999 }));
+    assert.equal(cell.value, null);
+    assert.equal(cell.label, "—");
+    assert.ok(cell.detail);
+  });
+}
