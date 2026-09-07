@@ -59,6 +59,7 @@ export type ImpactReadout = {
 
 /** One authoritative readout cell: an action's estimated impact on one metric. */
 export type ImpactCell = {
+  interpretation?: "observational" | "waiting" | "cannot_attribute" | "legacy_unverified";
   metricId: string;
   direction: Direction;
   /** Signed magnitude in the metric's native unit. null = no measured effect ("—"). */

@@ -436,7 +436,7 @@ def test_waiting_queue_schedules_horizon_and_does_not_busy_loop(fixture):
         )
         .fetchone()
     )
-    assert pending and wake == expected and reason == "WAITING_FOR_FIXED_HORIZON"
+    assert pending and wake == expected and reason is None
     assert process_next_recompute_job(f["admin"], scope_id=seed.SCOPE) is None
 
 
@@ -446,3 +446,22 @@ def test_actual_exposure_mismatch_refuses_before_the_fixed_horizon(fixture):
         evaluate(fixture, today=date(2026, 2, 22))[0].refusal
         == "EXPOSURE_DIFFERS_FROM_PLAN"
     )
+
+
+def test_scientific_refusal_is_a_completed_review_not_a_worker_failure(fixture):
+    install_plan(fixture, actual="2026-02-19")
+    result = process_next_recompute_job(fixture["admin"], scope_id=seed.SCOPE)
+    assert result.status == "PROCESSED"
+    with as_actor(fixture) as conn:
+        row = conn.execute(
+            "select status from public.get_current_causal_recompute_status_v1(%s)",
+            (seed.SCOPE,),
+        ).fetchone()
+        assert row[0] == "current"
+        assert (
+            conn.execute(
+                "select refusal_reason from public.current_edge_readouts where scope_id=%s",
+                (seed.SCOPE,),
+            ).fetchone()[0]
+            == "EXPOSURE_DIFFERS_FROM_PLAN"
+        )

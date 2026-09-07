@@ -9,7 +9,7 @@ and membership-based customer workspace discovery/provisioning/archive. No produ
 claimed. The [plan](reviews/2026-09-07/T05_T10_PLAN.md) and
 [delivery runbook](reviews/2026-09-07/T05_T10_RUNBOOK.md) contain the review path and release sequence.
 
-Local verification passes: 697 application tests with 19 optional live-model skips; 1,315 engine
+Local verification passes: 702 application tests with 19 optional live-model skips; 1,316 engine
 tests; actual member/worker/connector boundaries; fresh and upgrade migration paths; schema lint;
 typecheck; zero-warning ESLint; production webpack/dashboard build; load harness contract; and all
 three staged worker imports. Real local authenticated browser submissions pass for plan/exposure

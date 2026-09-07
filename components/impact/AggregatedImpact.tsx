@@ -52,7 +52,7 @@ export function AggregatedImpact({
           valueClass={TONE.plain}
         />
         <StatTile
-          label="Improvement Rate"
+          label="Observed improvement"
           value={improvement?.value ?? "—"}
           sub={improvement?.comparison ?? ""}
           change={improvement?.change}
@@ -76,13 +76,13 @@ export function AggregatedImpact({
               </div>
               <div
                 className={`mt-1.5 text-[26px] font-bold leading-none tabular-nums ${
-                  r.good ? TONE.positive : TONE.negative
+                  r.good === null ? TONE.neutral : r.good ? TONE.positive : TONE.negative
                 }`}
               >
                 {r.label}
               </div>
               <div className="mt-1.5 text-[11px] text-[var(--text-subtle)]">
-                {r.good ? "net positive" : "net negative"}
+                {r.good === null ? "direction not assessed" : r.good ? "observed improvement" : "observed deterioration"}
               </div>
             </div>
           );

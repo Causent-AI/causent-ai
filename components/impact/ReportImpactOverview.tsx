@@ -191,7 +191,7 @@ export function ReportImpactOverview({
 
               <div className="rounded-lg border border-[var(--border)] bg-slate-50/70 p-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Estimated contribution</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">{trace.isPrimary ? "Observed outcome" : "Individual contribution"}</p>
                   <p className="text-[16px] font-semibold tabular-nums text-[var(--text)]">{trace.impactLabel}</p>
                 </div>
                 <p className="mt-2 text-[10px] leading-4 text-[var(--text-muted)]">{trace.detail}</p>

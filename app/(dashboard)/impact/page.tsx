@@ -71,7 +71,7 @@ export default async function ImpactPage() {
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-[15px] font-semibold text-[var(--text)]">Impact by Metric</h2>
-                <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">Estimated causal lift</p>
+                <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">Observed level change</p>
               </div>
               <Link href="/data-workshop" className="min-h-9 rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50">
                 Data →

@@ -26,12 +26,12 @@ The create operation atomically writes an organization, project, workspace and o
 
 ## Verification evidence
 
-- Application: 697 passed, zero failed, 19 optional live-model skips. This is a seeded local Supabase run; live model generation is not claimed.
-- Engine: 1,315 passed, including actual authenticated/worker logins, separate organizations and database concurrency. The 21 focused measurement/tenancy checks cover a 250-action history positive control, fixed horizon wakeup, policy/data invalidation, lag, changed/missing exposure, viewer denial, exact operator retries and archived connector writes.
+- Application: 702 passed, zero failed, 19 optional live-model skips. This is a seeded local Supabase run; live model generation is not claimed.
+- Engine: 1,316 passed, including actual authenticated/worker logins, separate organizations and database concurrency. The 22 focused measurement/tenancy checks cover a 250-action history positive control, fixed horizon wakeup, policy/data invalidation, lag, changed/missing exposure, viewer denial, exact operator retries and archived connector writes.
 - Typecheck, zero-warning ESLint, production webpack build, dashboard request-bound route contract and load harness contract passed. Load harness contracts are not a throughput measurement.
 - Fresh migration replay and upgrade from merged schema passed. The upgrade preserved a historical evaluation's manifest, hash, model version and timestamp; no metric definitions or measurement plans were invented. Error-level schema lint passed.
 - Deployment bundles staged only: drift 22 files, recompute 20, resolve 20. All three imports passed. These are local package checks, not hosted deployments.
-- Browser: real local Supabase session and RLS with a synthetic customer; submitted plan and actual exposure, inspected immutable saved state and explicit 0.5% display. A local password sign-in harness supplied the session. This does not validate production Google OAuth, hosted worker invocation, live provider ingestion, mobile layout or partner acceptance.
+- Browser: real local Supabase session and RLS with a synthetic customer; submitted plan and actual exposure, completed both synthetic actions, ran the scoped worker and verified the changed-exposure refusal in the decision header. The review status is current, not a retry failure. Immutable saved state and explicit 0.5% display pass. A local password sign-in harness supplied the session. This does not validate production Google OAuth, hosted worker invocation, live provider ingestion, mobile layout or partner acceptance.
 
 The pinned Supabase development image crashes in its optional permission-error hint formatter on some denied function calls (upstream `supabase/supautils#214`). Local tests and CI disable only `supautils.hint_roles` after reset; grants, RLS and denial assertions remain active. This is test-environment configuration, not a production migration. Before release, determine whether the target database has the affected extension version and rehearse denial behavior on an isolated hosted clone.
 
@@ -52,7 +52,7 @@ TypeScript/React execute the forms and presentation; Next.js server actions use 
 
 Each manifest stores consumed observations as exact float encodings, definition, plan, actual exposures, included actions, primary family, policy, source digest, Python/NumPy versions, architecture and BLAS identity. Hashes may differ across worker bundles or runtime builds; old runs remain queryable. This is input/runtime provenance, not a promise of bitwise equality across hardware.
 
-Queue receipts retain activation, requested/processed generations, input hash, attempts, next attempt, processing time and sanitized error/refusal code in the private job table. Worker HTTP/cron logs retain their existing bounded outcome counts and class-only errors. The new plan/exposure forms add no free-text application logging; references and population are stored in the scoped database. The operator command writes operation, workspace ID and request ID to operator stdout, without credential values. Provisioning receipts are private. No new remote log sink or telemetry vendor is introduced.
+Queue receipts retain activation, requested/processed generations, input hash, attempts, next attempt, processing time and sanitized worker error code in the private job table. Scientific refusal reasons stay on the immutable evaluation; a successfully stored refusal completes normally. Worker HTTP/cron logs retain their existing bounded outcome counts and class-only errors. The new plan/exposure forms add no free-text application logging; references and population are stored in the scoped database. The operator command writes operation, workspace ID and request ID to operator stdout, without credential values. Provisioning receipts are private. No new remote log sink or telemetry vendor is introduced.
 
 ## References
 

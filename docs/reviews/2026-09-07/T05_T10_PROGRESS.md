@@ -38,3 +38,11 @@ Next: inspect actual T05–T10 producers/consumers and earlier reference differe
 - Real authenticated local browser submitted a prospective plan, saved actual exposure and showed explicit 0.5-point data as 0.5%. The synthetic sign-in harness is not Google OAuth/provider acceptance. Desktop inspected; mobile remains unverified.
 - A local production-server probe correctly rejects localhost Supabase and development flags under the existing release gate. No production configuration guard was relaxed. The successful browser mutation run used development mode with real local Supabase authentication.
 - Final diff reviewed; runbook records contracts, omissions, upgrade and rollback. Next: explicit-path commit/push, draft PR, exact-head hosted checks, then editable illustrated engineering report. No merge or release.
+
+## 2026-09-07 06:41 UTC — browser findings corrected
+
+- Draft PR #34 opened at bc98e2169eea8323711767fa5a37c45f2de2c155; hosted CI 34090969877 and both Vercel preview builds passed for that initial commit. Preview access redirects to Vercel SSO.
+- Full browser loop exposed old causal/contribution labels, an unknown-scale fallback, and workspace summary aggregation that bypassed the new definition/provenance gate. Corrected those paths; distinct registered windows are no longer summed as a net effect. Unknown direction remains neutral in summary/export cards.
+- Completed both synthetic actions through the real UI, processed only that fixture's worker job, and verified the changed-exposure refusal in Impact. Fixed successful scientific refusals appearing as exhausted retries; error codes now mean worker failures, while scientific reasons remain on immutable evaluations.
+- Final local app suite: 702 passed, 19 optional live-model skips, zero failures. Engine: 1,316 passed. Typecheck, zero-warning lint, webpack/dashboard build, diff check and refreshed 22/20/20 worker imports pass. Schema is unchanged from the fresh/upgrade-verified migration.
+- Next: commit/push these review fixes, verify the new exact head, finish the illustrated engineering report and pause the overnight heartbeat. Production and mobile/provider acceptance remain separate.

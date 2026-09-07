@@ -66,7 +66,7 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
     return { ...neutralCell(metric.id), detail };
   }
   if (edge?.interpretation === "cannot_attribute" || edge?.interpretation === "waiting") {
-    return { ...neutralCell(metric.id), good: null, detail: measurementReason(edge.refusalReason) };
+    return { ...neutralCell(metric.id), good: null, interpretation: edge.interpretation, detail: measurementReason(edge.refusalReason) };
   }
   if (edge?.interpretation === "legacy_unverified") {
     return { ...neutralCell(metric.id), good: null, detail: "Historical result has no registered measurement contract." };
@@ -82,6 +82,7 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
       good: metric.beneficialDirection === "neutral" || metric.beneficialDirection === "unknown"
         ? null : isGoodOutcome(direction, metric.higherIsBetter),
       evidence: "observational",
+      interpretation: "observational",
       detail: "Observed level change around registered exposure. Work and AI contribution are not identified.",
       readout: {
         ...provenance,

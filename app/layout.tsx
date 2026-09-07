@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Causent — Did-It-Ship, Did-It-Work",
   description:
-    "Tie every shipped change to a business metric and get an honest causal readout.",
+    "Connect decisions to business metrics and review observed outcomes.",
 };
 
 export default function RootLayout({

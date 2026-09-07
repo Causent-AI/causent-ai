@@ -94,7 +94,7 @@ test("an inconclusive numeric estimate is graphable but remains a no-signal clai
   assert.equal(view.state, "no-signal");
   assert.equal(view.hasMeasurement, true);
   assert.deepEqual(view.ci95Pct, { low: -0.5, high: 3 });
-  assert.match(view.statusDetail, /not as a confident causal claim/i);
+  assert.match(view.statusDetail, /not as an attribution claim/i);
 });
 
 test("an unresolved prediction reports connected history without plotting zero", () => {

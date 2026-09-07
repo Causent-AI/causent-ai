@@ -324,7 +324,7 @@ def process_next_recompute_job(
                 conn,
                 job,
                 input_hash=input_hash,
-                error_code=measurement.refusal,
+                error_code=None,
                 resume_at=measurement.resume_at,
             )
             return RecomputeResult(
@@ -346,7 +346,7 @@ def process_next_recompute_job(
             conn,
             job,
             input_hash=input_hash,
-            error_code=measurement.refusal,
+            error_code=None,
             resume_at=measurement.resume_at,
         )
         return RecomputeResult(

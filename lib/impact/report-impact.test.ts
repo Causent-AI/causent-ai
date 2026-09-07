@@ -316,5 +316,22 @@ test("an inconclusive numeric result stays visibly non-confident", () => {
   assert.equal(view.hasMeasurement, true);
   assert.equal(view.predictionState, "no-signal");
   assert.equal(view.measuredLabel, "+2.1%");
-  assert.match(view.predictionDetail, /not as a confident causal claim/i);
+  assert.match(view.predictionDetail, /not as an attribution claim/i);
+});
+
+test("committed timeline withholds percentage overlays when scale is unconfirmed", () => {
+  const prediction = { committedAt: "2026-07-01", direction: "POSITIVE", magnitudePctMean: 10 } as Prediction;
+  assert.deepEqual(buildCommittedPredictionTimelineLevels({ ...metric, definitionId: null, percentScale: "unknown" }, prediction), []);
+});
+
+test("a current exposure refusal reaches the decision header before prediction resolution", () => {
+  const pending = prediction({ verdict: null, measuredPct: null });
+  const refusal: Action["impact"][number] = { metricId: metric.id, direction: "neutral", value: null,
+    label: "—", good: null, interpretation: "cannot_attribute", detail: "Actual exposure differs from the registered plan." };
+  const view = buildReportImpactViewModel({ reportTitle: "Registered review", decision: decision([pending]),
+    predictionId: pending.id, projection, metric, metrics: [metric],
+    actions: [action("primary", "D1A1", "2026-06-15", [refusal])] });
+  assert.equal(view.predictionStatus, "Cannot attribute outcome");
+  assert.equal(view.predictionDetail, refusal.detail);
+  assert.equal(view.measuredLabel, "—");
 });
