@@ -52,6 +52,18 @@ function displayOptionalValue(
  * mean shift may appear only as an explicitly descriptive preliminary readout.
  */
 export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): ImpactCell {
+  const provenance = edge?.provenance === undefined ? {} : {
+    evaluationId: edge.evaluationId,
+    provenance: edge.provenance,
+  };
+  if (edge?.provenance && edge.provenance !== "computed") {
+    const detail = {
+      legacy_unverified: "Historical evidence awaits verified recomputation.",
+      manual: "Manual assertion; no computed result.",
+      incomplete: "The current evaluation has no complete result yet.",
+    }[edge.provenance];
+    return { ...neutralCell(metric.id), detail };
+  }
   if (edge && isConfident(edge.dbDirection, edge.beliefScore) && edge.lift != null) {
     const direction = directionFromEdge(edge.dbDirection);
     const value = displayValue(edge.lift, metric);
@@ -63,6 +75,7 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
       good: isGoodOutcome(direction, metric.higherIsBetter),
       evidence: "causal",
       readout: {
+        ...provenance,
         methodology: "ITS",
         ciLow: displayOptionalValue(edge.ciLow, metric),
         ciHigh: displayOptionalValue(edge.ciHigh, metric),
@@ -94,6 +107,7 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
       evidence: "descriptive",
       detail: `Preliminary 14-day before/after mean shift. Not a causal claim; gathering data for ITS.${overlap}`,
       readout: {
+        ...provenance,
         methodology: "BEFORE_AFTER_14D",
         ciLow: displayOptionalValue(edge.descriptiveCiLow, metric),
         ciHigh: displayOptionalValue(edge.descriptiveCiHigh, metric),
@@ -109,6 +123,7 @@ export function toImpactCell(metric: Metric, edge: EdgeReadout | undefined): Imp
   return {
     ...neutral,
     readout: {
+      ...provenance,
       methodology: "ITS",
       ciLow: displayOptionalValue(edge.ciLow, metric),
       ciHigh: displayOptionalValue(edge.ciHigh, metric),

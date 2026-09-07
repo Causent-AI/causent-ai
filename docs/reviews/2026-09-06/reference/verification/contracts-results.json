@@ -1,0 +1,32 @@
+{
+  "different_repositories_same_pr_number": {
+    "first": "github:pr:42",
+    "second": "github:pr:42",
+    "collision": true
+  },
+  "accepted_import_above_configured_1000_row_read_cap": {
+    "ok": true,
+    "acceptedRows": 1500
+  },
+  "actual_point_scale_half_percent_metric": {
+    "input_lift_percentage_points": 0.1,
+    "displayed_label": "+10.0pp"
+  },
+  "all_inconclusive_reference_class": {
+    "hasPrecedent": true,
+    "supportCount": 1,
+    "verdictCounts": {
+      "INCONCLUSIVE": 1
+    },
+    "baseRate": {
+      "n": 1,
+      "weightedMeanPct": 5,
+      "minPct": 5,
+      "maxPct": 5
+    },
+    "calibration": {
+      "n": 1,
+      "weightedMeanErrorPct": 5
+    }
+  }
+}

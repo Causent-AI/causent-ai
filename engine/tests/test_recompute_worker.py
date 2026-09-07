@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import uuid
 from datetime import date, timedelta
 from threading import Event, Thread
@@ -12,7 +14,7 @@ import pytest
 import persistence.recompute as recompute
 from persistence.recompute import process_next_recompute_job
 
-DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+DSN = os.environ.get("CAUSENT_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres")
 
 ORG = uuid.UUID("a1000000-0000-0000-0000-000000000001")
 PROJECT = uuid.UUID("a1000000-0000-0000-0000-000000000002")

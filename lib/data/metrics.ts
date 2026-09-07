@@ -2,6 +2,8 @@
 // lib/types.ts Metric. Mirrors the lib/seed.ts `metrics` export.
 
 import { cache } from "react";
+import { collectKeyset } from "./keyset.ts";
+import { readMetricHistory, type HistoryWindow } from "./metric-history.ts";
 import type { Metric, Observation } from "@/lib/types";
 import { getServerSupabase } from "@/lib/supabase-server";
 import {
@@ -19,8 +21,6 @@ type MetricRow = {
   granularity: string;
   is_core: boolean;
 };
-type ObsRow = { metric_id: string; obs_date: string; value: number | string | null };
-
 /**
  * A UI Metric paired with its DB metric_id (UUID). The UI Metric.id is the stable
  * slug; the graph (nodes/edges) keys by metric_id, so callers that join readouts
@@ -31,44 +31,36 @@ export type MetricRecord = {
   metric: Metric;
   configured: boolean;
   isCore: boolean;
+  observationRead: Awaited<ReturnType<typeof readMetricHistory>>["completeness"];
 };
 
 /**
- * All metrics in the demo scope (UI Metric + DB metric_id), ordered to match the UI's
- * canonical metric order (lib/seed.ts). A metric whose name has no UI config is
- * skipped (we never guess a color / inversion for an unknown metric).
+ * Workspace metrics with complete, bounded daily history. Known metrics use the
+ * canonical UI order; other metrics retain the existing neutral presentation.
  */
-export const getMetricRecords = cache(async function getMetricRecords(scopeId: string): Promise<
+export const getMetricRecords = cache(async function getMetricRecords(scopeId: string, window: HistoryWindow = {}): Promise<
   MetricRecord[]
 > {
   const sb = await getServerSupabase();
 
-  const metricsRes = await sb
-    .from("metrics")
-    .select("metric_id, name, unit, source, granularity, is_core")
-    .eq("scope_id", scopeId);
-  if (metricsRes.error) throw metricsRes.error;
-  const metricRows = (metricsRes.data ?? []) as MetricRow[];
+  const { rows: metricRows } = await collectKeyset<MetricRow>((after, size) => {
+    let query = sb.from("metrics").select("metric_id, name, unit, source, granularity, is_core")
+      .eq("scope_id", scopeId).order("metric_id").limit(size);
+    if (after) query = query.gt("metric_id", after);
+    return query;
+  }, (row) => row.metric_id, 100);
   if (metricRows.length === 0) return [];
 
-  // Fetch observations PER METRIC: a single .in() query would blow past PostgREST's
-  // default 1000-row page cap (5 metrics x 210 days = 1050), silently truncating the
-  // series. Per metric each series is < 1000 rows, so no page is ever clipped.
-  const obsResults = await Promise.all(
-    metricRows.map((m) =>
-      sb
-        .from("metric_observations")
-        .select("metric_id, obs_date, value")
-        .eq("metric_id", m.metric_id)
-        .order("obs_date", { ascending: true }),
-    ),
-  );
+  const obsResults: Awaited<ReturnType<typeof readMetricHistory>>[] = [];
+  for (let i = 0; i < metricRows.length; i += 4) {
+    obsResults.push(...await Promise.all(metricRows.slice(i, i + 4)
+      .map((row) => readMetricHistory(sb, row.metric_id, window))));
+  }
 
   const seriesByMetric = new Map<string, Observation[]>();
   const lastDateByMetric = new Map<string, string>();
   for (const res of obsResults) {
-    if (res.error) throw res.error;
-    for (const o of (res.data ?? []) as ObsRow[]) {
+    for (const o of res.rows) {
       if (o.value == null) continue; // NULL day: no observation to plot
       const list = seriesByMetric.get(o.metric_id) ?? [];
       list.push({ date: o.obs_date, value: Number(o.value) });
@@ -78,7 +70,7 @@ export const getMetricRecords = cache(async function getMetricRecords(scopeId: s
   }
 
   const records: MetricRecord[] = [];
-  for (const row of metricRows) {
+  for (const [index, row] of metricRows.entries()) {
     const configured = METRIC_CONFIG_BY_NAME[row.name] ?? null;
     // Report-created metrics are intentionally not limited to the legacy demo
     // catalog. They receive neutral presentation defaults; their database UUID
@@ -94,6 +86,7 @@ export const getMetricRecords = cache(async function getMetricRecords(scopeId: s
       metricId: row.metric_id,
       configured: configured !== null,
       isCore: row.is_core === true,
+      observationRead: obsResults[index].completeness,
       metric: {
         id: cfg.id,
         name: row.name,

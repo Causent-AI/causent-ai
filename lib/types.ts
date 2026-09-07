@@ -43,6 +43,8 @@ export type Direction = "up" | "down" | "neutral";
 
 /** Statistical context retained from the evidence row that produced a cell. */
 export type ImpactReadout = {
+  evaluationId?: string | null;
+  provenance?: "computed" | "manual" | "legacy_unverified" | "incomplete";
   methodology: "ITS" | "BEFORE_AFTER_14D";
   /** Display-scaled confidence bounds in the same native unit as `ImpactCell.value`. */
   ciLow: number | null;

@@ -1,0 +1,5 @@
+
+> causent@0.1.0 check:dashboard-build
+> node scripts/check-dashboard-build.mjs
+
+{"event":"dashboard_build_contract_valid","requestBoundRoutes":["/actions","/data-workshop","/impact","/reports"]}

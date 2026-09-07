@@ -1,0 +1,14 @@
+flowchart LR
+  batch["Overlapping batches<br/>duplicates + fresh rows"]
+  rpc["ingest_github_actions_v1<br/>workspace row lock"]
+  insert["INSERT ON CONFLICT<br/>canonical key only"]
+  receipt["Inserted / duplicates<br/>rejected = 0 on success"]
+  error["Other constraint failure<br/>whole statement rolls back"]
+  visible["CLI error and nonzero exit<br/>no false success receipt"]
+  batch -->|≤ 200| rpc
+  rpc -->|serialize| insert
+  insert -->|count| receipt
+  insert -->|error| error
+  error -->|propagate| visible
+  classDef changed fill:#f5f9f8,stroke:#82aaa6,color:#163e3b;
+  class batch,rpc,insert,receipt,error,visible changed;

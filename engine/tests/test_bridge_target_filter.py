@@ -102,11 +102,13 @@ def test_target_filter_keeps_full_fdr_family_without_non_target_writes(monkeypat
             else "b1000000-0000-0000-0000-000000000021"
         )
 
-    def upsert_edge(_conn, passed_scope, _source, _target, belief):
+    def upsert_edge(_conn, passed_scope, _source, _target, belief, evaluation_id):
+        assert evaluation_id == target_id
         assert passed_scope == scope_id
         edges.append(belief)
         return UUID("b1000000-0000-0000-0000-000000000022")
 
+    monkeypatch.setattr(bridge, "_record_evaluation", lambda *_: target_id)
     monkeypatch.setattr(bridge, "_upsert_node", upsert_node)
     monkeypatch.setattr(bridge, "_upsert_edge", upsert_edge)
     monkeypatch.setattr(

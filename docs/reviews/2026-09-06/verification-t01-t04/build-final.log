@@ -1,0 +1,45 @@
+> causent@0.1.0 build:webpack
+> next build --webpack
+
+▲ Next.js 16.2.11 (webpack)
+- Experiments (use with caution):
+  · serverActions
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.6s
+  Running TypeScript ...
+  Finished TypeScript in 4.2s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/6) ...
+  Generating static pages using 11 workers (1/6)
+  Generating static pages using 11 workers (2/6)
+  Generating static pages using 11 workers (4/6)
+✓ Generating static pages using 11 workers (6/6) in 136ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /actions
+├ ƒ /api/cron/connector-inbox
+├ ƒ /api/cron/drift
+├ ƒ /api/cron/recompute
+├ ƒ /api/cron/reconcile-levers
+├ ƒ /api/cron/resolve
+├ ƒ /api/decision-report-assets/[assetId]
+├ ƒ /api/webhooks/github
+├ ƒ /api/webhooks/jira
+├ ƒ /auth/callback
+├ ƒ /data-workshop
+├ ○ /icon.svg
+├ ƒ /impact
+├ ○ /login
+├ ƒ /onboarding
+└ ƒ /reports
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

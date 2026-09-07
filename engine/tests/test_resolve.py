@@ -26,6 +26,8 @@ fixture technique only — production predictions are always human-authored
 
 from __future__ import annotations
 
+import os
+
 import contextlib
 import json
 import uuid
@@ -57,7 +59,7 @@ from persistence.resolve import (
     verdict_for,
 )
 
-DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+DSN = os.environ.get("CAUSENT_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres")
 
 TODAY = date(2026, 5, 1)
 

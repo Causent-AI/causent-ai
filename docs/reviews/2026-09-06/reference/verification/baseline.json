@@ -1,0 +1,227 @@
+{
+  "reviewed_commit": "2c2b1bfd9b91e5250d4736a6d1b1e341812aa29f",
+  "remote_head_verified_with": "GitHub connector branches/main 2026-09-06 approximately 06:38 UTC",
+  "open_checkout_head": "95c3c07",
+  "source_snapshot": "/private/tmp/causent-review-20260906-source",
+  "migration_count": 42,
+  "table_declarations": [
+    {
+      "name": "public.orgs",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 9
+    },
+    {
+      "name": "public.projects",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 15
+    },
+    {
+      "name": "public.workspaces",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 22
+    },
+    {
+      "name": "public.memberships",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 39
+    },
+    {
+      "name": "public.metrics",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 58
+    },
+    {
+      "name": "public.metric_observations",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 68
+    },
+    {
+      "name": "public.clusters",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 81
+    },
+    {
+      "name": "public.actions",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 96
+    },
+    {
+      "name": "public.nodes",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 116
+    },
+    {
+      "name": "public.causal_edges",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 124
+    },
+    {
+      "name": "public.evidence_objects",
+      "file": "supabase/migrations/20260703223627_v1_schema.sql",
+      "line": 148
+    },
+    {
+      "name": "public.objectives",
+      "file": "supabase/migrations/20260710000000_objectives.sql",
+      "line": 9
+    },
+    {
+      "name": "public.decisions",
+      "file": "supabase/migrations/20260711000000_prospective_layer.sql",
+      "line": 25
+    },
+    {
+      "name": "public.decision_actions",
+      "file": "supabase/migrations/20260711000000_prospective_layer.sql",
+      "line": 48
+    },
+    {
+      "name": "public.predictions",
+      "file": "supabase/migrations/20260711000000_prospective_layer.sql",
+      "line": 67
+    },
+    {
+      "name": "public.prediction_revisions",
+      "file": "supabase/migrations/20260711000000_prospective_layer.sql",
+      "line": 102
+    },
+    {
+      "name": "public.transition_events",
+      "file": "supabase/migrations/20260711000000_prospective_layer.sql",
+      "line": 120
+    },
+    {
+      "name": "public.levers",
+      "file": "supabase/migrations/20260712040728_cold_start_levers.sql",
+      "line": 23
+    },
+    {
+      "name": "public.allowed_emails",
+      "file": "supabase/migrations/20260712052812_auth_allowlist.sql",
+      "line": 25
+    },
+    {
+      "name": "public.funnel_events",
+      "file": "supabase/migrations/20260713144706_funnel_events.sql",
+      "line": 19
+    },
+    {
+      "name": "public.decision_reports",
+      "file": "supabase/migrations/20260722052759_decision_report_persistence.sql",
+      "line": 15
+    },
+    {
+      "name": "public.decision_report_revisions",
+      "file": "supabase/migrations/20260722052759_decision_report_persistence.sql",
+      "line": 35
+    },
+    {
+      "name": "public.decision_report_activations",
+      "file": "supabase/migrations/20260722061432_decision_report_activation.sql",
+      "line": 17
+    },
+    {
+      "name": "public.report_assets",
+      "file": "supabase/migrations/20260722165809_decision_report_assets.sql",
+      "line": 18
+    },
+    {
+      "name": "public.decision_report_rollouts",
+      "file": "supabase/migrations/20260723043946_decision_report_partner_rollout.sql",
+      "line": 8
+    },
+    {
+      "name": "public.decision_report_series",
+      "file": "supabase/migrations/20260723053444_decision_report_iteration_series.sql",
+      "line": 3
+    },
+    {
+      "name": "private.decision_report_pointer_transitions",
+      "file": "supabase/migrations/20260723061012_workspace_current_decision_report_series.sql",
+      "line": 84
+    },
+    {
+      "name": "private.causal_recompute_jobs",
+      "file": "supabase/migrations/20260723061925_causal_recompute_current_report.sql",
+      "line": 26
+    },
+    {
+      "name": "private.decision_report_completion_transitions",
+      "file": "supabase/migrations/20260723061925_causal_recompute_current_report.sql",
+      "line": 61
+    },
+    {
+      "name": "private.decision_report_activation_v1_transitions",
+      "file": "supabase/migrations/20260723061925_causal_recompute_current_report.sql",
+      "line": 296
+    },
+    {
+      "name": "private.decision_report_source_receipts",
+      "file": "supabase/migrations/20260723064500_decision_report_source_provenance.sql",
+      "line": 181
+    },
+    {
+      "name": "private.decision_report_source_revision_transitions",
+      "file": "supabase/migrations/20260723064500_decision_report_source_provenance.sql",
+      "line": 225
+    },
+    {
+      "name": "public.decision_report_activation_metrics",
+      "file": "supabase/migrations/20260817012313_decision_report_multi_metric_activation.sql",
+      "line": 70
+    },
+    {
+      "name": "public.decision_report_activation_action_metrics",
+      "file": "supabase/migrations/20260817012313_decision_report_multi_metric_activation.sql",
+      "line": 81
+    },
+    {
+      "name": "public.decision_report_package_interventions",
+      "file": "supabase/migrations/20260817055407_decision_report_scientific_contracts.sql",
+      "line": 348
+    },
+    {
+      "name": "public.connector_webhook_inbox",
+      "file": "supabase/migrations/20260817055412_connector_webhook_inbox.sql",
+      "line": 123
+    },
+    {
+      "name": "private.drift_refresh_jobs",
+      "file": "supabase/migrations/20260817055415_materialize_current_prediction_drift.sql",
+      "line": 8
+    },
+    {
+      "name": "public.current_prediction_drift",
+      "file": "supabase/migrations/20260817055415_materialize_current_prediction_drift.sql",
+      "line": 60
+    },
+    {
+      "name": "public.metric_csv_import_jobs",
+      "file": "supabase/migrations/20260817055817_chunked_metric_csv_imports.sql",
+      "line": 8
+    },
+    {
+      "name": "private.metric_csv_import_chunks",
+      "file": "supabase/migrations/20260817055817_chunked_metric_csv_imports.sql",
+      "line": 61
+    },
+    {
+      "name": "private.metric_csv_import_staging",
+      "file": "supabase/migrations/20260817055817_chunked_metric_csv_imports.sql",
+      "line": 74
+    }
+  ],
+  "application_source_files": 415,
+  "runtime": {
+    "node": "26.5.0 (project pins 22.23.0)",
+    "python": "3.14.2 (CI pins 3.12)",
+    "numpy": "2.5.0"
+  },
+  "tests": {
+    "node_pure_files": 64,
+    "node_pure_passed": 620,
+    "python_pure_files": 26,
+    "python_pure_passed": 1085,
+    "database_integration": "not run; no shared DB mutated"
+  }
+}

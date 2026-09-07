@@ -21,6 +21,8 @@ Nothing here weakens an assertion to make the suite pass; a real leak fails the 
 
 from __future__ import annotations
 
+import os
+
 import contextlib
 import datetime
 import hashlib
@@ -31,7 +33,7 @@ import psycopg
 import pytest
 from psycopg import errors as pgerr
 
-DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+DSN = os.environ.get("CAUSENT_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres")
 
 # --- Deterministic seed UUIDs (namespaced so teardown is exact) ---------------
 ORG_A = uuid.UUID("aaaa0000-0000-0000-0000-0000000000a0")
@@ -257,14 +259,19 @@ def _seed(conn: psycopg.Connection) -> None:
              NODE_B_SRC, WS_B, ACTION_B, NODE_B_TGT, WS_B, METRIC_B),
         )
         cur.execute(
-            "insert into public.causal_edges (edge_id, scope_id, source_node_id, target_node_id, direction) values "
-            "(%s,%s,%s,%s,'POSITIVE'),(%s,%s,%s,%s,'POSITIVE')",
-            (EDGE_A, WS_A, NODE_A_SRC, NODE_A_TGT, EDGE_B, WS_B, NODE_B_SRC, NODE_B_TGT),
+            "insert into public.evaluation_runs (evaluation_id, scope_id, metric_id, actor_id, input_manifest, input_hash, model_version) values "
+            "(%s,%s,%s,%s,'{}',%s,'isolation-fixture'),(%s,%s,%s,%s,'{}',%s,'isolation-fixture')",
+            (EDGE_A, WS_A, METRIC_A, USER_A, "a" * 64, EDGE_B, WS_B, METRIC_B, USER_B, "b" * 64),
         )
         cur.execute(
-            "insert into public.evidence_objects (evidence_id, scope_id, edge_id, methodology) values "
-            "(%s,%s,%s,'ITS'),(%s,%s,%s,'ITS')",
-            (EVIDENCE_A, WS_A, EDGE_A, EVIDENCE_B, WS_B, EDGE_B),
+            "insert into public.causal_edges (edge_id, scope_id, source_node_id, target_node_id, direction, authoritative_method, evaluation_id) values "
+            "(%s,%s,%s,%s,'POSITIVE','ITS',%s),(%s,%s,%s,%s,'POSITIVE','ITS',%s)",
+            (EDGE_A, WS_A, NODE_A_SRC, NODE_A_TGT, EDGE_A, EDGE_B, WS_B, NODE_B_SRC, NODE_B_TGT, EDGE_B),
+        )
+        cur.execute(
+            "insert into public.evidence_objects (evidence_id, scope_id, edge_id, action_id, methodology) values "
+            "(%s,%s,%s,%s,'ITS'),(%s,%s,%s,%s,'ITS')",
+            (EVIDENCE_A, WS_A, EDGE_A, ACTION_A, EVIDENCE_B, WS_B, EDGE_B, ACTION_B),
         )
         cur.execute(
             "insert into public.objectives (objective_id, scope_id, statement) values "

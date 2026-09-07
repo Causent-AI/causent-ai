@@ -1,0 +1,104 @@
+
+> causent@0.1.0 test:load-contract
+> node --test load/contract.test.mjs
+
+TAP version 13
+# Subtest: expired and invalid sessions cannot pass as protected documents
+ok 1 - expired and invalid sessions cannot pass as protected documents
+  ---
+  duration_ms: 0.459042
+  type: 'test'
+  ...
+# Subtest: only a non-empty 2xx protected response passes
+ok 2 - only a non-empty 2xx protected response passes
+  ---
+  duration_ms: 0.113542
+  type: 'test'
+  ...
+# Subtest: session cookies remain separate and preserve values containing equals signs
+ok 3 - session cookies remain separate and preserve values containing equals signs
+  ---
+  duration_ms: 0.291167
+  type: 'test'
+  ...
+# Subtest: broker configuration requires non-local HTTPS and a strong token
+ok 4 - broker configuration requires non-local HTTPS and a strong token
+  ---
+  duration_ms: 0.31675
+  type: 'test'
+  ...
+# Subtest: session pool envelope is fresh, profile-bound, and lease-namespaced
+ok 5 - session pool envelope is fresh, profile-bound, and lease-namespaced
+  ---
+  duration_ms: 2.133417
+  type: 'test'
+  ...
+# Subtest: session pool envelope rejects duplicate identities and auth sessions
+ok 6 - session pool envelope rejects duplicate identities and auth sessions
+  ---
+  duration_ms: 1.166208
+  type: 'test'
+  ...
+# Subtest: session identities are bound to one profile lease
+ok 7 - session identities are bound to one profile lease
+  ---
+  duration_ms: 2.576375
+  type: 'test'
+  ...
+# Subtest: every possible VU maps to one distinct pool entry without reuse
+ok 8 - every possible VU maps to one distinct pool entry without reuse
+  ---
+  duration_ms: 0.141042
+  type: 'test'
+  ...
+# Subtest: adversarial control uses a separate owner session and a real foreign workspace
+ok 9 - adversarial control uses a separate owner session and a real foreign workspace
+  ---
+  duration_ms: 0.690375
+  type: 'test'
+  ...
+# Subtest: load probe workspace cookie matches the application contract
+ok 10 - load probe workspace cookie matches the application contract
+  ---
+  duration_ms: 2.800292
+  type: 'test'
+  ...
+# Subtest: k6 harness isolates VU sessions and grounds the adversarial marker
+ok 11 - k6 harness isolates VU sessions and grounds the adversarial marker
+  ---
+  duration_ms: 0.8485
+  type: 'test'
+  ...
+# Subtest: broker preflight rejects weak credentials without logging them
+ok 12 - broker preflight rejects weak credentials without logging them
+  ---
+  duration_ms: 59.395334
+  type: 'test'
+  ...
+# Subtest: session-pool preflight fails closed on an undersized profile
+ok 13 - session-pool preflight fails closed on an undersized profile
+  ---
+  duration_ms: 34.012708
+  type: 'test'
+  ...
+# Subtest: adversarial preflight requires and validates its positive control
+ok 14 - adversarial preflight requires and validates its positive control
+  ---
+  duration_ms: 38.351458
+  type: 'test'
+  ...
+# Subtest: workflow labels profile-only success separately from the complete release gate
+ok 15 - workflow labels profile-only success separately from the complete release gate
+  ---
+  duration_ms: 0.5385
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 181.696625

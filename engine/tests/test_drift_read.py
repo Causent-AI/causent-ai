@@ -14,6 +14,8 @@ the window stops at the ship date — the lever's effect is not drift.
 
 from __future__ import annotations
 
+import os
+
 import contextlib
 import json
 import uuid
@@ -27,7 +29,7 @@ import pytest
 import persistence.drift_read as drift_read
 from persistence.drift_read import read_prediction_drift, read_scope_drift
 
-DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+DSN = os.environ.get("CAUSENT_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres")
 
 ORG = uuid.UUID("d21f0000-0000-0000-0000-0000000000a1")
 PROJ = uuid.UUID("d21f0000-0000-0000-0000-0000000000a2")

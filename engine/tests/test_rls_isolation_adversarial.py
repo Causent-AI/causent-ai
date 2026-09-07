@@ -17,6 +17,8 @@ Against: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
 from __future__ import annotations
 
+import os
+
 import contextlib
 import json
 import uuid
@@ -25,7 +27,7 @@ import psycopg
 import pytest
 from psycopg import errors as pgerr, sql
 
-DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+DSN = os.environ.get("CAUSENT_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres")
 
 # Namespaced seed ids (c*/d* so they never collide with the base gate's a*/b*).
 ORG_C = uuid.UUID("cccc0000-0000-0000-0000-0000000000c0")

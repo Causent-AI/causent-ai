@@ -1,0 +1,382 @@
+[
+  {
+    "id": "t01",
+    "title": "Complete history and one current evaluation",
+    "boundary": "Application server \u2192 database read boundary",
+    "nodes": [
+      [
+        "request",
+        [
+          "Data and Impact",
+          "request a workspace"
+        ],
+        40,
+        90
+      ],
+      [
+        "page",
+        [
+          "TypeScript readers",
+          "\u2264 500 rows per page"
+        ],
+        340,
+        90
+      ],
+      [
+        "db",
+        [
+          "metric_observations",
+          "current_edge_readouts"
+        ],
+        640,
+        90
+      ],
+      [
+        "output",
+        [
+          "Complete history",
+          "coherent readout"
+        ],
+        940,
+        90
+      ],
+      [
+        "limit",
+        [
+          "Empty page proves done",
+          "Over limit raises error"
+        ],
+        340,
+        300
+      ],
+      [
+        "run",
+        [
+          "evaluation_id joins",
+          "direction and interval"
+        ],
+        640,
+        300
+      ]
+    ],
+    "edges": [
+      [
+        "request",
+        "page",
+        "scope"
+      ],
+      [
+        "page",
+        "db",
+        "keyset"
+      ],
+      [
+        "db",
+        "output",
+        "rows"
+      ],
+      [
+        "page",
+        "limit",
+        "bound"
+      ],
+      [
+        "run",
+        "db",
+        "same run"
+      ]
+    ]
+  },
+  {
+    "id": "t02",
+    "title": "Computed evidence requires a trusted login",
+    "boundary": "Database login authority plus actor RLS",
+    "nodes": [
+      [
+        "worker",
+        [
+          "Recompute or resolve",
+          "dedicated login"
+        ],
+        40,
+        90
+      ],
+      [
+        "guard",
+        [
+          "Invoker triggers",
+          "login + actor scope"
+        ],
+        340,
+        90
+      ],
+      [
+        "store",
+        [
+          "evaluation_runs",
+          "edge + evidence snapshot"
+        ],
+        640,
+        90
+      ],
+      [
+        "output",
+        [
+          "Current evaluation",
+          "computed readout"
+        ],
+        940,
+        90
+      ],
+      [
+        "member",
+        [
+          "Ordinary member",
+          "authenticated API"
+        ],
+        40,
+        300
+      ],
+      [
+        "manual",
+        [
+          "Scoped MANUAL path",
+          "belief \u2264 0.3"
+        ],
+        340,
+        300
+      ],
+      [
+        "neutral",
+        [
+          "Manual assertion",
+          "no computed provenance"
+        ],
+        640,
+        300
+      ]
+    ],
+    "edges": [
+      [
+        "worker",
+        "guard",
+        "write"
+      ],
+      [
+        "guard",
+        "store",
+        "allowed"
+      ],
+      [
+        "store",
+        "output",
+        "view"
+      ],
+      [
+        "member",
+        "manual",
+        "assert"
+      ],
+      [
+        "manual",
+        "neutral",
+        "stored"
+      ],
+      [
+        "member",
+        "guard",
+        "computed denied"
+      ]
+    ]
+  },
+  {
+    "id": "t03",
+    "title": "Repository identity survives a rename",
+    "boundary": "Provider lookup precedes service-only database write",
+    "nodes": [
+      [
+        "github",
+        [
+          "GitHub repository API",
+          "stable numeric ID"
+        ],
+        40,
+        90
+      ],
+      [
+        "key",
+        [
+          "github:repo:id:123",
+          "pr:42 or issue:42"
+        ],
+        340,
+        90
+      ],
+      [
+        "actions",
+        [
+          "actions unique key",
+          "scope + external_ref"
+        ],
+        640,
+        90
+      ],
+      [
+        "output",
+        [
+          "Distinct action UUIDs",
+          "same-number PRs retained"
+        ],
+        940,
+        90
+      ],
+      [
+        "alias",
+        [
+          "Legacy source URL",
+          "action_identity_aliases"
+        ],
+        40,
+        300
+      ],
+      [
+        "verify",
+        [
+          "Provider verification",
+          "collision audit"
+        ],
+        340,
+        300
+      ],
+      [
+        "reconcile",
+        [
+          "Reconciliation function",
+          "UUID and alias retained"
+        ],
+        640,
+        300
+      ]
+    ],
+    "edges": [
+      [
+        "github",
+        "key",
+        "parse"
+      ],
+      [
+        "key",
+        "actions",
+        "insert"
+      ],
+      [
+        "actions",
+        "output",
+        "display"
+      ],
+      [
+        "alias",
+        "verify",
+        "review"
+      ],
+      [
+        "verify",
+        "reconcile",
+        "verified"
+      ],
+      [
+        "reconcile",
+        "actions",
+        "map"
+      ]
+    ]
+  },
+  {
+    "id": "t04",
+    "title": "Concurrent imports preserve fresh actions",
+    "boundary": "One short database transaction per scoped batch",
+    "nodes": [
+      [
+        "batch",
+        [
+          "Overlapping batches",
+          "duplicates + fresh rows"
+        ],
+        40,
+        90
+      ],
+      [
+        "rpc",
+        [
+          "ingest_github_actions_v1",
+          "workspace row lock"
+        ],
+        340,
+        90
+      ],
+      [
+        "insert",
+        [
+          "INSERT ON CONFLICT",
+          "canonical key only"
+        ],
+        640,
+        90
+      ],
+      [
+        "receipt",
+        [
+          "Inserted / duplicates",
+          "rejected = 0 on success"
+        ],
+        940,
+        90
+      ],
+      [
+        "error",
+        [
+          "Other constraint failure",
+          "whole statement rolls back"
+        ],
+        640,
+        300
+      ],
+      [
+        "visible",
+        [
+          "CLI error and nonzero exit",
+          "no false success receipt"
+        ],
+        940,
+        300
+      ]
+    ],
+    "edges": [
+      [
+        "batch",
+        "rpc",
+        "\u2264 200"
+      ],
+      [
+        "rpc",
+        "insert",
+        "serialize"
+      ],
+      [
+        "insert",
+        "receipt",
+        "count"
+      ],
+      [
+        "insert",
+        "error",
+        "error"
+      ],
+      [
+        "error",
+        "visible",
+        "propagate"
+      ]
+    ]
+  }
+]

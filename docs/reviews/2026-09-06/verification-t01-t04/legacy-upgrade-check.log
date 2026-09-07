@@ -1,0 +1,1 @@
+PASS: original UUID and source URL preserved as an unresolved alias; legacy evidence retained without verified status; explicit writer ACLs survive migration replay.

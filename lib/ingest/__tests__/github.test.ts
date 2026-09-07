@@ -9,6 +9,7 @@ import { join } from "node:path";
 
 import {
   GitHubRequestError,
+  githubIdentity,
   MAX_RATIONALE_LINE_CHARS,
   ingestActions,
   parseIssueToAction,
@@ -29,8 +30,8 @@ const FIXTURES = join(import.meta.dirname, "..", "__fixtures__");
 const readFixture = <T>(name: string): T[] =>
   JSON.parse(readFileSync(join(FIXTURES, name), "utf8")) as T[];
 
-const PULLS = readFixture<GitHubPullRequest>("pulls-closed.json");
-const ISSUES = readFixture<GitHubIssue>("issues-closed.json");
+const PULLS = readFixture<GitHubPullRequest>("pulls-closed.json").map((pr) => ({ ...pr, base: { repo: { id: 123 } } }));
+const ISSUES = readFixture<GitHubIssue>("issues-closed.json").map((issue) => ({ ...issue, repository: { id: 123 } }));
 
 const SCOPE = "ca5e0000-0000-0000-0000-0000000000d3";
 // Fixed "now" so the 90-day window is deterministic (cutoff = 2025-01-01).
@@ -46,6 +47,7 @@ function jsonResponse(body: unknown, status = 200): GitHubHttpResponse {
 function fixtureTransport(): GitHubTransport {
   return {
     async fetch(path: string): Promise<GitHubHttpResponse> {
+      if (!path.includes("?")) return jsonResponse({ id: 123 });
       const query = new URLSearchParams(path.slice(path.indexOf("?") + 1));
       const page = Number(query.get("page") ?? "1");
       const perPage = Number(query.get("per_page") ?? "100");
@@ -67,6 +69,39 @@ class InMemoryStore implements ActionStore {
   }
 }
 
+test("same-number PRs in different repositories stay distinct through parsing and UI identity", async () => {
+  const { toActionIdentity } = await import("../../data/action-identifiers.ts");
+  const pr = PULLS.find((row) => row.merged_at)!;
+  const first = parsePullRequestToAction(pr, SCOPE, 100)!;
+  const second = parsePullRequestToAction({ ...pr, html_url: pr.html_url.replace("/orbit/", "/api/") }, SCOPE, 200)!;
+  assert.notEqual(first.external_ref, second.external_ref);
+  assert.equal(toActionIdentity({ ...first, action_id: "first" }).uiId, "first");
+  assert.equal(toActionIdentity({ ...second, action_id: "second" }).uiId, "second");
+});
+
+test("repository rename and transfer retain identity; provider kind remains separate", () => {
+  assert.equal(githubIdentity("pr", 42, "https://github.com/acme/app/pull/42", 123),
+    githubIdentity("pr", 42, "https://github.com/new-owner/renamed/pull/42", 123));
+  assert.notEqual(githubIdentity("pr", 42, "https://github.com/acme/app/pull/42", 123),
+    githubIdentity("issue", 42, "https://github.com/acme/app/issues/42", 123));
+  assert.throws(() => githubIdentity("pr", 42, "https://github.com/acme/app/pull/42", undefined), /repository ID required/);
+  assert.throws(() => githubIdentity("pr", 42, "https://github.com/acme/app/pull/43", 123), /entity URL/);
+});
+
+test("overlapping insert receipts count concurrent duplicates and retain fresh rows", async () => {
+  const rows = PULLS.filter((pr) => pr.merged_at).slice(0, 2).map((pr) => parsePullRequestToAction(pr, SCOPE)!);
+  const store: ActionStore = { existingRefs: async () => new Set(), insert: async () => 1 };
+  assert.deepEqual(await upsertActions(store, rows, SCOPE), { inserted: 1, skipped: 1 });
+});
+
+test("unrelated storage failures and mixed-scope input never become duplicate success", async () => {
+  const row = parsePullRequestToAction(PULLS.find((pr) => pr.merged_at)!, SCOPE)!;
+  const failure = new Error("unrelated unique constraint");
+  const store: ActionStore = { existingRefs: async () => new Set(), insert: async () => { throw failure; } };
+  await assert.rejects(upsertActions(store, [row], SCOPE), failure);
+  await assert.rejects(upsertActions(store, [{ ...row, scope_id: "foreign" }], SCOPE), /scope mismatch/);
+});
+
 const refsOf = (store: InMemoryStore) => new Set(store.rows.keys());
 
 // --- parsing ---------------------------------------------------------------
@@ -76,7 +111,7 @@ test("parsePullRequestToAction maps a merged PR to an action row", () => {
   const row = parsePullRequestToAction(merged, SCOPE);
   assert.ok(row);
   assert.equal(row.source, "github_pr");
-  assert.equal(row.external_ref, "github:pr:8256");
+  assert.equal(row.external_ref, "github:repo:id:123:pr:8256");
   assert.equal(row.status, "merged");
   assert.equal(row.effective_date, "2025-03-05");
   assert.equal(row.ship_ts, "2025-03-05T12:00:00Z");
@@ -96,7 +131,7 @@ test("parseIssueToAction maps a resolved (completed) issue to an action row", ()
   const row = parseIssueToAction(resolved, SCOPE);
   assert.ok(row);
   assert.equal(row.source, "github_issue");
-  assert.equal(row.external_ref, "github:issue:412");
+  assert.equal(row.external_ref, "github:repo:id:123:issue:412");
   assert.equal(row.status, "completed");
   assert.equal(row.effective_date, "2025-02-20");
 });
@@ -204,7 +239,7 @@ test("ingestActions parses PRs + issues into deduped action rows in the window",
   assert.equal(result.capped, 3);
   assert.deepEqual(
     refsOf(store),
-    new Set(["github:pr:8256", "github:pr:8107", "github:issue:412"]),
+    new Set(["github:repo:id:123:pr:8256", "github:repo:id:123:pr:8107", "github:repo:id:123:issue:412"]),
   );
 });
 
@@ -213,7 +248,7 @@ test("ingestActions caps to the recent window (excludes the old PR #7900)", asyn
   await ingestActions(fixtureTransport(), store, {
     scopeId: SCOPE, owner: "acme", repo: "orbit", now: NOW, perPage: 1,
   });
-  assert.ok(!refsOf(store).has("github:pr:7900"));
+  assert.ok(!refsOf(store).has("github:repo:id:123:pr:7900"));
 });
 
 test("ingestActions respects a tighter windowDays", async () => {
@@ -224,7 +259,7 @@ test("ingestActions respects a tighter windowDays", async () => {
     scopeId: SCOPE, owner: "acme", repo: "orbit", now: NOW, perPage: 1, windowDays: 40,
   });
   assert.equal(result.capped, 2);
-  assert.deepEqual(refsOf(store), new Set(["github:pr:8256", "github:issue:412"]));
+  assert.deepEqual(refsOf(store), new Set(["github:repo:id:123:pr:8256", "github:repo:id:123:issue:412"]));
 });
 
 test("ingestActions applies the maxItems count cap, newest first", async () => {
@@ -234,7 +269,7 @@ test("ingestActions applies the maxItems count cap, newest first", async () => {
   });
   assert.equal(result.capped, 1);
   assert.equal(result.inserted, 1);
-  assert.deepEqual(refsOf(store), new Set(["github:pr:8256"])); // the newest ship
+  assert.deepEqual(refsOf(store), new Set(["github:repo:id:123:pr:8256"])); // the newest ship
 });
 
 test("ingestActions is idempotent: a second run inserts nothing", async () => {

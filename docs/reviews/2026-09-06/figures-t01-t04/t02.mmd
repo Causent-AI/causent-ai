@@ -1,0 +1,16 @@
+flowchart LR
+  worker["Recompute or resolve<br/>dedicated login"]
+  guard["Invoker triggers<br/>login + actor scope"]
+  store["evaluation_runs<br/>edge + evidence snapshot"]
+  output["Current evaluation<br/>computed readout"]
+  member["Ordinary member<br/>authenticated API"]
+  manual["Scoped MANUAL path<br/>belief ≤ 0.3"]
+  neutral["Manual assertion<br/>no computed provenance"]
+  worker -->|write| guard
+  guard -->|allowed| store
+  store -->|view| output
+  member -->|assert| manual
+  manual -->|stored| neutral
+  member -->|computed denied| guard
+  classDef changed fill:#f5f9f8,stroke:#82aaa6,color:#163e3b;
+  class worker,guard,store,output,member,manual,neutral changed;

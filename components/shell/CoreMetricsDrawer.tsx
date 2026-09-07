@@ -121,7 +121,10 @@ export function CoreMetricsDrawer({
   function rangeOptionLabel(option: SeriesRange): string {
     const optionSeries = filterSeriesRange(visibleSeries, option);
     if (optionSeries.length === 0) return option === "all" ? "All data" : `Last ${option.slice(0, -1)} days`;
-    const dates = `${formatShortDate(optionSeries[0].date)} – ${formatLongDate(optionSeries.at(-1)!.date)}`;
+    const first = optionSeries[0].date;
+    const last = optionSeries.at(-1)!.date;
+    const start = first.slice(0, 4) === last.slice(0, 4) ? formatShortDate(first) : formatLongDate(first);
+    const dates = `${start} – ${formatLongDate(last)}`;
     return option === "all" ? `All data · ${dates}` : dates;
   }
 
