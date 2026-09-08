@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:review": "node scripts/review-local.mjs",
     "build": "next build",
     "build:webpack": "next build --webpack",
     "start": "next start",
