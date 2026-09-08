@@ -19,7 +19,7 @@ Baseline: merged PR #34, `dd1901db247d5ca824d0a8419497d94113d13127`. Changes inc
 | Final new migration definitions | Clean replay in a transaction, then rollback, passed |
 | Authenticated local UX inspection | Desktop and phone captures; interactive proposal checked at phone/tablet/desktop |
 
-The migration replay recreated only the two new migrations' objects within a rolled-back transaction. It did not reset all historical migrations in this turn or advance production migration history. Hosted CI performs the fresh disposable reset and all three worker bundle checks. The local Supabase image still requires optional permission hints disabled for upstream `supabase/supautils#214`; grants and RLS denial tests remain active.
+The local migration replay recreated only the two new migrations' objects within a rolled-back transaction. It did not reset all historical migrations locally or advance production migration history. [Hosted CI run 34193693141](https://github.com/Causent-AI/causent-ai/actions/runs/34193693141) subsequently passed the fresh disposable reset, full suites, and all three worker bundle checks for implementation commit `a46fe0f`; both previews passed too. The local Supabase image still requires optional permission hints disabled for upstream `supabase/supautils#214`; grants and RLS denial tests remain active.
 
 From a disposable Supabase test environment, load its local credentials without printing them and run:
 

@@ -33,7 +33,7 @@
 - [x] Resume T11–T14 with user-authorized implementation; see the current checklist above for
   implemented scope and the remaining empirical validation.
 
-Last reconciled: 2026-08-19. Active and deliberately deferred work appears first; the dated
+Last reconciled: 2026-09-07. Active and deliberately deferred work appears first; the dated
 completed-slice checklists below are retained as point-in-time implementation history.
 
 PR #29 merged Slice 10 and the bounded MVP expansions into `main` as `690e196` on 2026-08-03 local

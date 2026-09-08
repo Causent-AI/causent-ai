@@ -4,7 +4,7 @@
 
 Causent now has durable admission controls for paid report generation, independent retry scheduling for resolution workspaces, recompute timing, and a more accurate history summary. These changes address the four remaining engineering findings from the September 6 review. The implementation builds on merged PR #34 (`dd1901db247d5ca824d0a8419497d94113d13127`) in `codex/p2-and-ux-review`.
 
-The local application, database, engine, and production-build checks pass. Merge, production migrations, worker deployment, and application promotion remain separate release states. The accompanying [UX review](UX_REVIEW.md) and [interactive proposal](ux-proposal/index.html) recommend a substantial document-centered redesign; they do not implement it. Visible engineering changes are limited to generation cancellation and denial messages, plus clearer History copy.
+The local application, database, engine, and production-build checks pass. Hosted CI and both preview builds also pass for implementation commit `a46fe0f` in [draft PR #35](https://github.com/Causent-AI/causent-ai/pull/35). Merge, production migrations, worker deployment, and application promotion remain separate release states. The accompanying [UX review](UX_REVIEW.md) and [interactive proposal](ux-proposal/index.html) recommend a substantial document-centered redesign; they do not implement it. Visible engineering changes are limited to generation cancellation and denial messages, plus clearer History copy.
 
 ## Executive Summary
 
@@ -111,4 +111,4 @@ flowchart LR
 - [Original technical review, T11–T14](../2026-09-06/reference/TECHNICAL_REVIEW.md), [engineering handbook](../../ENGINEERING.md), [Decision Report requirements](../../designs/ai-assisted-decision-report.md), [prediction-loop design](../../designs/prospective-prediction-loop.md).
 - Main stack from the lockfile: Next.js 16.2.11, React 19.2.4, TypeScript 5.9.3, AI SDK 7.0.34, Supabase JS 2.104.1, Tiptap 3.30.1. Verification used Node 22.23.0 and Python 3.12. Worker bundles pin NumPy 2.5.0 and psycopg 3.3.4. No dependency or license change is included.
 - Applied engineering guidance: installed Next.js documentation for Server Actions and environment handling; Supabase guidance for least-privilege functions and short transactions; React checklist for pending-state rendering; independent adversarial review. The Mermaid blocks above are editable figure sources.
-- Commit, PR, and hosted-check evidence are recorded in [HOSTED_VERIFICATION_T11_T14.md](HOSTED_VERIFICATION_T11_T14.md) after submission. This report's test counts describe the local implementation checkpoint.
+- Commit, PR, and hosted-check evidence are recorded in [HOSTED_VERIFICATION_T11_T14.md](HOSTED_VERIFICATION_T11_T14.md). This report's test counts describe the local implementation checkpoint; hosted CI independently passed the fresh database, full suites, all three worker packages, and build.

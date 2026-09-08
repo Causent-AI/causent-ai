@@ -7,6 +7,8 @@ budgets/receipts/cancellation, independent resolution leases and retries, recomp
 and honest History coverage/error summaries. Local verification passes: 710 application tests
 with 19 optional live-model skips, 1,324 engine tests, types, zero-warning lint, schema lint,
 production webpack/dashboard build, load contracts, and the changed staged worker import.
+Implementation commit `a46fe0f` is pushed in draft PR #35 with passing hosted CI and both preview
+builds; the follow-up documentation commit's current checks are linked in the submission evidence.
 See the [engineering review](reviews/2026-09-07/T11_T14_ENGINEERING_REVIEW.md),
 [runbook](reviews/2026-09-07/T11_T14_RUNBOOK.md), and
 [submission evidence](reviews/2026-09-07/HOSTED_VERIFICATION_T11_T14.md).
