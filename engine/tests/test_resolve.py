@@ -26,29 +26,22 @@ fixture technique only — production predictions are always human-authored
 
 from __future__ import annotations
 
-import os
-
 import contextlib
 import json
+import os
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from types import SimpleNamespace
+from datetime import date, timedelta
 
 import numpy as np
 import psycopg
 import pytest
-
-import persistence.resolve as resolve_module
 from causal.its_readout import its_readout
 from causal.types import Series
-from persistence.bridge import CLUSTER_POST_WINDOW, _load_metric
+from persistence.bridge import _load_metric
 from persistence.resolve import (
-    GATHERING_EXTENSION_DAYS,
     MAX_CLUSTER_SPAN_DAYS,
     EdgeState,
-    DecisionPackageContract,
     Lever,
-    ResolutionResult,
     pre_verdict,
     pre_window_mean_for,
     predicted_native_value,
@@ -183,159 +176,8 @@ class _SingleRow:
         return self._row
 
 
-class _PackageResolutionConnection:
-    def __init__(self, prediction_row):
-        self.prediction_row = prediction_row
-        self.commits = 0
-        self.updates = []
-
-    def execute(self, sql, _params=None):
-        if "from public.predictions where prediction_id" in sql:
-            return _SingleRow(self.prediction_row)
-        if "select m.source" in sql:
-            return _SingleRow(("csv", True))
-        if "update public.predictions set resolved_verdict = 'GATHERING'" in sql:
-            self.updates.append(_params)
-            return _SingleRow(None)
-        raise AssertionError(f"unexpected SQL: {sql}")
-
-    def commit(self):
-        self.commits += 1
-
-
-def test_complete_decision_package_uses_latest_effective_action_as_timing_marker(monkeypatch):
-    prediction_id = uuid.uuid4()
-    scope_id = uuid.uuid4()
-    decision_id = uuid.uuid4()
-    metric_id = uuid.uuid4()
-    registered_primary_id = uuid.uuid4()
-    final_action_id = uuid.uuid4()
-    intervention_date = date(2026, 2, 20)
-    completed_at = datetime(2026, 2, 20, 18, 0, tzinfo=timezone.utc)
-    package = DecisionPackageContract(
-        registered_primary_action_id=registered_primary_id,
-        intervention_action=Lever(
-            final_action_id,
-            "Final included action",
-            intervention_date,
-            "SHIPPED",
-        ),
-        included_action_ids=[registered_primary_id, final_action_id],
-        package_hash="a" * 64,
-        completed_at=completed_at,
-    )
-    conn = _PackageResolutionConnection((
-        scope_id,
-        decision_id,
-        metric_id,
-        "POSITIVE",
-        10.0,
-        TODAY,
-        None,
-    ))
-    persisted_actions = []
-    terminal = {}
-    monkeypatch.setattr(
-        resolve_module,
-        "_decision_package_for_prediction",
-        lambda *_args: package,
-    )
-    monkeypatch.setattr(resolve_module, "_reference_class_features", lambda *_args: {})
-    monkeypatch.setattr(
-        resolve_module,
-        "persist_metric_readouts",
-        lambda *_args, **kwargs: persisted_actions.extend(kwargs["action_ids"]),
-    )
-    monkeypatch.setattr(
-        resolve_module,
-        "_load_edge_state",
-        lambda *_args: EdgeState(
-            direction="POSITIVE",
-            belief_score=1.0,
-            belief_reason=None,
-            lift=10.0,
-            ci_low=8.0,
-            ci_high=12.0,
-            edge_id=uuid.uuid4(),
-        ),
-    )
-    start = date(2026, 1, 1)
-    monkeypatch.setattr(
-        resolve_module,
-        "_load_metric",
-        lambda *_args: SimpleNamespace(
-            ordinals=[(start + timedelta(days=index)).toordinal() for index in range(100)],
-            series=SimpleNamespace(values=np.full(100, 100.0)),
-        ),
-    )
-
-    def capture_terminal(_conn, _prediction_id, edge_id, verdict, memory_tuple):
-        terminal.update(edge_id=edge_id, verdict=verdict, tuple=memory_tuple)
-
-    monkeypatch.setattr(resolve_module, "_write_terminal", capture_terminal)
-
-    result = resolve_prediction(conn, prediction_id, TODAY, force=True)
-
-    assert result.status == "RESOLVED"
-    assert persisted_actions == [final_action_id]
-    assert terminal["verdict"] == "CONFIRMED"
-    assert terminal["tuple"]["causal_object"] == "decision_package"
-    assert terminal["tuple"]["intervention_rule"] == "latest_effective_included_action"
-    assert terminal["tuple"]["registered_primary_action_id"] == str(registered_primary_id)
-    assert terminal["tuple"]["intervention_action_id"] == str(final_action_id)
-    assert terminal["tuple"]["included_action_ids"] == [
-        str(registered_primary_id),
-        str(final_action_id),
-    ]
-    assert terminal["tuple"]["individual_attribution"] is False
-    assert "lever_action_id" not in terminal["tuple"]
-    assert conn.commits == 1
-
-
-def test_incomplete_decision_package_preserves_registration_without_measuring(monkeypatch):
-    prediction_id = uuid.uuid4()
-    registered_primary_id = uuid.uuid4()
-    support_action_id = uuid.uuid4()
-    package = DecisionPackageContract(
-        registered_primary_action_id=registered_primary_id,
-        included_action_ids=[registered_primary_id, support_action_id],
-    )
-    conn = _PackageResolutionConnection((
-        uuid.uuid4(),
-        uuid.uuid4(),
-        uuid.uuid4(),
-        "POSITIVE",
-        10.0,
-        TODAY,
-        None,
-    ))
-    monkeypatch.setattr(
-        resolve_module,
-        "_decision_package_for_prediction",
-        lambda *_args: package,
-    )
-    monkeypatch.setattr(resolve_module, "_reference_class_features", lambda *_args: {})
-    monkeypatch.setattr(
-        resolve_module,
-        "persist_metric_readouts",
-        lambda *_args, **_kwargs: pytest.fail("incomplete package must not run ITS"),
-    )
-
-    result = resolve_prediction(conn, prediction_id, TODAY, force=True)
-
-    assert result.status == "GATHERING"
-    assert len(conn.updates) == 1
-    resolution_tuple = json.loads(conn.updates[0][1])
-    assert resolution_tuple["causal_object"] == "decision_package"
-    assert resolution_tuple["registered_primary_action_id"] == str(registered_primary_id)
-    assert resolution_tuple["included_action_ids"] == [
-        str(registered_primary_id),
-        str(support_action_id),
-    ]
-    assert resolution_tuple["intervention_action_id"] is None
-    assert resolution_tuple["individual_attribution"] is False
-    assert conn.commits == 1
-
+# The former latest-completion mock cases are superseded by real registered
+# exposure and fixed-horizon worker tests in test_registered_measurement.py.
 
 # --- multi-lever: cluster-window derivation + ship-span guard (C4/#17) --------
 
@@ -637,54 +479,24 @@ def _verdict_row(conn, pid):
 
 # --- each verdict reachable end-to-end ---------------------------------------
 
-def test_e2e_verdicts_land_as_seeded(resolved):
+def test_e2e_unregistered_completed_predictions_refuse_attribution(resolved):
     conn, _, _ = resolved
-    expected = {
-        P_CONF: "CONFIRMED",
-        P_DIR: "DIRECTION_CONFIRMED",
-        P_REF: "REFUTED",
-        P_INC: "INCONCLUSIVE",
-        P_GATH: "GATHERING",
-        P_VOID: "VOIDED",
-        P_UNATTR: "UNATTRIBUTED",
-        P_CLUS: "CONFIRMED",              # multi-lever via the cluster edge
-        P_SPAN: "UNRESOLVABLE",           # ships too far apart to cluster
-        P_DROP: "VOIDED",                 # every lever dropped
-        P_NOM: "UNMEASURABLE_NO_METRIC",  # declared metric, no observations
-    }
-    got = {pid: _verdict_row(conn, pid)[0] for pid in expected}
-    assert got == expected
+    for pid in (P_CONF, P_DIR, P_REF, P_INC, P_GATH, P_CLUS, P_SPAN):
+        verdict, resolved_at, _, _, tup = _verdict_row(conn, pid)
+        assert verdict == "UNRESOLVABLE" and resolved_at is not None
+        assert tup["interpretation"] == "cannot_attribute"
+        assert tup["refusal_reason"] == "METRIC_DEFINITION_REQUIRED"
+        assert tup["measured_lift"] is None and tup["ci_low"] is None
+        assert tup["individual_attribution"] is False and tup["ai_attribution"] is False
+        assert tup["evaluation_id"] and len(tup["input_hash"]) == 64
 
 
-def test_e2e_terminal_rows_fully_written(resolved):
-    conn, _, _ = resolved
-    verdict, resolved_at, edge_id, _, tup = _verdict_row(conn, P_CONF)
-    assert verdict == "CONFIRMED"
-    assert resolved_at is not None
-    assert edge_id is not None
-    assert tup["verdict"] == "CONFIRMED"
-
-
-def test_e2e_gathering_extends_and_stays_open(resolved):
-    conn, _, _ = resolved
-    verdict, resolved_at, _, resolution_date, _ = _verdict_row(conn, P_GATH)
-    assert verdict == "GATHERING"
-    assert resolved_at is None, "GATHERING must not write a terminal resolution"
-    assert resolution_date == TODAY + timedelta(days=GATHERING_EXTENSION_DAYS)
-
-
-def test_e2e_memory_tuple_contents(resolved):
+def test_e2e_refusal_preserves_human_prediction(resolved):
     conn, _, oracle_pct = resolved
     tup = _verdict_row(conn, P_CONF)[4]
     assert tup["predicted_direction"] == "POSITIVE"
-    assert tup["measured_direction"] == "POSITIVE"
-    assert tup["belief_score"] == 1.0
-    assert tup["metric_name"] == "Resolve Gate Metric"
-    assert tup["mechanism_category"] == "conversion-funnel"
-    assert "PR #9001" in tup["action_labels"]
-    assert tup["ci_low"] <= tup["predicted_native"] <= tup["ci_high"]
-    assert tup["measured_pct"] == pytest.approx(oracle_pct, rel=1e-3)
     assert tup["predicted_magnitude_pct"] == pytest.approx(oracle_pct, rel=1e-4)
+    assert tup["verdict"] == "UNRESOLVABLE"
 
 
 def test_e2e_voided_and_unattributed_have_no_edge(resolved):
@@ -707,8 +519,8 @@ def test_e2e_rerun_is_idempotent(resolved):
         # so a second sweep never even returns them — and never rewrites them.
         assert pid not in statuses
         assert _verdict_row(conn, pid) == before[pid]
-    # GATHERING re-measures — but its extended date is no longer due today.
-    assert P_GATH not in statuses  # resolution_date moved past TODAY
+    # Unregistered history is terminally refused rather than repeatedly tested.
+    assert P_GATH not in statuses
     # Direct re-resolution of a terminal prediction IS a reported no-op.
     with as_user(USER) as user_conn:
         direct = resolve_prediction(user_conn, P_CONF, today=TODAY, force=True)
@@ -718,49 +530,12 @@ def test_e2e_rerun_is_idempotent(resolved):
 
 # --- multi-lever cluster path (C4/#17) ----------------------------------------
 
-def test_e2e_multi_lever_resolves_via_cluster_edge(resolved):
-    # Two shipped levers on one metric, ships within the span window: the
-    # prediction resolves against a CLUSTER -> METRIC edge measured as ONE
-    # intervention at the earliest ship (day 50) — so the oracle magnitude
-    # derived at split 50 lands CONFIRMED, same as the single-lever case.
+def test_e2e_unregistered_multi_lever_does_not_create_cluster_estimate(resolved):
     conn, _, _ = resolved
     verdict, resolved_at, edge_id, _, tup = _verdict_row(conn, P_CLUS)
-    assert verdict == "CONFIRMED"
-    assert resolved_at is not None and edge_id is not None
-    assert tup["cluster_id"] is not None
-    assert set(tup["lever_refs"]) == {"PR #9001", "PR #9002"}
-    assert tup["ship_span_days"] == 24
-    src_type = conn.execute(
-        "select s.type from public.causal_edges e "
-        "join public.nodes s on s.node_id = e.source_node_id "
-        "where e.edge_id = %s", (edge_id,)).fetchone()[0]
-    assert src_type == "CLUSTER"
-    # the persisted cluster window: [earliest ship, latest ship + post-window]
-    window = conn.execute(
-        "select window_start, window_end from public.clusters where cluster_id = %s",
-        (uuid.UUID(tup["cluster_id"]),)).fetchone()
-    assert window == (_day(50), _day(74) + CLUSTER_POST_WINDOW)
-
-
-def test_e2e_single_lever_tuple_shape_unchanged(resolved):
-    # Regression: the single-lever memory tuple keeps its singular fields and
-    # gains NO cluster fields (byte-for-byte path separation).
-    conn, _, _ = resolved
-    tup = _verdict_row(conn, P_CONF)[4]
-    assert tup["lever_ref"] == "PR #9001"
-    assert "cluster_id" not in tup and "lever_refs" not in tup
-
-
-def test_e2e_ship_span_guard_unresolvable(resolved):
-    # Ships 50 days apart (> MAX_CLUSTER_SPAN_DAYS): the co-occurrence premise
-    # fails; the honest verdict is UNRESOLVABLE with no edge, not a forced fit.
-    conn, results, _ = resolved
-    verdict, resolved_at, edge_id, _, tup = _verdict_row(conn, P_SPAN)
-    assert verdict == "UNRESOLVABLE"
-    assert resolved_at is not None and edge_id is None
-    assert tup["verdict"] == "UNRESOLVABLE"
-    detail = {r.prediction_id: r.detail for r in results}[P_SPAN]
-    assert "MAX_CLUSTER_SPAN_DAYS" in detail
+    assert verdict == "UNRESOLVABLE" and resolved_at is not None and edge_id is None
+    assert tup["measured_lift"] is None
+    assert conn.execute("select count(*) from public.clusters where scope_id=%s", (WS,)).fetchone()[0] == 0
 
 
 def test_e2e_all_dropped_levers_voided(resolved):

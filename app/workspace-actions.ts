@@ -3,10 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import {
-  listAccessibleDemoWorkspaces,
+  listAccessibleWorkspaces,
   writeActiveWorkspaceCookie,
 } from "@/lib/auth/workspace-context";
-import { demoWorkspaceById } from "@/lib/data/config";
 import { getServerSupabase, isLocalDemo } from "@/lib/supabase-server";
 
 export type SelectWorkspaceResult =
@@ -16,8 +15,8 @@ export type SelectWorkspaceResult =
 export async function selectWorkspaceAction(
   requestedWorkspaceId: unknown,
 ): Promise<SelectWorkspaceResult> {
-  const requested = demoWorkspaceById(requestedWorkspaceId);
-  if (!requested) {
+  if (typeof requestedWorkspaceId !== "string" ||
+      !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(requestedWorkspaceId)) {
     return { ok: false, error: "That workspace is unavailable." };
   }
 
@@ -29,12 +28,12 @@ export async function selectWorkspaceAction(
     }
   }
 
-  const accessible = await listAccessibleDemoWorkspaces(client).catch(() => []);
-  if (!accessible.some((workspace) => workspace.id === requested.id)) {
+  const accessible = await listAccessibleWorkspaces(client).catch(() => []);
+  if (!accessible.some((workspace) => workspace.id === requestedWorkspaceId)) {
     return { ok: false, error: "That workspace is unavailable." };
   }
 
-  await writeActiveWorkspaceCookie(requested.id);
+  await writeActiveWorkspaceCookie(requestedWorkspaceId);
   revalidatePath("/", "layout");
   revalidatePath("/onboarding");
   return { ok: true };

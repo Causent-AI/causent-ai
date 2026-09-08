@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { FileCsvIcon } from "@/components/ui/icons";
 import {
   importWorkspaceMetricCsvAction,
@@ -21,6 +21,8 @@ export function WorkspaceMetricCsvDropzone({
   const defaultUnit = activeMetricUnit === "percent" || activeMetricUnit === "USD"
     ? activeMetricUnit
     : "count";
+  const [unit, setUnit] = useState(defaultUnit);
+  const fieldClass = "mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-base text-[var(--text)] outline-none focus:border-[var(--brand-blue)] md:text-[12px]";
 
   return (
     <section aria-labelledby="workspace-metric-import-title">
@@ -34,7 +36,7 @@ export function WorkspaceMetricCsvDropzone({
         </div>
       </div>
 
-      <form action={action} className="mt-4 grid gap-3 md:grid-cols-[1.4fr_0.7fr_1.2fr_auto] md:items-end">
+      <form action={action} className="mt-4 grid gap-3 sm:grid-cols-2 sm:items-end">
         <label className="text-[11px] font-medium text-[var(--text-muted)]" htmlFor="workspace-metric-name">
           Metric name
           <input
@@ -52,7 +54,8 @@ export function WorkspaceMetricCsvDropzone({
           <select
             id="workspace-metric-unit"
             name="unit"
-            defaultValue={defaultUnit}
+            value={unit}
+            onChange={(event) => setUnit(event.target.value as typeof defaultUnit)}
             className="mt-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-base text-[var(--text)] outline-none focus:border-[var(--brand-blue)] md:text-[12px]"
           >
             <option value="percent">Percent</option>
@@ -72,12 +75,50 @@ export function WorkspaceMetricCsvDropzone({
             className="mt-1 block w-full rounded-lg border border-[var(--border)] bg-white px-2 py-[6px] text-[11px] text-[var(--text-muted)] file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-blue)] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-white"
           />
         </label>
+        {unit === "percent" ? (
+          <label className="text-[11px] font-medium text-[var(--text-muted)]">
+            How are percentages stored?
+            <select key={unit} name="numericScale" required defaultValue="" className={fieldClass}>
+              <option value="">Choose a scale</option>
+              <option value="points">0.5 means 0.5%</option>
+              <option value="ratio">0.5 means 50%</option>
+            </select>
+          </label>
+        ) : <input type="hidden" name="numericScale" value="native" />}
+        <label className="text-[11px] font-medium text-[var(--text-muted)]">
+          Which direction is better?
+          <select name="beneficialDirection" required defaultValue="" className={fieldClass}>
+            <option value="">Choose a direction</option>
+            <option value="higher">Higher is better</option>
+            <option value="lower">Lower is better</option>
+            <option value="neutral">No preferred direction</option>
+          </select>
+        </label>
+        <label className="text-[11px] font-medium text-[var(--text-muted)]">
+          What does each daily value represent?
+          <select name="aggregation" required defaultValue="" className={fieldClass}>
+            <option value="">Choose a daily measure</option>
+            <option value="sum">Total</option>
+            <option value="mean">Average</option>
+            <option value="rate">Rate</option>
+            <option value="snapshot">Snapshot</option>
+          </select>
+        </label>
+        <label className="text-[11px] font-medium text-[var(--text-muted)]">
+          Population or denominator
+          <input name="denominator" required maxLength={500} className={fieldClass}
+            placeholder="e.g. eligible accounts; all orders for a total" />
+        </label>
+        <p className="text-[11px] text-[var(--text-muted)] sm:col-span-2">
+          Values use daily UTC dates. Confirm what this metric means before importing.
+          A later change to its definition needs a new metric, so saved results stay interpretable.
+        </p>
         <button
           type="submit"
           disabled={pending}
           className="rounded-lg bg-[var(--brand-blue)] px-4 py-2 text-[12px] font-semibold text-white hover:brightness-105 disabled:cursor-wait disabled:opacity-60"
         >
-          {pending ? "Importing…" : "Import metric"}
+          {pending ? "Importing…" : "Confirm and import"}
         </button>
       </form>
 

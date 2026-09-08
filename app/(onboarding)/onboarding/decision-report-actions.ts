@@ -23,7 +23,7 @@ import {
 import { recordDecisionReportTelemetry } from "@/lib/decision-reports/telemetry";
 import { validateDecisionReportReviewExampleSelection } from "@/lib/decision-reports/fixtures/review-examples";
 import {
-  listAccessibleDemoWorkspaces,
+  listAccessibleWorkspaces,
   writeActiveWorkspaceCookie,
 } from "@/lib/auth/workspace-context";
 import { getScope } from "@/lib/data/scope";
@@ -122,7 +122,7 @@ export async function generateDecisionReportAction(
   const reviewExample = reviewExampleSelection.example;
   if (reviewExample) {
     const selectionClient = telemetryClient ?? await getServerSupabase();
-    const accessible = await listAccessibleDemoWorkspaces(selectionClient).catch(() => []);
+    const accessible = await listAccessibleWorkspaces(selectionClient).catch(() => []);
     if (!accessible.some((workspace) => workspace.id === reviewExample.workspaceId)) {
       return { ok: false, error: "That example workspace is unavailable." };
     }

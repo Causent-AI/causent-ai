@@ -3,6 +3,20 @@ import test from "node:test";
 
 import { calculateNativePredictionTarget } from "./prediction-calibration.ts";
 
+test("point-scale sub-one predictions stay in points and unconfirmed scale is withheld", () => {
+  const input = { baselineNative: 0.5, format: "percent" as const,
+    direction: "POSITIVE" as const, magnitudePctMean: 20 };
+  const points = calculateNativePredictionTarget({ ...input, percentScale: "points" });
+  assert.ok(points.available);
+  if (points.available) {
+    assert.equal(points.baselineLabel, "0.5%");
+    assert.equal(points.impliedTargetLabel, "0.6%");
+  }
+  assert.deepEqual(calculateNativePredictionTarget({ ...input, percentScale: "unknown" }), {
+    available: false, reason: "unconfirmed-scale",
+  });
+});
+
 test("calculates an implied target while retaining percent-of-mean semantics", () => {
   const result = calculateNativePredictionTarget({
     baselineNative: 100,

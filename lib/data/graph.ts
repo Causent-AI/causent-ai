@@ -5,6 +5,8 @@ import { getServerSupabase } from "@/lib/supabase-server";
 
 /** One materialized ACTION -> METRIC readout, already joined to its ITS lift. */
 export type EdgeReadout = {
+  interpretation?: "legacy_unverified" | "observational" | "cannot_attribute" | "waiting";
+  refusalReason?: string | null;
   evaluationId?: string | null;
   provenance?: "computed" | "manual" | "legacy_unverified" | "incomplete";
   inputHash?: string | null;
@@ -46,6 +48,8 @@ export const loadGraphReadouts = cache(async function loadGraphReadouts(scopeId:
     readouts.set(edgeKey(row.action_id, row.metric_id), {
       actionId: row.action_id,
       metricId: row.metric_id,
+      interpretation: row.interpretation,
+      refusalReason: row.refusal_reason,
       evaluationId: row.evaluation_id,
       provenance: row.provenance,
       inputHash: row.input_hash,

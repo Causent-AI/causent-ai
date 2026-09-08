@@ -107,18 +107,15 @@ function LiveCommitmentChart({
     direction: commitment.direction,
     magnitudePctMean: commitment.magnitudePctMean,
   });
-  const baselineDisplay = commitment.baselineNative === null
+  const baselineLabel = commitment.baselineNative === null
     ? null
-    : commitment.format === "percent" && commitment.percentScale === "ratio"
-      ? commitment.baselineNative * 100
-      : commitment.baselineNative;
-  const baselineLabel = baselineDisplay === null
-    ? null
-    : formatMetricValue(baselineDisplay, commitment.format);
+    : formatMetricValue(commitment.baselineNative, commitment.format, commitment.percentScale);
 
   if (!target.available) {
     const emptyLabel = !commitment.metricSelected
       ? "Choose an outcome metric"
+      : target.reason === "unconfirmed-scale"
+        ? "Confirm the metric's percentage scale"
       : target.reason === "invalid-commitment"
         ? "Set the expected change"
         : commitment.baselineUnavailableLabel ?? "Connect a baseline";
@@ -193,7 +190,7 @@ function LiveCommitmentChart({
         <circle cx="650" cy={targetY} r="5" fill="var(--brand-teal)" />
         <text x="55" y={Math.max(13, baselineY - 10)} fill="var(--text)" fontSize="12" fontWeight="600">{target.baselineLabel} baseline</text>
         <text x="650" y={Math.max(13, targetY - 10)} textAnchor="end" fill="var(--brand-teal)" fontSize="12" fontWeight="700">{target.impliedTargetLabel} target</text>
-        <text x="360" y="128" textAnchor="middle" fill="var(--brand-blue)" fontSize="11" fontWeight="600">Decision implemented</text>
+        <text x="360" y="128" textAnchor="middle" fill="var(--brand-blue)" fontSize="11" fontWeight="600">Planned change</text>
         <text x="650" y="144" textAnchor="end" fill="var(--brand-teal)" fontSize="11" fontWeight="700">{commitmentLabel}</text>
       </svg>
       <figcaption className="text-[11px] leading-5 text-[var(--text-muted)]">

@@ -110,6 +110,8 @@ export function fromStoredTuple(row: {
 }): ResolutionTuple | null {
   const tup = row.resolution_tuple;
   if (!tup) return null;
+  // Observational changes cannot calibrate predictions about work or AI effects.
+  if (tup.interpretation) return null;
   const mag = typeof tup.predicted_magnitude_pct === "number" ? tup.predicted_magnitude_pct : null;
   const dir = tup.predicted_direction === "NEGATIVE" ? -1 : 1;
   if (mag === null) return null;

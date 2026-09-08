@@ -1,5 +1,23 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-09-07 — remaining P1 measurement and customer workspace changes prepared
+
+The T05–T10 branch builds on merged PR #33 (`6ac6511`). It adds explicit immutable metric
+definitions, prospective fixed-horizon measurement plans, actual exposure records, a bounded
+registered primary family, complete evaluation identity, conservative observational interpretation,
+and membership-based customer workspace discovery/provisioning/archive. No production change is
+claimed. The [plan](reviews/2026-09-07/T05_T10_PLAN.md) and
+[delivery runbook](reviews/2026-09-07/T05_T10_RUNBOOK.md) contain the review path and release sequence.
+
+Local verification passes: 702 application tests with 19 optional live-model skips; 1,316 engine
+tests; actual member/worker/connector boundaries; fresh and upgrade migration paths; schema lint;
+typecheck; zero-warning ESLint; production webpack/dashboard build; load harness contract; and all
+three staged worker imports. Real local authenticated browser submissions pass for plan/exposure
+and explicit percentage display. Hosted CI/preview, mobile layout, provider/OAuth acceptance and
+production rollout are separate gates. The test Supabase image needs its optional permission hints
+disabled to avoid upstream `supabase/supautils#214`; grants and RLS remain tested. No semantic
+backfill, live customer provisioning, worker deployment or production alias change occurred.
+
 ## 2026-08-19 — latest onboarding and per-action handoff prepared for release
 
 The evidence, root causes, contributing factors, and revised release contract are recorded in

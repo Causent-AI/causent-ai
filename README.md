@@ -31,6 +31,29 @@ The application lives at the repository root rather than under `src/`.
 
 ## Local development
 
+### Review the saved T05–T10 changes
+
+In the T05–T10 review worktree, run:
+
+```bash
+npm run dev:review
+```
+
+Open `http://localhost:3125/`, select **Sign in to local review**, and keep the
+terminal running. This restores `.env.local` from the existing isolated Docker
+stack, starts the app on port 3115 if needed, and signs in to the saved synthetic
+customer workspace. Data Workshop and Impact retain the reviewed plan and
+exposure mismatch. Docker Desktop is started automatically on macOS.
+
+The command preserves the database and uses the existing `causent-t05-t10`
+containers on ports 57420–57429. It does not reset, migrate, provision a customer,
+send an email, or use hosted credentials. `.env.local` and `.local-review/` stay
+untracked. An unrelated `.env.local` is preserved with an explicit error. This
+helper requires the saved review database; it is not a fresh installation or
+production sign-in path.
+
+### Set up a separate local demo
+
 Use the repository's pinned Node version (`.node-version`, Node 22) and reset the
 entire local database before exercising Decision Report persistence:
 

@@ -134,7 +134,7 @@ def test_target_filter_keeps_full_fdr_family_without_non_target_writes(monkeypat
     )
 
     connection = _MetricOnlyConnection(scope_id)
-    bridge.persist_metric_readouts(
+    bridge.persist_legacy_metric_readouts(
         connection,
         scope_id,
         metric_id,

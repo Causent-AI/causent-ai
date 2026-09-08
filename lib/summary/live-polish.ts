@@ -22,7 +22,7 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
 
 const SYSTEM_PROMPT = [
-  "You copy-edit an already-written, honest causal readout for a product analytics tool.",
+  "You copy-edit an already-written, honest observational readout for a product analytics tool.",
   "You may ONLY improve the clarity and flow of the one-line `headline` and the `detail` lines.",
   "You MUST NOT change what the numbers say. Never add certainty, never claim something is",
   "'proven', 'guaranteed', or 'confirmed', never call the descriptive 14-day check more",

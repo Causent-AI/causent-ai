@@ -85,18 +85,15 @@ test("every seeded resolved verdict class shapes without throwing", (t) => {
   }
 });
 
-test("CONFIRMED shows a measured %-of-mean number", (t) => {
+test("unregistered demo results explicitly refuse attribution", (t) => {
   if (!gated(t)) return;
-  const confirmed = rows.find((r) => r.resolved_verdict === "CONFIRMED");
-  assert.ok(confirmed, "seed exercises CONFIRMED");
-  const sc = shapeScorecard({
-    verdict: "CONFIRMED",
-    committedDirection: confirmed!.direction,
-    committedMagnitudePct: confirmed!.magnitude_pct_mean,
-    tuple: confirmed!.resolution_tuple,
-  });
-  assert.equal(sc.kind, "measured");
-  assert.ok(sc.measured && sc.measured.pct !== null, "CONFIRMED carries a measured pct");
+  const refused = rows.find((row) => row.resolved_verdict === "UNRESOLVABLE");
+  assert.ok(refused, "seed exercises unregistered refusal");
+  const sc = shapeScorecard({ verdict: refused.resolved_verdict!, committedDirection: refused.direction,
+    committedMagnitudePct: refused.magnitude_pct_mean, tuple: refused.resolution_tuple });
+  assert.equal(sc.kind, "no-signal");
+  assert.equal(sc.measured, null);
+  assert.equal(sc.presentation.label, "Cannot attribute");
 });
 
 test("UNMEASURABLE_NO_METRIC routes to the connect/self-report surface", (t) => {
@@ -113,16 +110,13 @@ test("UNMEASURABLE_NO_METRIC routes to the connect/self-report surface", (t) => 
   assert.equal(sc.measured, null); // never a fabricated readout
 });
 
-test("GATHERING routes to the not-yet surface (no hard resolve)", (t) => {
+test("legacy demo significance never becomes work or AI confirmation", (t) => {
   if (!gated(t)) return;
-  const gathering = rows.find((r) => r.resolved_verdict === "GATHERING");
-  assert.ok(gathering, "seed exercises GATHERING");
-  const sc = shapeScorecard({
-    verdict: "GATHERING",
-    committedDirection: gathering!.direction,
-    committedMagnitudePct: gathering!.magnitude_pct_mean,
-    tuple: gathering!.resolution_tuple,
-  });
-  assert.equal(sc.kind, "gathering");
-  assert.equal(sc.measured, null);
+  assert.ok(rows.length > 0);
+  assert.equal(rows.some((row) => row.resolved_verdict === "CONFIRMED" || row.resolved_verdict === "DIRECTION_CONFIRMED"), false);
+  for (const row of rows.filter((candidate) => candidate.resolved_verdict === "UNRESOLVABLE")) {
+    assert.equal(row.resolution_tuple?.interpretation, "cannot_attribute");
+    assert.equal(row.resolution_tuple?.individual_attribution, false);
+    assert.equal(row.resolution_tuple?.ai_attribution, false);
+  }
 });

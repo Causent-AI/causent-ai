@@ -205,6 +205,14 @@ def seeded():
     try:
         try:
             _seed(conn)
+            from test_registered_measurement import install_plan
+            conn.execute("update public.metrics set unit='count' where metric_id=%s", (METRIC,))
+            definition = conn.execute(
+                "insert into public.metric_definitions(metric_id,scope_id,unit,numeric_scale,beneficial_direction,aggregation,denominator,confirmed_by) "
+                "values(%s,%s,'count','native','higher','sum','eligible requests',%s) returning definition_id",
+                (METRIC, SCOPE, ACTOR)).fetchone()[0]
+            conn.commit()
+            install_plan(dict(admin=conn, definition=definition))
         except psycopg.errors.UndefinedTable:
             conn.rollback()
             pytest.skip("causal recompute migration is unavailable")
@@ -233,7 +241,7 @@ def _evidence_counts(conn: psycopg.Connection) -> tuple[int, int, int]:
 def test_worker_is_exact_retry_safe_current_action_only_and_supersedes_stale_pointer(seeded):
     first = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert first is not None and first.status == "PROCESSED"
-    assert _evidence_counts(seeded) == (0, 2, 0)
+    assert _evidence_counts(seeded) == (2, 0, 0)
 
     seeded.execute(
         "select private.enqueue_current_causal_recompute(%s, %s, 'exact_retry', %s)",
@@ -242,7 +250,7 @@ def test_worker_is_exact_retry_safe_current_action_only_and_supersedes_stale_poi
     seeded.commit()
     retry = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert retry is not None and retry.status == "UNCHANGED"
-    assert _evidence_counts(seeded) == (0, 2, 0)
+    assert _evidence_counts(seeded) == (2, 0, 0)
 
     seeded.execute(
         "update public.metric_observations set value = value + 1 "
@@ -252,7 +260,7 @@ def test_worker_is_exact_retry_safe_current_action_only_and_supersedes_stale_poi
     seeded.commit()
     changed = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert changed is not None and changed.status == "PROCESSED"
-    assert _evidence_counts(seeded) == (0, 4, 0)
+    assert _evidence_counts(seeded) == (4, 0, 0)
 
     seeded.execute(
         "select private.enqueue_current_causal_recompute(%s, %s, 'stale_pointer', %s)",
@@ -266,7 +274,7 @@ def test_worker_is_exact_retry_safe_current_action_only_and_supersedes_stale_poi
     seeded.commit()
     stale = process_next_recompute_job(seeded, scope_id=SCOPE, metric_id=METRIC)
     assert stale is not None and stale.status == "SUPERSEDED"
-    assert _evidence_counts(seeded) == (0, 4, 0)
+    assert _evidence_counts(seeded) == (4, 0, 0)
 
 
 def test_worker_runs_graph_io_as_stored_actor_and_fails_closed_for_forgery(seeded):
@@ -305,7 +313,7 @@ def test_worker_locks_current_pointer_spine_until_graph_receipt_commits(
     failures = []
 
     def blocking_bridge(*_args, **kwargs):
-        assert kwargs == {"action_ids": [FINAL_ACTION], "commit": False}
+        assert kwargs == {"action_ids": [ACTION], "activation_id": ACTIVATION, "commit": False}
         bridge_entered.set()
         assert release_bridge.wait(5), "test did not release the bridge"
 

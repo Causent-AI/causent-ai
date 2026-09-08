@@ -99,7 +99,7 @@ export function ReportPreview({
               tone="plain"
             />
             <Figure
-              label="Improvement Rate"
+              label="Observed improvement"
               value={improvement?.value ?? "—"}
               tone="positive"
             />
@@ -111,15 +111,15 @@ export function ReportPreview({
                   label={m?.name ?? r.metricId}
                   value={r.label}
                   dot={m?.color}
-                  tone={r.good ? "positive" : "negative"}
+                  tone={r.good === null ? "plain" : r.good ? "positive" : "negative"}
                 />
               );
             })}
           </div>
           <p className="mt-3 text-[12px] leading-relaxed text-[var(--text-muted)]">
-            Figures are net confident causal lift (OLS Interrupted Time Series).
-            Metrics with fewer than 45 days since a ship are still gathering data
-            and are withheld from a confident claim.
+            Figures describe registered observational level changes (OLS Interrupted Time Series).
+            Distinct measurement windows are not added together. Work and AI contribution
+            are not identified.
           </p>
         </Section>
 

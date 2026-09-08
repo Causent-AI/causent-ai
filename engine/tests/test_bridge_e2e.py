@@ -56,7 +56,7 @@ from causal.belief_direction import belief_direction
 from causal.its_readout import its_readout
 from causal.placebo_in_time import placebo_in_time
 from causal.types import Series
-from persistence.bridge import persist_metric_readouts
+from persistence.bridge import persist_legacy_metric_readouts as persist_metric_readouts
 
 DSN = os.environ.get("CAUSENT_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres")
 

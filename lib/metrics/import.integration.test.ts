@@ -169,6 +169,7 @@ test("creates a named workspace CSV metric, shows it as selectable data, and ret
     scopeId: WORKSPACE,
     name: "AI assistant adoption rate",
     unit: "percent",
+    definition: { numericScale: "points", beneficialDirection: "higher", aggregation: "rate", denominator: "eligible users" },
     observations,
     authoredBy: null,
   });
@@ -191,6 +192,7 @@ test("creates a named workspace CSV metric, shows it as selectable data, and ret
     scopeId: WORKSPACE,
     name: "AI assistant adoption rate",
     unit: "percent",
+    definition: { numericScale: "points", beneficialDirection: "higher", aggregation: "rate", denominator: "eligible users" },
     observations: [{ ...observations[0], value: 0.44 }, observations[1]],
     authoredBy: null,
   });
@@ -241,6 +243,7 @@ test("workspace metric import rejects a missing workspace before writing", async
       scopeId,
       name: "Should not be written",
       unit: "count",
+    definition: { numericScale: "native", beneficialDirection: "higher", aggregation: "sum", denominator: "eligible events" },
       observations: [{ date: "2026-07-22", value: 1 }],
       authoredBy: null,
     });
@@ -265,6 +268,7 @@ test("a 251-row workspace import commits as two resumable chunks", async (t) => 
     scopeId: WORKSPACE,
     name: "Chunked Volume",
     unit: "count",
+    definition: { numericScale: "native", beneficialDirection: "higher", aggregation: "sum", denominator: "eligible events" },
     observations,
     authoredBy: null,
   });

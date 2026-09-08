@@ -60,9 +60,9 @@ function outcomeAxis(values: Array<number | null>): PredictionOutcomeAxis {
 
 function unresolvedDetail(observationCount: number, resolutionDate: string): string {
   if (observationCount > 0) {
-    return `${observationCount} observations are connected. The engine has not produced a measured outcome yet; it will re-evaluate against the ${resolutionDate} resolution date and causal gates.`;
+    return `${observationCount} observations are connected. The engine has not produced a measured outcome yet; it will re-evaluate against the ${resolutionDate} resolution date and registered measurement requirements.`;
   }
-  return "No engine measurement is available yet. Connect daily metric data so the prediction can be evaluated after the action ships and the causal gates pass.";
+  return "No engine measurement is available yet. Connect daily metric data so the prediction can be evaluated after documented exposure and the registered fixed horizon.";
 }
 
 export function buildPredictionOutcomeViewModel(input: {
@@ -143,7 +143,7 @@ export function buildPredictionOutcomeViewModel(input: {
       ?? unresolvedDetail(observationCount, prediction.resolutionDate);
   } else if (hasMeasurement) {
     statusTitle = scorecard?.presentation.label ?? "No confident signal";
-    statusDetail = `${scorecard?.presentation.caveat ?? "The engine did not classify this as a confident causal result."} The estimate is shown for context, not as a confident causal claim.`;
+    statusDetail = `${scorecard?.presentation.caveat ?? "The engine did not classify this as a confident observational result."} The estimate is shown for context, not as an attribution claim.`;
   } else if (scorecard?.kind === "measured") {
     statusTitle = "Measured result unavailable";
     statusDetail =
@@ -152,6 +152,11 @@ export function buildPredictionOutcomeViewModel(input: {
     statusTitle = scorecard?.presentation.label ?? "No confident signal";
     statusDetail = scorecard?.presentation.caveat
       ?? "The engine did not produce a numeric result. No zero has been substituted.";
+  }
+
+  if (prediction.resolutionTuple?.interpretation) {
+    statusTitle = scorecard?.presentation.label ?? statusTitle;
+    statusDetail = scorecard?.presentation.caveat ?? statusDetail;
   }
 
   const axis = outcomeAxis([

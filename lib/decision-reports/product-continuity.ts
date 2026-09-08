@@ -4,19 +4,6 @@ export type ReportLifecycleStage =
   | "start_action"
   | "active";
 
-export function inferMetricPercentScale(
-  format: "currency" | "percent" | "count",
-  series: ReadonlyArray<{ value: number }>,
-): "ratio" | "points" {
-  if (format !== "percent" || series.length === 0) return "points";
-  return series.every(
-    (observation) =>
-      Number.isFinite(observation.value) && Math.abs(observation.value) <= 1,
-  )
-    ? "ratio"
-    : "points";
-}
-
 export type ReportLifecyclePresentation = {
   stage: ReportLifecycleStage;
   label: string;

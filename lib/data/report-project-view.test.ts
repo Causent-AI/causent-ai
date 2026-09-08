@@ -63,7 +63,7 @@ test("an active report isolates every dashboard dataset to its project", () => {
     ],
     metrics: [metric("completion"), metric("support"), metric("arr")],
     metricUiIdByDbId: new Map([["metric-uuid", "completion"]]),
-    aggregatedImpact: [{ label: "Improvement Rate", value: "50%", comparison: "legacy", tone: "positive" }],
+    aggregatedImpact: [{ label: "Observed improvement", value: "50%", comparison: "legacy", tone: "positive" }],
     impactByMetric: [
       { metricId: "completion", value: 0, label: "—", direction: "neutral", good: true },
       { metricId: "arr", value: 10, label: "+10", direction: "up", good: true },
@@ -116,7 +116,7 @@ test("current report impact uses only the primary lever's causal cell", () => {
     ],
     metrics: [metric("completion"), metric("support")],
     metricUiIdByDbId: new Map([["metric-uuid", "completion"]]),
-    aggregatedImpact: [{ label: "Improvement Rate", value: "0%", comparison: "workspace", tone: "negative" }],
+    aggregatedImpact: [{ label: "Observed improvement", value: "0%", comparison: "workspace", tone: "negative" }],
     impactByMetric: [{ metricId: "completion", value: -147, label: "-147.0pp", direction: "down", good: false }],
   });
 
@@ -129,12 +129,12 @@ test("current report impact uses only the primary lever's causal cell", () => {
   }]);
   assert.deepEqual(view.metrics.map((item) => item.id), ["completion", "support"]);
   assert.deepEqual(view.aggregatedImpact, [{
-    label: "Improvement Rate", value: "100%",
-    comparison: "1 / 1 confident readouts for this report", tone: "positive",
+    label: "Observed improvement", value: "100%",
+    comparison: "1 / 1 observational readouts with a defined desired direction", tone: "positive",
   }]);
 });
 
-test("a completed package rolls up only the latest-effective action on the primary outcome", () => {
+test("a completed package rolls up only its registered primary observational outcome", () => {
   const registered = action("registered", [{
     metricId: "completion", direction: "up", value: 99,
     label: "+99.0pp", good: true, evidence: "causal",
@@ -172,9 +172,9 @@ test("a completed package rolls up only the latest-effective action on the prima
   });
 
   assert.deepEqual(view.impactByMetric, [{
-    metricId: "completion", value: 4, label: "+4.0pp", direction: "up", good: true,
+    metricId: "completion", value: 99, label: "+99.0pp", direction: "up", good: true,
   }]);
-  assert.equal(view.aggregatedImpact[0].comparison, "1 / 1 confident readouts for this report");
+  assert.equal(view.aggregatedImpact[0].comparison, "1 / 1 observational readouts with a defined desired direction");
 });
 
 test("legacy workspaces retain their complete dashboard payload", () => {

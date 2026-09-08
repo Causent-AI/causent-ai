@@ -184,6 +184,7 @@ export async function listProductionResolutionTargets(
     .select(
       "workspace_id, project_id, projects!inner(org_id), predictions!inner(prediction_id)",
     )
+    .is("archived_at", null)
     .is("predictions.resolved_at", null)
     .lte("predictions.resolution_date", today)
     .order("workspace_id", { ascending: true })

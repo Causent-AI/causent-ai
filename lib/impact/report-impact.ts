@@ -72,14 +72,11 @@ function finiteNumber(value: number | null | undefined): number | null {
 
 /** Ratio-form percentage CSVs store 40% as 0.4; older datasets store 40. */
 export function usesRatioPercentScale(metric: Metric): boolean {
-  return metric.format === "percent" &&
-    metric.series.length > 0 &&
-    metric.series.every((observation) => Math.abs(observation.value) <= 1);
+  return metric.format === "percent" && metric.percentScale === "ratio";
 }
 
 export function formatReportMetricLevel(value: number, metric: Metric): string {
-  const displayValue = usesRatioPercentScale(metric) ? value * 100 : value;
-  return formatMetricValue(displayValue, metric.format);
+  return formatMetricValue(value, metric.format, metric.percentScale);
 }
 
 /** Overlay planning levels only when the connected series has the same percent unit. */
@@ -87,7 +84,7 @@ export function buildReportTimelineLevels(
   metric: Metric,
   projection: MetricProjection,
 ): ReportImpactTimelineLevel[] {
-  if (metric.format !== "percent") return [];
+  if (metric.format !== "percent" || metric.percentScale === "unknown" || metric.definitionId === null) return [];
   const ratioScale = usesRatioPercentScale(metric);
   const levels: ReportImpactTimelineLevel[] = [];
   const baseline = finiteNumber(projection.baselinePct);
@@ -125,7 +122,7 @@ export function buildCommittedPredictionTimelineLevels(
   const calibration = calculateNativePredictionTarget({
     baselineNative: baselineObservation?.value ?? null,
     format: metric.format,
-    percentScale: usesRatioPercentScale(metric) ? "ratio" : "points",
+    percentScale: metric.percentScale ?? "unknown",
     direction: prediction.direction,
     magnitudePctMean: prediction.magnitudePctMean,
   });
@@ -198,13 +195,13 @@ function traceForAction(
       state: "not-completed",
       stateLabel: "Not completed",
       impactLabel: "—",
-      detail: "This action has no completion date, so no outcome is attributed to it.",
+      detail: "Completion has not been recorded. Actual customer exposure is recorded separately in Data Workshop.",
       ci95Label: null,
       sampleLabel: null,
     };
   }
 
-  if (isDecisionPackage && !isPackageIntervention) {
+  if (isDecisionPackage && !isPrimary) {
     return {
       ...base,
       state: "not-independently-estimated",
@@ -216,27 +213,25 @@ function traceForAction(
     };
   }
 
-  if (!isPrimary && !isPackageIntervention) {
+  if (!isPrimary) {
     return {
       ...base,
       state: "not-independently-estimated",
       stateLabel: "Not independently estimated",
       impactLabel: "—",
-      detail: `Completed support action connected to ${assignedMetricName}. The action-level causal readout is reserved for the pre-registered primary lever.`,
+      detail: `Completed support action connected to ${assignedMetricName}. The registered primary outcome is measured around documented exposure; individual contribution is not identified.`,
       ci95Label: null,
       sampleLabel: null,
     };
   }
 
-  if (cell?.evidence === "causal" && cell.value !== null) {
+  if ((cell?.evidence === "observational" || cell?.evidence === "causal") && cell.value !== null) {
     return {
       ...base,
       state: "measured",
-      stateLabel: "ITS estimate",
+      stateLabel: "Observational estimate",
       impactLabel: cell.label,
-      detail: isDecisionPackage
-        ? "Estimated decision-package impact—not proof. The latest effective action defines timing; individual action attribution is unavailable."
-        : "Estimated impact—not proof. This is the confident causal readout for the pre-registered primary lever.",
+      detail: "Observed level change around registered exposure. Individual work and AI contribution are not identified.",
       ci95Label: intervalLabel(cell, primaryMetric),
       sampleLabel: sampleLabel(cell),
     };
@@ -257,11 +252,9 @@ function traceForAction(
   return {
     ...base,
     state: "gathering",
-    stateLabel: "No confident estimate yet",
+    stateLabel: cell?.interpretation === "cannot_attribute" ? "Cannot attribute" : "No confident estimate yet",
     impactLabel: "—",
-    detail: isDecisionPackage
-      ? "The decision package is complete, but the engine has not produced a confident causal estimate. No zero is substituted."
-      : "The primary lever is complete, but the engine has not produced a confident causal estimate. No zero is substituted.",
+    detail: cell?.detail ?? "No registered observational estimate is available. No zero is substituted.",
     ci95Label: null,
     sampleLabel: sampleLabel(cell),
   };
@@ -304,8 +297,7 @@ export function buildReportImpactViewModel(input: {
     (action) => action.reportContext?.causalObject === "decision_package" &&
       action.reportContext.isPackageIntervention,
   );
-  const causalAction = packageInterventionAction ??
-    input.actions.find((action) => action.id === primaryActionId);
+  const causalAction = input.actions.find((action) => action.id === primaryActionId);
   const primaryCell = causalAction?.impact.find(
     (cell) => cell.metricId === input.metric.id,
   );
@@ -332,8 +324,9 @@ export function buildReportImpactViewModel(input: {
     decisionTitle: input.decision.title,
     metricName: input.metric.name,
     predictionState: outcome.state,
-    predictionStatus: outcome.statusTitle,
-    predictionDetail: outcome.statusDetail,
+    predictionStatus: primaryCell?.interpretation === "cannot_attribute" ? "Cannot attribute outcome" : outcome.statusTitle,
+    predictionDetail: primaryCell?.interpretation === "cannot_attribute" || primaryCell?.interpretation === "waiting"
+      ? primaryCell.detail ?? outcome.statusDetail : outcome.statusDetail,
     plannedLabel: outcome.plannedLabel ?? "—",
     measuredLabel: outcome.measuredLabel ?? "—",
     varianceLabel: variancePct === null ? "—" : formatSignedPredictionPct(variancePct),

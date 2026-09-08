@@ -139,9 +139,7 @@ export function ReportImpactOverview({
           <div>
             <h2 className="text-[15px] font-semibold text-[var(--text)]">Actions and metric</h2>
             <p className="mt-1 max-w-3xl text-[11px] leading-5 text-[var(--text-muted)]">
-              {view.causalObject === "decision_package"
-                ? "Measured as one decision package at the latest effective completion; individual actions are not attributed."
-                : "Only the primary action receives an action-level causal estimate."}
+              The primary outcome is measured around registered customer exposure. Completion markers describe execution; individual work and AI contribution are not identified.
             </p>
           </div>
           <Link
@@ -193,7 +191,7 @@ export function ReportImpactOverview({
 
               <div className="rounded-lg border border-[var(--border)] bg-slate-50/70 p-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Estimated contribution</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">{trace.isPrimary ? "Observed outcome" : "Individual contribution"}</p>
                   <p className="text-[16px] font-semibold tabular-nums text-[var(--text)]">{trace.impactLabel}</p>
                 </div>
                 <p className="mt-2 text-[10px] leading-4 text-[var(--text-muted)]">{trace.detail}</p>

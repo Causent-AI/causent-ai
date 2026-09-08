@@ -3,36 +3,20 @@ import "server-only";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  DEMO_WORKSPACES,
-  type DemoWorkspaceId,
-} from "@/lib/data/config";
-import {
-  mapAccessibleDemoWorkspaces,
-  type AccessibleWorkspace,
-  type AccessibleWorkspaceRow,
-} from "@/lib/auth/workspace-selection";
+import { isLocalDemo } from "@/lib/supabase-server";
+import { readAccessibleWorkspaces } from "./workspace-query";
+import type { AccessibleWorkspace } from "./workspace-selection";
 
 export const ACTIVE_WORKSPACE_COOKIE = "causent_active_workspace";
 
 /**
- * Return only registered demo workspaces visible through the supplied client.
- * In production RLS performs authorization. In local-demo service-role mode,
- * the registry itself is the fail-closed allowlist.
+ * Request-scoped RLS determines customer workspace visibility. Explicit local
+ * demo mode retains its fixture allowlist despite its service-role client.
  */
-export async function listAccessibleDemoWorkspaces(
+export async function listAccessibleWorkspaces(
   client: SupabaseClient,
 ): Promise<AccessibleWorkspace[]> {
-  const ids = DEMO_WORKSPACES.map((workspace) => workspace.id);
-  const response = await client
-    .from("workspaces")
-    .select("workspace_id, name, projects(name)")
-    .in("workspace_id", ids);
-  if (response.error) throw response.error;
-
-  return mapAccessibleDemoWorkspaces(
-    (response.data ?? []) as unknown as AccessibleWorkspaceRow[],
-  );
+  return readAccessibleWorkspaces(client, isLocalDemo());
 }
 
 export async function readRequestedWorkspaceId(): Promise<string | null> {
@@ -40,7 +24,7 @@ export async function readRequestedWorkspaceId(): Promise<string | null> {
 }
 
 export async function writeActiveWorkspaceCookie(
-  workspaceId: DemoWorkspaceId,
+  workspaceId: string,
 ): Promise<void> {
   (await cookies()).set(ACTIVE_WORKSPACE_COOKIE, workspaceId, {
     httpOnly: true,

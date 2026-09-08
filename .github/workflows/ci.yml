@@ -46,6 +46,16 @@ jobs:
           supabase start
           CAUSENT_ENGINE_PYTHON="$(command -v python)" npm run db:reset-demo
 
+      - name: Disable local database permission hints
+        # supabase/supautils#214 crashes while formatting some denied function
+        # calls. Disable hints only; grants, RLS and denial tests stay intact.
+        run: |
+          docker exec -i supabase_db_causent sh -c \
+            'PGPASSWORD="$POSTGRES_PASSWORD" psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1' <<'SQL'
+          ALTER SYSTEM SET supautils.hint_roles = '';
+          SELECT pg_reload_conf();
+          SQL
+
       - name: Export local Supabase credentials for integration tests
         run: |
           eval "$(supabase status -o env)"
@@ -111,9 +121,9 @@ jobs:
             grep -Fq -- '--scope "$TARGET_VERCEL_ORG_ID"' "$deploy_script"
           done
 
-          test "$(find "$drift_stage" -type f | wc -l)" -eq 21
-          test "$(find "$recompute_stage" -type f | wc -l)" -eq 19
-          test "$(find "$resolve_stage" -type f | wc -l)" -eq 19
+          test "$(find "$drift_stage" -type f | wc -l)" -eq 22
+          test "$(find "$recompute_stage" -type f | wc -l)" -eq 20
+          test "$(find "$resolve_stage" -type f | wc -l)" -eq 20
 
           test -f "$drift_stage/api/drift.py"
           test -f "$drift_stage/engine/persistence/drift_materialization.py"
@@ -130,6 +140,7 @@ jobs:
           test ! -f "$resolve_stage/engine/persistence/seed_demo.py"
 
           for stage_dir in "$drift_stage" "$recompute_stage" "$resolve_stage"; do
+            test -f "$stage_dir/engine/persistence/measurement.py"
             test "$(cat "$stage_dir/requirements.txt")" = $'numpy==2.5.0\npsycopg[binary]==3.3.4'
             PYTHONPYCACHEPREFIX="$RUNNER_TEMP/causent-worker-pycache" \
               python -m compileall -q "$stage_dir/api" "$stage_dir/engine"

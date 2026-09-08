@@ -63,7 +63,7 @@ export function ImpactBar({
         {rows.map((r) => {
           const metricName = nameById.get(r.metricId);
           const pos = r.value >= 0;
-          const barColor = r.good ? "var(--pos)" : "var(--neg)";
+          const barColor = r.good === null ? "var(--neutral)" : r.good ? "var(--pos)" : "var(--neg)";
           const left = Math.min(frac(r.value), zero);
           const width = Math.abs(frac(r.value) - zero);
           return (

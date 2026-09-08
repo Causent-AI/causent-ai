@@ -15,6 +15,7 @@ const metric: Metric = {
   name: "Adoption Rate",
   color: "#00A29C",
   format: "percent",
+  percentScale: "ratio", beneficialDirection: "higher", definitionId: "definition",
   source: "CSV",
   cadence: "Daily",
   lastUpdated: "2026-07-31T00:00:00.000Z",
@@ -247,7 +248,7 @@ test("an unresolved primary action stays blank instead of becoming a zero result
   assert.match(view.actionTraces[0].detail, /No zero is substituted/);
 });
 
-test("decision package uses the latest-effective action as timing without individual attribution", () => {
+test("decision package displays only its registered primary observational outcome", () => {
   const packageCell: Action["impact"][number] = {
     metricId: metric.id,
     direction: "up",
@@ -256,7 +257,7 @@ test("decision package uses the latest-effective action as timing without indivi
     good: true,
     evidence: "causal",
   };
-  const registered = action("primary", "D1A1", "2026-06-01");
+  const registered = action("primary", "D1A1", "2026-06-01", [{ ...packageCell, evidence: "observational" }]);
   registered.reportContext = {
     activationId: "activation",
     role: "registered-primary",
@@ -291,10 +292,10 @@ test("decision package uses the latest-effective action as timing without indivi
   assert.equal(view.primaryActionId, "primary");
   assert.equal(view.interventionActionId, "support-1");
   assert.equal(view.packageCompletedAt, "2026-06-15T12:00:00Z");
-  assert.equal(view.actionTraces[0].state, "not-independently-estimated");
-  assert.equal(view.actionTraces[1].state, "measured");
-  assert.match(view.actionTraces[1].detail, /decision-package impact/i);
-  assert.match(view.actionTraces[1].detail, /individual action attribution is unavailable/i);
+  assert.equal(view.actionTraces[0].state, "measured");
+  assert.equal(view.actionTraces[1].state, "not-independently-estimated");
+  assert.match(view.actionTraces[0].detail, /registered exposure/i);
+  assert.match(view.actionTraces[0].detail, /AI contribution are not identified/i);
 });
 
 test("an inconclusive numeric result stays visibly non-confident", () => {
@@ -315,5 +316,22 @@ test("an inconclusive numeric result stays visibly non-confident", () => {
   assert.equal(view.hasMeasurement, true);
   assert.equal(view.predictionState, "no-signal");
   assert.equal(view.measuredLabel, "+2.1%");
-  assert.match(view.predictionDetail, /not as a confident causal claim/i);
+  assert.match(view.predictionDetail, /not as an attribution claim/i);
+});
+
+test("committed timeline withholds percentage overlays when scale is unconfirmed", () => {
+  const prediction = { committedAt: "2026-07-01", direction: "POSITIVE", magnitudePctMean: 10 } as Prediction;
+  assert.deepEqual(buildCommittedPredictionTimelineLevels({ ...metric, definitionId: null, percentScale: "unknown" }, prediction), []);
+});
+
+test("a current exposure refusal reaches the decision header before prediction resolution", () => {
+  const pending = prediction({ verdict: null, measuredPct: null });
+  const refusal: Action["impact"][number] = { metricId: metric.id, direction: "neutral", value: null,
+    label: "—", good: null, interpretation: "cannot_attribute", detail: "Actual exposure differs from the registered plan." };
+  const view = buildReportImpactViewModel({ reportTitle: "Registered review", decision: decision([pending]),
+    predictionId: pending.id, projection, metric, metrics: [metric],
+    actions: [action("primary", "D1A1", "2026-06-15", [refusal])] });
+  assert.equal(view.predictionStatus, "Cannot attribute outcome");
+  assert.equal(view.predictionDetail, refusal.detail);
+  assert.equal(view.measuredLabel, "—");
 });

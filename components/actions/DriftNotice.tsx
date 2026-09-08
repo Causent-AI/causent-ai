@@ -188,7 +188,7 @@ export function DriftNotice({
             Since you committed, <span className="font-medium">{metricName}</span>&rsquo;s
             baseline moved{" "}
             <span className="font-semibold tabular-nums">
-              {formatMetricValue(p.preLevel, format)}
+              {formatMetricValue(p.preLevel, format, metric?.percentScale)}
             </span>
             <span className="mx-1 text-[var(--text-subtle)]">→</span>
             <span className="inline-flex items-center gap-2 align-middle">
@@ -197,7 +197,7 @@ export function DriftNotice({
                 tone="neutral"
                 good
                 size="md"
-                label={formatMetricValue(p.postLevel, format)}
+                label={formatMetricValue(p.postLevel, format, metric?.percentScale)}
               />
               <span className="rounded border border-[var(--neutral)]/30 bg-[var(--neutral)]/[0.06] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--neutral)]">
                 {p.moveLabel}

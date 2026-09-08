@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { UUID_PATTERN } from "../decision-reports/persistence.ts";
 import { METRIC_CSV_MAX_ROWS, type MetricCsvObservation } from "./csv.ts";
+import { parseMetricDefinition } from "./definition.ts";
 
 export const METRIC_CSV_CHUNK_ROWS = 250;
 
@@ -385,6 +386,7 @@ export async function importWorkspaceMetricCsv(
     scopeId: string;
     name: string;
     unit: "count" | "percent" | "USD";
+    definition?: unknown;
     observations: MetricCsvObservation[];
     authoredBy: string | null;
   },
@@ -395,18 +397,27 @@ export async function importWorkspaceMetricCsv(
   if (input.authoredBy !== null && !validUuid(input.authoredBy)) {
     return { ok: false, code: "validation", error: "The import author is invalid." };
   }
+  const definition = parseMetricDefinition(input.definition, input.unit);
+  if (!definition) {
+    return { ok: false, code: "validation", error: "Confirm the metric's scale, preferred direction, daily aggregation and population." };
+  }
   const observations = normalizeObservations(input.observations);
   if (!observations) {
     return { ok: false, code: "validation", error: `Import one to ${METRIC_CSV_MAX_ROWS.toLocaleString("en-US")} unique daily observations.` };
   }
 
   const name = input.name.trim().replace(/\s+/g, " ");
-  const response = await retryImportRpc(sb, "begin_workspace_metric_csv_import_v2", {
+  const response = await retryImportRpc(sb, "begin_workspace_metric_csv_import_v3", {
     p_scope_id: input.scopeId,
     p_name: name,
     p_unit: input.unit,
+    p_numeric_scale: definition.numericScale,
+    p_beneficial_direction: definition.beneficialDirection,
+    p_aggregation: definition.aggregation,
+    p_denominator: definition.denominator,
     p_content_hash: importDigest({
-      schemaVersion: 2,
+      schemaVersion: 3,
+      definition,
       target: { kind: "workspace_metric", scopeId: input.scopeId, name, unit: input.unit },
       observations,
     }),

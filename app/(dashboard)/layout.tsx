@@ -4,7 +4,7 @@ import { TabStrip } from "@/components/shell/TabStrip";
 import { CoreMetricsDrawer } from "@/components/shell/CoreMetricsDrawer";
 import { loadDashboardDataForWorkspace } from "@/lib/data/dashboard";
 import { getSession } from "@/lib/auth/session";
-import { listAccessibleDemoWorkspaces } from "@/lib/auth/workspace-context";
+import { listAccessibleWorkspaces } from "@/lib/auth/workspace-context";
 import { staticDemoWorkspaceOption } from "@/lib/auth/workspace-selection";
 import { getServerSupabase } from "@/lib/supabase-server";
 
@@ -32,7 +32,7 @@ export default async function DashboardLayout({
     loadDashboardDataForWorkspace(session.workspaceId, session.userId),
     process.env.CAUSENT_USE_SEED === "1"
       ? Promise.resolve([staticDemoWorkspaceOption()])
-      : getServerSupabase().then(listAccessibleDemoWorkspaces),
+      : getServerSupabase().then(listAccessibleWorkspaces),
   ]);
 
   return (

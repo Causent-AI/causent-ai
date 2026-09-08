@@ -2,27 +2,27 @@ import type { CausalRecomputeStatus as Status } from "@/lib/data/causal-recomput
 
 const COPY: Record<Status["state"], { label: string; detail: string | null; tone: string }> = {
   idle: {
-    label: "No causal update queued",
+    label: "No measurement update queued",
     detail: null,
     tone: "border-slate-200 bg-slate-50 text-slate-800",
   },
   queued: {
-    label: "Causal update queued",
-    detail: "New metric data, activation, or action completion is waiting for the background causal analysis. Existing readouts stay visible until the update completes.",
+    label: "Measurement update queued",
+    detail: "New metric data, activation, or action completion is waiting for the background measurement. Existing readouts stay visible until the update completes.",
     tone: "border-blue-200 bg-blue-50 text-blue-900",
   },
   retrying: {
-    label: "Causal update retrying",
+    label: "Measurement update retrying",
     detail: "The last attempt did not complete. Causent will retry automatically; existing readouts are unchanged.",
     tone: "border-amber-200 bg-amber-50 text-amber-950",
   },
   current: {
-    label: "Causal analysis current",
+    label: "Measurement review current",
     detail: null,
     tone: "border-emerald-200 bg-emerald-50 text-emerald-950",
   },
   failed: {
-    label: "Causal update needs attention",
+    label: "Measurement update needs attention",
     detail: "The automatic update exhausted its retries. Existing readouts are unchanged; an operator can inspect the worker safely.",
     tone: "border-rose-200 bg-rose-50 text-rose-950",
   },

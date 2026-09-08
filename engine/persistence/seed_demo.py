@@ -81,7 +81,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from causal.drift import detect_baseline_drift  # noqa: E402
 from causal.types import Series  # noqa: E402
-from persistence.bridge import persist_metric_readouts  # noqa: E402
+from persistence.bridge import persist_legacy_metric_readouts as persist_metric_readouts  # noqa: E402
 from persistence.resolve import resolve_due_predictions  # noqa: E402
 
 DSN = os.environ.get(
@@ -305,10 +305,9 @@ UNSHIPPED_ACTION = (8440, "Usage-Based Pricing",
 
 
 # --- Prospective layer (epic #6 child #11): decisions + predictions -------------------
-# One graph, two on-ramps: these pre-registered predictions resolve against the SAME
-# ITS engine the retrospective path uses. Every target verdict state is exercised:
-#   CONFIRMED / REFUTED (ARR class — 2 resolved tuples so priors have a base rate),
-#   DIRECTION_CONFIRMED (+ a logged revision), INCONCLUSIVE, GATHERING, VOIDED.
+# Historical decision fixtures retain their original forecasts. They have no
+# registered exposure contract, so the live resolver returns conservative
+# dispositions. Registered positive controls live in test_registered_measurement.
 def _decision_uuid(n: int) -> uuid.UUID:
     return uuid.UUID(f"ca5e0000-0000-0000-0000-0000000d{n:04d}")
 
@@ -674,8 +673,7 @@ def _verify(conn: psycopg.Connection) -> dict:
         "select count(*) from public.causal_edges "
         "where scope_id=%s and belief_reason='INSUFFICIENT_HISTORY'", (SCOPE,))
 
-    # Prospective layer: verdict per seeded prediction (the demo must exercise
-    # CONFIRMED / REFUTED / DIRECTION_CONFIRMED / INCONCLUSIVE / GATHERING / VOIDED).
+    # Historical forecast dispositions; no retrospective registration is invented.
     cur.execute(
         "select d.title, m.name, p.direction, p.magnitude_pct_mean, "
         "p.resolved_verdict, p.resolution_date "
@@ -762,7 +760,7 @@ def main() -> int:
         bstr = "—" if belief is None else f"{belief:.2f}"
         print(f"  {ref:9s} {metric:16s} {direction:13s} {bstr:7s} {reason or ''}")
 
-    print("\n=== Pre-registered predictions (resolved via the verdict machine) ===")
+    print("\n=== Historical demo predictions (unregistered attribution is withheld) ===")
     print(f"  {'decision':38s} {'metric':16s} {'dir':9s} {'pct':7s} verdict")
     for title, metric, direction, pct, verdict, due in result["predictions"]:
         print(f"  {title:38s} {metric:16s} {direction:9s} {pct:7.2f} "
@@ -777,8 +775,7 @@ def main() -> int:
         print(f"  {drift.status} — reason {drift.reason}")
 
     verdicts = {v for *_, v, _ in result["predictions"] if v}
-    target = {"CONFIRMED", "REFUTED", "DIRECTION_CONFIRMED",
-              "INCONCLUSIVE", "GATHERING", "VOIDED", "UNMEASURABLE_NO_METRIC"}
+    target = {"UNRESOLVABLE", "VOIDED", "UNMEASURABLE_NO_METRIC"}
 
     ok = (
         c["projects"] == 2
@@ -788,12 +785,12 @@ def main() -> int:
         and c["metrics"] == 7                            # + drift metric + declared (no-obs) metric
         and c["metric_observations"] == 6 * SERIES_DAYS  # declared metric has NO observations
         and c["actions"] == len(ACTIONS) + 2         # + the VOIDED lever + the drift lever
-        and result["confident_edges"] >= 1
+        and result["confident_edges"] == 0  # unregistered prediction claims are refused
         and result["insufficient_edges"] >= 1
         and target <= verdicts
         and drift.status == "FIRED"                  # the seed must fire the drift detector
     )
-    print("\nRESULT:", "PASS — confident, gathering-data, all 7 target verdicts, "
+    print("\nRESULT:", "PASS — unregistered attribution withheld, all 3 disposition classes, "
           "and a firing baseline-drift beat"
           if ok else f"FAIL — required demo invariants not met "
           f"(verdicts seen: {sorted(verdicts)}; drift: {drift.status})")

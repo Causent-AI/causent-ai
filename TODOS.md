@@ -1,5 +1,16 @@
 # Causent active backlog
 
+## 2026-09-07 remaining P1 delivery
+
+- [x] T05–T10 implemented and locally verified in one task with separate plan/build/test phases;
+  see [delivery runbook](docs/reviews/2026-09-07/T05_T10_RUNBOOK.md).
+- [ ] Review the draft PR and exact-head hosted checks, then accept the changed measurement and
+  metric-definition UI. Validate mobile layout and hosted authenticated customer/provider paths.
+- [ ] Separately authorize and rehearse schema plus worker/application rollout. No production
+  rollout or real customer provisioning is part of this delivery.
+- [ ] P2 T11–T14 remain deferred: queue lock duration, resolution batch fairness, generation budgets
+  and validation of the learning layer. No completion is claimed for these findings.
+
 Last reconciled: 2026-08-19. Active and deliberately deferred work appears first; the dated
 completed-slice checklists below are retained as point-in-time implementation history.
 

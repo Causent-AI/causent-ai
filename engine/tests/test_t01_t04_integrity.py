@@ -16,7 +16,7 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from psycopg.types.json import Jsonb
 import pytest
 
-from persistence.bridge import persist_metric_readouts
+from persistence.bridge import persist_legacy_metric_readouts as persist_metric_readouts
 
 DSN = os.environ.get(
     "CAUSENT_TEST_DATABASE_URL",

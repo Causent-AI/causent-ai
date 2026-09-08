@@ -268,7 +268,7 @@ export function ReportImpactTimeline({
         ) : null}
 
         <figcaption className="mt-3 border-t border-[var(--border)] pt-2 text-[10px] leading-4 text-[var(--text-muted)]">
-          The line is observed history and is descriptive. Timing markers do not assign causality; the checked ITS estimate in this view is the causal readout.
+          The line shows observed history. Completion markers describe execution. A registered ITS estimate describes a level change around exposure; it does not identify individual work or AI contribution.
         </figcaption>
       </figure>
     </Panel>

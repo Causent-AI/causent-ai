@@ -1,6 +1,6 @@
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { getSession } from "@/lib/auth/session";
-import { listAccessibleDemoWorkspaces } from "@/lib/auth/workspace-context";
+import { listAccessibleWorkspaces } from "@/lib/auth/workspace-context";
 import { staticDemoWorkspaceOption } from "@/lib/auth/workspace-selection";
 import { getServerSupabase } from "@/lib/supabase-server";
 
@@ -15,7 +15,7 @@ export default async function OnboardingLayout({
   const session = await getSession();
   const workspaces = process.env.CAUSENT_USE_SEED === "1"
     ? [staticDemoWorkspaceOption()]
-    : await listAccessibleDemoWorkspaces(await getServerSupabase());
+    : await listAccessibleWorkspaces(await getServerSupabase());
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
       <GlobalHeader activeWorkspaceId={session.workspaceId} workspaces={workspaces} />

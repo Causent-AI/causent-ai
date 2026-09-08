@@ -35,6 +35,7 @@ test("authenticated CSV import and history read exceed the API cap with exact in
     }));
     const imported = await importWorkspaceMetricCsv(member, {
       scopeId: scope, name: "Long history", unit: "count", authoredBy: actor, observations,
+      definition: { numericScale: "native", beneficialDirection: "higher", aggregation: "sum", denominator: "eligible events" },
     });
     assert.ok(imported.ok, imported.ok ? undefined : imported.error);
     if (!imported.ok) return;

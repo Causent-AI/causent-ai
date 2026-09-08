@@ -205,7 +205,7 @@ test("builds a deterministic bounded packet from only the selected current actio
   assert.match(handoff.canonicalContext, /"direction":"POSITIVE"/);
   assert.match(handoff.canonicalContext, /"magnitudePctOfMetricMean":15/);
   assert.match(handoff.canonicalContext, /"resolutionDate":"2026-09-30"/);
-  assert.match(handoff.canonicalContext, /Current Causent measurement readout/);
+  assert.match(handoff.canonicalContext, /Current observational measurement readout/);
   const disclosedContext = JSON.parse(handoff.canonicalContext) as {
     action: {
       metricAssignment: {
@@ -230,6 +230,7 @@ test("builds a deterministic bounded packet from only the selected current actio
     sourceCount: 1,
   });
   assert.deepEqual(disclosedContext.action.metricAssignment, {
+    metricDefinitionConfirmed: false, percentStorageScale: null, beneficialDirection: "unknown",
     causalInterpretation: "Registered primary action for the decision outcome.",
     metricName: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection.metricName,
     monitoringCheckDate: null,
@@ -269,6 +270,7 @@ test("builds a supporting-action handoff with explicit non-causal monitoring con
 
   assert.equal(handoff.actionTitle, "Build the contextual assistant");
   assert.deepEqual(context.action.metricAssignment, {
+    metricDefinitionConfirmed: false, percentStorageScale: null, beneficialDirection: "unknown",
     causalInterpretation:
       "Monitoring context only; not an independent causal prediction or causal attribution.",
     metricName: "Support Tickets",
@@ -314,6 +316,7 @@ test("preserves explicit null supporting monitoring fields", () => {
   };
 
   assert.deepEqual(context.action.metricAssignment, {
+    metricDefinitionConfirmed: false, percentStorageScale: null, beneficialDirection: "unknown",
     causalInterpretation:
       "Monitoring context only; not an independent causal prediction or causal attribution.",
     metricName: "Support Tickets",

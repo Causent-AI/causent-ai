@@ -8,6 +8,7 @@ const metric: Metric = {
   id: "adoption",
   name: "Adoption Rate",
   format: "percent",
+  percentScale: "ratio",
   source: "CSV",
   color: "#00A29C",
   cadence: "Daily",
@@ -16,6 +17,25 @@ const metric: Metric = {
   higherIsBetter: true,
   series: [{ date: "2026-07-22", value: 0.31 }],
 };
+
+test("sub-one percentages in point scale are not multiplied by one hundred", () => {
+  const points: Metric = { ...metric, percentScale: "points", beneficialDirection: "lower",
+    higherIsBetter: false, series: [{ date: "2026-07-22", value: 0.5 }] };
+  const cell = toImpactCell(points, edge({ dbDirection: "POSITIVE", beliefScore: 1,
+    lift: 0.1, ciLow: 0.08, ciHigh: 0.12 }));
+  assert.equal(cell.label, "+0.1pp");
+  assert.equal(cell.good, false);
+  assert.equal(cell.readout?.ciLow, 0.08);
+});
+
+test("unconfirmed scale and unknown business direction do not become positive outcomes", () => {
+  const measured = edge({ dbDirection: "POSITIVE", beliefScore: 1, lift: 0.1 });
+  const unknown = toImpactCell({ ...metric, percentScale: "unknown", definitionId: null }, measured);
+  assert.equal(unknown.value, null);
+  assert.equal(unknown.good, null);
+  assert.match(unknown.detail ?? "", /Confirm/);
+  assert.equal(toImpactCell({ ...metric, beneficialDirection: "neutral" }, measured).good, null);
+});
 
 function edge(overrides: Partial<EdgeReadout> = {}): EdgeReadout {
   return {
@@ -52,7 +72,7 @@ test("shows the 14-day descriptive estimate while ITS gathers history", () => {
     nPost: 14,
     beliefReason: "INSUFFICIENT_HISTORY",
   });
-  assert.match(cell.detail ?? "", /Not a causal claim/);
+  assert.match(cell.detail ?? "", /Not an attribution claim/);
   assert.match(cell.detail ?? "", /Overlaps another completed action/);
 });
 
@@ -68,7 +88,7 @@ test("a confident ITS estimate remains authoritative", () => {
     nPost: 47,
   }));
   assert.equal(cell.label, "+5.2pp");
-  assert.equal(cell.evidence, "causal");
+  assert.equal(cell.evidence, "observational");
   assert.deepEqual(cell.readout, {
     methodology: "ITS",
     ciLow: 4.1000000000000005,
@@ -103,6 +123,15 @@ for (const provenance of ["legacy_unverified", "manual", "incomplete"] as const)
     const cell = toImpactCell(metric, edge({ provenance, dbDirection: "POSITIVE", beliefScore: 1, lift: 999 }));
     assert.equal(cell.value, null);
     assert.equal(cell.label, "—");
+    assert.ok(cell.detail);
+  });
+}
+
+for (const interpretation of ["cannot_attribute", "waiting", "legacy_unverified"] as const) {
+  test(`${interpretation} withholds a stale positive numeric effect`, () => {
+    const cell = toImpactCell(metric, edge({ interpretation, refusalReason: "EXPOSURE_DIFFERS_FROM_PLAN", dbDirection: "POSITIVE", beliefScore: 1, lift: 99 }));
+    assert.equal(cell.value, null);
+    assert.equal(cell.good, null);
     assert.ok(cell.detail);
   });
 }
