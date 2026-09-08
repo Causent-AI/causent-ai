@@ -20,6 +20,7 @@ const WRITER_ROLES = new Set(["member", "admin", "owner"]);
 type ProjectRelation = { org_id: unknown } | Array<{ org_id: unknown }> | null;
 
 type DueWorkspaceRow = {
+  claim_id: unknown;
   workspace_id: unknown;
   project_id: unknown;
   projects: ProjectRelation;
@@ -43,11 +44,13 @@ type ScopeCoordinates = {
 export type ResolutionTarget = {
   scopeId: string;
   userId: string;
+  claimId: string;
 };
 
 export type ResolutionTargetBatch = {
   targets: ResolutionTarget[];
   truncated: boolean;
+  failures: number;
 };
 
 /**
@@ -179,42 +182,49 @@ export async function listProductionResolutionTargets(
   client: SupabaseClient,
   today: string,
 ): Promise<ResolutionTargetBatch> {
-  const response = await client
-    .from("workspaces")
-    .select(
-      "workspace_id, project_id, projects!inner(org_id), predictions!inner(prediction_id)",
-    )
-    .is("archived_at", null)
-    .is("predictions.resolved_at", null)
-    .lte("predictions.resolution_date", today)
-    .order("workspace_id", { ascending: true })
-    .limit(MAX_RESOLUTION_WORKSPACES + 1)
-    .limit(1, { referencedTable: "predictions" });
+  const response = await client.rpc("claim_resolution_targets", {
+    p_today: today, p_limit: MAX_RESOLUTION_WORKSPACES,
+  });
 
   if (response.error) {
     throw new ResolutionScopeDiscoveryError("due_workspace_query_failed");
   }
 
-  const dueRows = (response.data ?? []) as unknown as DueWorkspaceRow[];
+  const dueRows = (response.data?.rows ?? []) as DueWorkspaceRow[];
   const selectedRows = dueRows.slice(0, MAX_RESOLUTION_WORKSPACES);
-  const scopes = selectedRows.map(scopeCoordinates);
-  if (scopes.some((scope) => scope === null)) {
-    throw new ResolutionScopeDiscoveryError("invalid_scope_row");
-  }
-
-  const targets = await mapWithConcurrency(
-    scopes as ScopeCoordinates[],
+  const results = await mapWithConcurrency(
+    selectedRows,
     RESOLUTION_WORKER_CONCURRENCY,
-    async (scope) => ({
-      scopeId: scope.workspaceId,
-      userId: await eligibleActor(client, scope),
-    }),
+    async (row): Promise<ResolutionTarget | null> => {
+      const scope = scopeCoordinates(row);
+      const claimId = uuid(row.claim_id);
+      try {
+        if (!scope || !claimId) throw new ResolutionScopeDiscoveryError("invalid_scope_row");
+        return { scopeId: scope.workspaceId, claimId, userId: await eligibleActor(client, scope) };
+      } catch (error) {
+        const code = error instanceof ResolutionScopeDiscoveryError ? error.code : "actor_query_failed";
+        if (uuid(row.workspace_id) && claimId) {
+          await finishResolutionTarget(client, { scopeId: row.workspace_id as string, claimId }, code)
+            .catch(() => { console.error("[cron/resolve] discovery failure receipt unavailable"); });
+        }
+        return null;
+      }
+    },
   );
 
   return {
-    targets,
-    truncated: dueRows.length > MAX_RESOLUTION_WORKSPACES,
+    targets: results.filter((target): target is ResolutionTarget => target !== null),
+    truncated: response.data?.truncated === true,
+    failures: results.filter((target) => target === null).length,
   };
+}
+
+export async function finishResolutionTarget(client: SupabaseClient,
+  target: { scopeId: string; claimId: string }, errorCode: string | null): Promise<void> {
+  const { data, error } = await client.rpc("finish_resolution_target", {
+    p_scope: target.scopeId, p_claim: target.claimId, p_error: errorCode,
+  });
+  if (error || data !== true) throw new Error("Resolution receipt unavailable.");
 }
 
 export async function mapWithConcurrency<T, R>(

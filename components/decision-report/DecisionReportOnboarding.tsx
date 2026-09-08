@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
@@ -104,6 +104,7 @@ export function DecisionReportOnboarding({
 }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
+  const generationRequest = useRef<{ signature: string; id: string } | null>(null);
   const [selectedExampleId, setSelectedExampleId] =
     useState<DecisionReportReviewExampleId | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
@@ -155,6 +156,11 @@ export function DecisionReportOnboarding({
     setError(null);
     startTransition(async () => {
       const formData = new FormData();
+      const signature = JSON.stringify([prompt, sourceUrl, pdfFile?.name, pdfFile?.size, pdfFile?.lastModified, selectedExampleId]);
+      if (generationRequest.current?.signature !== signature) {
+        generationRequest.current = { signature, id: crypto.randomUUID() };
+      }
+      formData.set("generationRequestId", generationRequest.current.id);
       formData.set("brief", prompt);
       formData.set("telemetrySessionKey", telemetryRun.sessionKey);
       formData.set(
@@ -172,10 +178,12 @@ export function DecisionReportOnboarding({
         return;
       }
       if (!result.ok) {
+        if (!["running", "busy", "unavailable"].includes(result.code ?? "")) generationRequest.current = null;
         setError(result.error);
         return;
       }
       const generated: GeneratedReport = result.generation;
+      generationRequest.current = null;
       setDraft({
         workspaceId: generated.workspaceId,
         report: generated.report,
@@ -364,6 +372,17 @@ export function DecisionReportOnboarding({
           >
             {isPending ? "Building report…" : "Build Decision Report"}
           </button>
+          {isPending ? (
+            <button type="button" className="min-h-11 px-3 text-[13px]" onClick={async () => {
+              try {
+                const response = await fetch("/api/decision-reports/generation/cancel", {
+                  method: "POST", headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ requestId: generationRequest.current?.id }),
+                });
+                if (!response.ok) setError("Cancellation unavailable. Try again.");
+              } catch { setError("Cancellation unavailable. Try again."); }
+            }}>Cancel</button>
+          ) : null}
           <p className="max-w-xl text-right text-[10px] leading-4 text-[var(--text-muted)]">
             Causent sends your description and extracted source text to the configured AI provider.
           </p>

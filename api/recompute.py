@@ -120,6 +120,7 @@ def _summarize(results: list[RecomputeResult]) -> dict:
                 "generation": result.generation,
                 "status": result.status,
                 "detail": result.detail,
+                **({"timings_ms": result.timings_ms} if result.timings_ms is not None else {}),
             }
             for result in results[:MAX_RESULT_ROWS]
         ],

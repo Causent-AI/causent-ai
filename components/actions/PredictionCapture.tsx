@@ -35,8 +35,7 @@ function PrecedentPanel({ priors }: { priors: ReferenceClassPriors | null }) {
   if (!priors.hasPrecedent) {
     return (
       <p className="text-[12px] text-[var(--text-muted)]">
-        No precedent yet — record your prior. Your resolved predictions become
-        the base rate for the next one.
+        No history yet. Record your expectation.
       </p>
     );
   }
@@ -44,6 +43,7 @@ function PrecedentPanel({ priors }: { priors: ReferenceClassPriors | null }) {
   const cal = priors.calibration;
   return (
     <div className="flex flex-col gap-1 text-[12px] text-[var(--text-muted)]">
+      <p className="font-semibold">History</p>
       <p>
         {priors.supportCount} resolved prediction{priors.supportCount === 1 ? "" : "s"} in
         this class
@@ -69,12 +69,10 @@ function PrecedentPanel({ priors }: { priors: ReferenceClassPriors | null }) {
       )}
       {cal.weightedMeanErrorPct !== null && (
         <p>
-          This team{" "}
-          {cal.weightedMeanErrorPct > 0 ? "over-predicts" : "under-predicts"} this class by{" "}
-          <span className="tabular-nums">{Math.abs(cal.weightedMeanErrorPct).toFixed(1)}pp</span>{" "}
-          on average.
+          Historical signed error: <span className="tabular-nums">{cal.weightedMeanErrorPct.toFixed(1)}pp</span>.
         </p>
       )}
+      <p>{priors.evaluation.confidentCount}/{priors.supportCount} outcomes passed measurement checks. Descriptive history; future accuracy is unvalidated.</p>
     </div>
   );
 }

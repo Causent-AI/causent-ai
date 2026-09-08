@@ -92,14 +92,13 @@ function PrecedentPanel({
   return (
     <div className="rounded border border-dashed border-[var(--border)] p-3">
       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
-        Precedent (informs — never authors — your number)
+        History
       </p>
       {loading ? (
         <p className="text-[12px] text-[var(--text-subtle)]">Checking past resolutions…</p>
       ) : priors === null || !priors.hasPrecedent ? (
         <p className="text-[12px] text-[var(--text-muted)]">
-          No precedent yet — record your prior. Your resolved predictions become the
-          base rate for the next one.
+          No history yet. Record your expectation.
         </p>
       ) : (
         <div className="flex flex-col gap-1 text-[12px] text-[var(--text-muted)]">
@@ -120,15 +119,14 @@ function PrecedentPanel({
           )}
           {priors.calibration.weightedMeanErrorPct !== null && (
             <p>
-              This team{" "}
-              {priors.calibration.weightedMeanErrorPct > 0 ? "over-predicts" : "under-predicts"}{" "}
-              this class by{" "}
+              Historical signed error:{" "}
               <span className="tabular-nums">
-                {Math.abs(priors.calibration.weightedMeanErrorPct).toFixed(1)}pp
+                {priors.calibration.weightedMeanErrorPct.toFixed(1)}pp
               </span>{" "}
-              on average.
+              .
             </p>
           )}
+          <p>{priors.evaluation.confidentCount}/{priors.supportCount} outcomes passed measurement checks. Descriptive history; future accuracy is unvalidated.</p>
         </div>
       )}
     </div>

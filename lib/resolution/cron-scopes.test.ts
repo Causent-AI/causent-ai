@@ -69,6 +69,13 @@ function query(response: QueryResponse, calls: string[]) {
 function client(responses: QueryResponse[], calls: string[]): SupabaseClient {
   let index = 0;
   return {
+    rpc(name: string) {
+      calls.push(`rpc:${name}`);
+      if (name === "finish_resolution_target") return Promise.resolve({ data: true, error: null });
+      const response = responses[index++];
+      const rows = (response.data ?? []) as Record<string, unknown>[];
+      return Promise.resolve({ data: { rows: rows.slice(0, MAX_RESOLUTION_WORKSPACES).map((row) => ({ ...row, claim_id: WORKSPACE })), truncated: rows.length > MAX_RESOLUTION_WORKSPACES }, error: response.error });
+    },
     from(table: string) {
       calls.push(`from:${table}`);
       const response = responses[index];
@@ -99,12 +106,11 @@ test("production discovery selects a real write-capable actor and mirrors inheri
   const batch = await listProductionResolutionTargets(sb, "2026-08-18");
 
   assert.deepEqual(batch, {
-    targets: [{ scopeId: WORKSPACE, userId: MEMBER }],
+    targets: [{ scopeId: WORKSPACE, userId: MEMBER, claimId: WORKSPACE }],
     truncated: false,
+    failures: 0,
   });
-  assert.ok(calls.includes("from:workspaces"));
-  assert.ok(calls.includes(`limit:${MAX_RESOLUTION_WORKSPACES + 1}:root`));
-  assert.ok(calls.includes("limit:1:predictions"));
+  assert.ok(calls.includes("rpc:claim_resolution_targets"));
   assert.ok(calls.includes(`eq:org_id:${ORG}`));
   assert.ok(calls.some((call) => call.startsWith("or:and(project_id.is.null")));
 });
@@ -124,12 +130,9 @@ test("viewer-only or cross-workspace identities fail closed without returning a 
     },
   ], []);
 
-  await assert.rejects(
-    listProductionResolutionTargets(sb, "2026-08-18"),
-    (error: unknown) => error instanceof ResolutionScopeDiscoveryError
-      && error.code === "no_eligible_actor"
-      && !error.message.includes(WORKSPACE),
-  );
+  assert.deepEqual(await listProductionResolutionTargets(sb, "2026-08-18"), {
+    targets: [], failures: 1, truncated: false,
+  });
 });
 
 test("due-workspace query failures and malformed hierarchy rows expose only a generic error", async () => {
@@ -145,11 +148,22 @@ test("due-workspace query failures and malformed hierarchy rows expose only a ge
     data: [{ workspace_id: WORKSPACE, project_id: PROJECT, projects: null }],
     error: null,
   }], []);
-  await assert.rejects(
-    listProductionResolutionTargets(malformed, "2026-08-18"),
-    (error: unknown) => error instanceof ResolutionScopeDiscoveryError
-      && error.code === "invalid_scope_row",
-  );
+  assert.equal((await listProductionResolutionTargets(malformed, "2026-08-18")).failures, 1);
+});
+
+test("a poison workspace records its failure while later valid work progresses", async () => {
+  const calls: string[] = [];
+  const next = "30000000-0000-4000-8000-000000000099";
+  const row = { workspace_id: WORKSPACE, project_id: PROJECT, projects: { org_id: ORG } };
+  const sb = client([
+    { data: [row, { ...row, workspace_id: next }], error: null },
+    { data: [], error: null },
+    { data: [{ user_id: MEMBER, org_id: ORG, project_id: null, workspace_id: null, role: "member" }], error: null },
+  ], calls);
+  const batch = await listProductionResolutionTargets(sb, "2026-08-18");
+  assert.equal(batch.failures, 1);
+  assert.deepEqual(batch.targets.map((t) => t.scopeId), [next]);
+  assert.ok(calls.includes("rpc:finish_resolution_target"));
 });
 
 test("production discovery caps workspace enumeration and reports continuation", async () => {

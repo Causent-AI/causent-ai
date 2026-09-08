@@ -1,5 +1,22 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-09-07 — T11–T14 implemented; document UX proposal prepared
+
+PR #34 (T05–T10) is merged as `dd1901d`. The next branch adds durable AI generation
+budgets/receipts/cancellation, independent resolution leases and retries, recompute phase timing,
+and honest History coverage/error summaries. Local verification passes: 710 application tests
+with 19 optional live-model skips, 1,324 engine tests, types, zero-warning lint, schema lint,
+production webpack/dashboard build, load contracts, and the changed staged worker import.
+See the [engineering review](reviews/2026-09-07/T11_T14_ENGINEERING_REVIEW.md),
+[runbook](reviews/2026-09-07/T11_T14_RUNBOOK.md), and
+[submission evidence](reviews/2026-09-07/HOSTED_VERIFICATION_T11_T14.md).
+
+The [UX review](reviews/2026-09-07/UX_REVIEW.md) includes actual local screenshots, fourteen
+prioritized recommendations, and an interactive document-centered proposal for all four tabs.
+The redesign is proposed, not implemented. Representative lock contention, prospective learning
+validation, paid-provider acceptance, and production rollout remain open. No production change
+was performed during this pass. Earlier dated entries below are historical checkpoints.
+
 ## 2026-09-07 — remaining P1 measurement and customer workspace changes prepared
 
 The T05–T10 branch builds on merged PR #33 (`6ac6511`). It adds explicit immutable metric

@@ -21,8 +21,9 @@ import {
 } from "./generation-policy.ts";
 import { createReportSourceCorpus } from "./sources/corpus.ts";
 import type { ReportSourceCorpus } from "./sources/types.ts";
+import { GENERATION_MODEL, GENERATION_OUTPUT_TOKENS, MAX_GENERATION_REQUEST_BYTES, GenerationAdmissionError } from "./generation-admission.ts";
 
-export const DEFAULT_DECISION_REPORT_MODEL = "anthropic/claude-sonnet-5";
+export const DEFAULT_DECISION_REPORT_MODEL = GENERATION_MODEL;
 export const DECISION_REPORT_GENERATION_TIMEOUT_MS = 35_000;
 
 export type DecisionReportGenerationMode = "live" | "fixture" | "fallback";
@@ -143,28 +144,27 @@ async function generateDraftWithGateway(
   signal: AbortSignal,
 ): Promise<DraftGeneratorResult> {
   const model = process.env.CAUSENT_DECISION_REPORT_MODEL?.trim() || DEFAULT_DECISION_REPORT_MODEL;
+  const prompt = JSON.stringify({
+    projectBrief: corpus.brief,
+    sourceChunks: corpus.chunks.map((chunk) => ({
+      chunkId: chunk.chunkId, sourceId: chunk.sourceId, sourceKind: chunk.kind,
+      sourceLabel: chunk.label, locator: chunk.locator, text: chunk.text,
+    })),
+  });
+  const requestBytes = Buffer.byteLength(prompt + GENERATION_INSTRUCTIONS + JSON.stringify(MODEL_DECISION_REPORT_JSON_SCHEMA));
+  if (requestBytes > MAX_GENERATION_REQUEST_BYTES) throw new GenerationAdmissionError("input_too_large");
   try {
     const result = await generateText({
       model,
       instructions: GENERATION_INSTRUCTIONS,
-      prompt: JSON.stringify({
-        projectBrief: corpus.brief,
-        sourceChunks: corpus.chunks.map((chunk) => ({
-          chunkId: chunk.chunkId,
-          sourceId: chunk.sourceId,
-          sourceKind: chunk.kind,
-          sourceLabel: chunk.label,
-          locator: chunk.locator,
-          text: chunk.text,
-        })),
-      }),
+      prompt,
       output: Output.object({
         schema: modelDraftSchema,
         name: "decision_report_draft",
         description: "A compact three-section Decision Report draft with explicit provenance.",
       }),
       temperature: 0.2,
-      maxOutputTokens: 2_200,
+      maxOutputTokens: GENERATION_OUTPUT_TOKENS,
       maxRetries: 0,
       abortSignal: signal,
     });
@@ -237,8 +237,10 @@ export async function generateDecisionReportFromPrompt(
     generateDraft?: DraftGenerator;
     forceFixture?: boolean;
     sources?: ReportSourceCorpus;
+    signal?: AbortSignal;
   } = {},
 ): Promise<DecisionReportGenerationResult> {
+  options.signal?.throwIfAborted();
   const startedAt = Date.now();
   const prompt = rawPrompt.trim();
   if (
@@ -270,6 +272,7 @@ export async function generateDecisionReportFromPrompt(
       },
       DECISION_REPORT_GENERATION_TIMEOUT_MS,
       shouldRetryGenerationError,
+      options.signal,
     );
     const materialized = materializeModelDecisionReport(generated.value.draft, corpus);
     return {
@@ -286,6 +289,8 @@ export async function generateDecisionReportFromPrompt(
       },
     };
   } catch (error) {
+    options.signal?.throwIfAborted();
+    if (error instanceof GenerationAdmissionError) throw error;
     console.error(
       "Decision Report generation failed; rendering safe fallback.",
       generationErrorDetails(error),

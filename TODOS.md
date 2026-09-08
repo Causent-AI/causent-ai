@@ -1,15 +1,37 @@
 # Causent active backlog
 
+## 2026-09-07 T11–T14 and UX review
+
+- [x] T11: instrument recompute phases and conservative lock duration; verify held-lock timing.
+- [x] T12: isolate invalid resolution targets with durable leases, fairness, failure receipts,
+  and retries; verify independent progress and stale-claim rejection.
+- [x] T13: enforce durable generation budgets, concurrency, identity, replay, cancellation,
+  and receipt expiry; verify permissions and real concurrent admission.
+- [x] T14: fix inconclusive history, validate tuples, preserve observational exclusion, and
+  expose descriptive coverage/error with accurate labels.
+- [x] Complete the [UX review](docs/reviews/2026-09-07/UX_REVIEW.md), actual desktop/mobile
+  captures, and an interactive report/Data/Actions/Impact proposal. No redesign implementation.
+- [ ] Review the [submitted branch and hosted results](docs/reviews/2026-09-07/HOSTED_VERIFICATION_T11_T14.md),
+  then perform authenticated candidate acceptance and a separately authorized release.
+- [ ] Collect representative T11 lock/write-blocking data; redesign with snapshots and CAS only
+  when the operating trigger is reached and correctness is proven.
+- [ ] Add T13 provider invoice reconciliation, receipt retention, and cost per retained customer
+  or useful decision; current values are conservative reservations.
+- [ ] Validate T14 prospective calibration, recommendation acceptance, decision change, utility,
+  and comparable-mechanism transfer; no validated compounding model is claimed.
+- [ ] Review the proposed UX01–05/10–11 document scope, then implement and test the accepted design.
+
 ## 2026-09-07 remaining P1 delivery
 
 - [x] T05–T10 implemented and locally verified in one task with separate plan/build/test phases;
   see [delivery runbook](docs/reviews/2026-09-07/T05_T10_RUNBOOK.md).
-- [ ] Review the draft PR and exact-head hosted checks, then accept the changed measurement and
-  metric-definition UI. Validate mobile layout and hosted authenticated customer/provider paths.
+- [x] PR #34 merged with passing hosted checks as `dd1901d`.
+- [ ] Complete hosted authenticated customer/provider acceptance. Local mobile layout was
+  inspected during the UX review; this does not establish hosted acceptance.
 - [ ] Separately authorize and rehearse schema plus worker/application rollout. No production
   rollout or real customer provisioning is part of this delivery.
-- [ ] P2 T11–T14 remain deferred: queue lock duration, resolution batch fairness, generation budgets
-  and validation of the learning layer. No completion is claimed for these findings.
+- [x] Resume T11–T14 with user-authorized implementation; see the current checklist above for
+  implemented scope and the remaining empirical validation.
 
 Last reconciled: 2026-08-19. Active and deliberately deferred work appears first; the dated
 completed-slice checklists below are retained as point-in-time implementation history.

@@ -268,6 +268,7 @@ export async function fetchPriors(params: {
   if (!uuid) {
     return {
       hasPrecedent: false,
+      evaluation: { measuredCount: 0, confidentCount: 0, coveragePct: 0, meanAbsoluteErrorPct: null },
       supportCount: 0,
       verdictCounts: {},
       baseRate: { n: 0, weightedMeanPct: null, minPct: null, maxPct: null },

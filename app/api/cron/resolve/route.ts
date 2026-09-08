@@ -29,6 +29,7 @@ import path from "node:path";
 import { DEMO_WORKSPACES } from "@/lib/data/config";
 import {
   listProductionResolutionTargets,
+  finishResolutionTarget,
   mapWithConcurrency,
   RESOLUTION_WORKER_CONCURRENCY,
   ResolutionScopeDiscoveryError,
@@ -108,6 +109,7 @@ async function runLocalResolution(
 type CronResolutionTarget = {
   scopeId: string;
   userId?: string;
+  claimId?: string;
   workspace?: string;
 };
 
@@ -153,6 +155,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   let targets: CronResolutionTarget[];
   let targetBatchTruncated = false;
+  let discoveryFailures = 0;
   if (localDemo) {
     targets = demoTargets();
   } else {
@@ -165,6 +168,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       );
       targets = batch.targets;
       targetBatchTruncated = batch.truncated;
+      discoveryFailures = batch.failures;
     } catch (error) {
       const code = error instanceof ResolutionScopeDiscoveryError
         ? error.code
@@ -185,16 +189,23 @@ export async function GET(request: Request): Promise<NextResponse> {
     const workspaces = await mapWithConcurrency(
       targets,
       RESOLUTION_WORKER_CONCURRENCY,
-      async (target) => ({
-        workspace: target.workspace,
-        outcome: await resolveViaRemote(
+      async (target) => {
+        const outcome = await resolveViaRemote(
           remoteUrl,
           remoteSecret,
           resolutionDay,
           target.scopeId,
           target.userId,
-        ),
-      }),
+        );
+        if (!localDemo && target.claimId) {
+          try {
+            await finishResolutionTarget(getServiceRoleSupabase(), { scopeId: target.scopeId, claimId: target.claimId }, outcome.ok ? null : "worker_failed");
+          } catch {
+            return { workspace: target.workspace, outcome: { ok: false, status: 503, body: { error: "receipt unavailable" } } };
+          }
+        }
+        return { workspace: target.workspace, outcome };
+      },
     );
     const failed = workspaces.find(({ outcome }) => !outcome.ok);
     if (!localDemo) {
@@ -202,21 +213,18 @@ export async function GET(request: Request): Promise<NextResponse> {
         console.error(
           `[cron/resolve] production resolver failed with downstream status ${failed.outcome.status}`,
         );
-        return NextResponse.json(
-          { error: "workspace resolution failed" },
-          { status: 502 },
-        );
       }
       const summaries = workspaces.map(({ outcome }) => numericSummary(outcome.body));
       return NextResponse.json({
-        ok: true,
+        ok: !failed && discoveryFailures === 0,
+        failures: discoveryFailures + workspaces.filter(({ outcome }) => !outcome.ok).length,
         resolver: "remote",
         workspaces: summaries.length,
         processed: summaries.reduce((total, summary) => total + summary.processed, 0),
         predictions: summaries.reduce((total, summary) => total + summary.total, 0),
         continuation_required:
           targetBatchTruncated || summaries.some((summary) => summary.continuationRequired),
-      }, { status: 200 });
+      }, { status: failed || discoveryFailures ? 502 : 200 });
     }
     return NextResponse.json(
       {
@@ -235,11 +243,16 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   // No remote configured — fall back to the local runner (dev). On Vercel there
   // is no Python venv, so this fails loudly rather than pretending to resolve.
-  const workspaces = await Promise.all(
-    targets.map(async (target) => ({
-      workspace: target.workspace,
-      result: await runLocalResolution(target.scopeId, target.userId),
-    })),
+  const workspaces = await mapWithConcurrency(targets, RESOLUTION_WORKER_CONCURRENCY,
+    async (target) => {
+      const result = await runLocalResolution(target.scopeId, target.userId);
+      if (!localDemo && target.claimId) {
+        try {
+          await finishResolutionTarget(getServiceRoleSupabase(), { scopeId: target.scopeId, claimId: target.claimId }, result.code === 0 ? null : "worker_unavailable");
+        } catch { return { workspace: target.workspace, result: { code: 1, out: "receipt unavailable" } }; }
+      }
+      return { workspace: target.workspace, result };
+    },
   );
   const failed = workspaces.find(({ result }) => result.code !== 0);
   if (failed) {
@@ -262,7 +275,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
   return NextResponse.json({
-    ok: true,
+    ok: discoveryFailures === 0,
+    failures: discoveryFailures,
     resolver: "local",
     workspaces: localDemo
       ? workspaces.map(({ workspace, result }) => ({
@@ -274,5 +288,5 @@ export async function GET(request: Request): Promise<NextResponse> {
         }))
       : workspaces.length,
     continuation_required: targetBatchTruncated,
-  }, { status: 200 });
+  }, { status: discoveryFailures ? 502 : 200 });
 }

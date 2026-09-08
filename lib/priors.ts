@@ -38,6 +38,12 @@ export type ReferenceClassPriors = {
   /** Resolved tuples in the class (all verdicts — no survivorship filter). */
   supportCount: number;
   verdictCounts: Partial<Record<PredictionVerdict, number>>;
+  evaluation: {
+    measuredCount: number;
+    confidentCount: number;
+    coveragePct: number;
+    meanAbsoluteErrorPct: number | null;
+  };
   /** Distribution of measured lifts for the class (the base rate). */
   baseRate: {
     /** Tuples with a measured figure. */
@@ -59,12 +65,16 @@ const EMPTY: ReferenceClassPriors = {
   hasPrecedent: false,
   supportCount: 0,
   verdictCounts: {},
+  evaluation: { measuredCount: 0, confidentCount: 0, coveragePct: 0, meanAbsoluteErrorPct: null },
   baseRate: { n: 0, weightedMeanPct: null, minPct: null, maxPct: null },
   calibration: { n: 0, weightedMeanErrorPct: null },
 };
 
 /** Pure prior computation over resolution tuples (unit-testable, no DB). */
 export function computePriors(tuples: ResolutionTuple[]): ReferenceClassPriors {
+  tuples = tuples.filter((t) => Number.isFinite(t.predictedPct)
+    && (t.measuredPct === null || Number.isFinite(t.measuredPct))
+    && (t.beliefScore === null || (Number.isFinite(t.beliefScore) && t.beliefScore >= 0 && t.beliefScore <= 1)));
   if (tuples.length === 0) return EMPTY;
 
   const verdictCounts: Partial<Record<PredictionVerdict, number>> = {};
@@ -75,6 +85,8 @@ export function computePriors(tuples: ResolutionTuple[]): ReferenceClassPriors {
   const measured = tuples.filter(
     (t): t is ResolutionTuple & { measuredPct: number } => t.measuredPct !== null,
   );
+  // 1.0 is the engine's passed-checks bucket, never a calibrated probability.
+  const confident = measured.filter((t) => t.beliefScore === 1);
 
   let weightSum = 0;
   let weightedMeasured = 0;
@@ -90,15 +102,23 @@ export function computePriors(tuples: ResolutionTuple[]): ReferenceClassPriors {
     hasPrecedent: true,
     supportCount: tuples.length,
     verdictCounts,
+    evaluation: {
+      measuredCount: measured.length,
+      confidentCount: confident.length,
+      coveragePct: 100 * confident.length / tuples.length,
+      meanAbsoluteErrorPct: confident.length
+        ? confident.reduce((sum, t) => sum + Math.abs(t.predictedPct - t.measuredPct), 0) / confident.length
+        : null,
+    },
     baseRate: {
       n: measured.length,
-      weightedMeanPct: weightSum > 0 ? weightedMeasured / weightSum : null,
+      weightedMeanPct: confident.length && weightSum > 0 ? weightedMeasured / weightSum : null,
       minPct: measured.length ? Math.min(...measured.map((t) => t.measuredPct)) : null,
       maxPct: measured.length ? Math.max(...measured.map((t) => t.measuredPct)) : null,
     },
     calibration: {
       n: measured.length,
-      weightedMeanErrorPct: weightSum > 0 ? weightedError / weightSum : null,
+      weightedMeanErrorPct: confident.length && weightSum > 0 ? weightedError / weightSum : null,
     },
   };
 }
@@ -110,11 +130,15 @@ export function fromStoredTuple(row: {
 }): ResolutionTuple | null {
   const tup = row.resolution_tuple;
   if (!tup) return null;
+  if (!["CONFIRMED", "DIRECTION_CONFIRMED", "REFUTED", "INCONCLUSIVE", "UNRESOLVABLE", "VOIDED", "UNATTRIBUTED"].includes(row.resolved_verdict)) return null;
   // Observational changes cannot calibrate predictions about work or AI effects.
   if (tup.interpretation) return null;
   const mag = typeof tup.predicted_magnitude_pct === "number" ? tup.predicted_magnitude_pct : null;
+  if (tup.predicted_direction !== "NEGATIVE" && tup.predicted_direction !== "POSITIVE") return null;
   const dir = tup.predicted_direction === "NEGATIVE" ? -1 : 1;
-  if (mag === null) return null;
+  if (mag === null || !Number.isFinite(mag) || mag < 0) return null;
+  if (tup.measured_pct != null && (typeof tup.measured_pct !== "number" || !Number.isFinite(tup.measured_pct))) return null;
+  if (tup.belief_score != null && (typeof tup.belief_score !== "number" || !Number.isFinite(tup.belief_score) || tup.belief_score < 0 || tup.belief_score > 1)) return null;
   return {
     metricId: typeof tup.metric_id === "string" ? tup.metric_id : "",
     mechanismCategory:
