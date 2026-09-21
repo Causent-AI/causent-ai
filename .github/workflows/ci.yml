@@ -71,6 +71,7 @@ jobs:
           npm run typecheck
           npm run lint -- --max-warnings=0
           npm run test:load-contract
+          npm run test:ui-proposals
           npm test | tee "$RUNNER_TEMP/lib-tests.tap"
           if grep -Eq '# .*(Supabase.*(unavailable|not reachable)|migration.*unavailable|seed not present|Storage is unavailable|provenance fixture is unavailable)' "$RUNNER_TEMP/lib-tests.tap"; then
             echo "A database integration test skipped despite the reset local Supabase stack." >&2

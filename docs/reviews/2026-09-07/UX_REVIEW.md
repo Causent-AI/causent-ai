@@ -1,5 +1,12 @@
 # Causent: a document workspace with AI on request
 
+**September 21 update:** [Proposal D](ui-proposals/d/README.md) records the final agreed direction;
+see the [delivery review](../2026-09-21/PROPOSAL_D_REVIEW.md) and [GA4 handoff](../../handoffs/ga4-core-metrics.md).
+The earlier captures and recommendations below remain historical context.
+
+
+**September 15 update:** the [branding and onboarding revision](../2026-09-15/BRAND_REFINEMENT.md) restores the original logo, logo teal, pill tabs, pageless content, and bottom Core Metrics, and adds onboarding in the same Reports workspace. The interactive proposal reflects this revision; the original September 7 captures below remain historical evidence.
+
 ## Overview
 
 Make the report the place where the user works. The proposed experience is a continuous, editable document with ordinary paragraphs, a compact toolbar, and a few useful chart, table, and action objects. Sources, history, settings, and AI suggestions open beside it. The same concise controls and request → preview → accept pattern should carry through Data, Actions, and Impact.

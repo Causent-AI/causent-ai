@@ -1,5 +1,20 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-09-21 — Proposal D and GA4 implementation handoff
+
+Proposal D packages the agreed document editor/onboarding, five-tab navigation, Decision
+Network, Connections, Harnesses, and task Cost views as a local prototype. The application,
+database, workers, and existing Impact models retain the parent engineering implementation.
+
+See the [delivery review](reviews/2026-09-21/PROPOSAL_D_REVIEW.md) and
+[prototype review steps](reviews/2026-09-07/ui-proposals/d/README.md). Local verification:
+12 prototype tests, both editor builds, typecheck, zero-warning lint, and browser interaction checks.
+The UI PR is based on the still-open [PR #35](https://github.com/Causent-AI/causent-ai/pull/35).
+
+The [GA4 handoff](handoffs/ga4-core-metrics.md) defines the next PR: user-owned Google Analytics
+connections, real daily core metrics through existing analysis, and a data infrastructure/frontend
+security review. GA4 backend, live provider acceptance, and that security review remain pending.
+
 ## 2026-09-07 — T11–T14 implemented; document UX proposal prepared
 
 PR #34 (T05–T10) is merged as `dd1901d`. The next branch adds durable AI generation

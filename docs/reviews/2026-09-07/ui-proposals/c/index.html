@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>UI Proposal C — Causent</title>
+  <link rel="stylesheet" href="styles.css?v=20260921f">
+  <script src="assets/workbench.js?v=20260921d" defer></script>
+  <script src="proposal.js?v=20260921g" defer></script>
+</head>
+<body>
+  <svg class="symbol-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5h6l2 3h10v12H3z"/></symbol>
+    <symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v7c0 4 14 4 14 0V5M5 12v7c0 4 14 4 14 0v-7"/></symbol>
+    <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/></symbol>
+    <symbol id="i-actions" viewBox="0 0 24 24"><path d="m4 6 2 2 4-4M13 6h7M4 13h5M13 13h7M4 20h5M13 20h7"/></symbol>
+    <symbol id="i-impact" viewBox="0 0 24 24"><path d="M4 3v17h17M7 15l5-6 4 3 5-7"/></symbol>
+    <symbol id="i-ai" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5zM20 2v4M18 4h4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8 4 8 8-8 8"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V3H3v13h5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m3 3 18 9-18 9 4-9zM7 12h14"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <a class="brand" href="../" aria-label="Causent — compare proposals"><img src="assets/causent-logo.svg" alt="Causent" width="158" height="27"></a>
+    <div class="project-navigation">
+    <button class="project-selector" id="project-button" aria-controls="view-projects" aria-expanded="false"><span id="current-project">First session</span><svg class="icon small" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+    <div class="tabs" role="tablist" aria-label="Project navigation">
+      <button class="tab" id="tab-data" role="tab" aria-selected="false" aria-controls="view-data" tabindex="-1" data-tab="data"><svg class="icon"><use href="#i-data"/></svg>Data</button>
+      <button class="tab" id="tab-reports" role="tab" aria-selected="true" aria-controls="view-reports" data-tab="reports"><svg class="icon"><use href="#i-report"/></svg>Reports</button>
+      <button class="tab" id="tab-actions" role="tab" aria-selected="false" aria-controls="view-actions" tabindex="-1" data-tab="actions"><svg class="icon"><use href="#i-actions"/></svg>Actions</button>
+      <button class="tab" id="tab-impact" role="tab" aria-selected="false" aria-controls="view-impact" tabindex="-1" data-tab="impact"><svg class="icon"><use href="#i-impact"/></svg>Impact</button>
+    </div>
+    </div>
+    <div class="header-actions">
+      <div class="popover-anchor"><button class="button primary" id="create-button" aria-expanded="false" aria-controls="create-menu"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Create</button><div class="popover" id="create-menu" hidden><button id="create-project"><svg class="icon"><use href="#i-folder"/></svg>Project</button><button id="create-report"><svg class="icon"><use href="#i-report"/></svg>Report</button><button id="create-metric"><svg class="icon"><use href="#i-data"/></svg>Metric</button></div></div>
+      <div class="popover-anchor"><button class="avatar" id="profile-button" aria-label="Profile" aria-expanded="false" aria-controls="profile-menu">AO</button><div class="popover profile-menu" id="profile-menu" hidden><strong>Design review</strong><span id="profile-context">Proposal C · Sample workspace</span><a href="../">Compare A / B / C ↗</a><p>Changes stay in this tab until reload. No connected services.</p></div></div>
+    </div>
+  </header>
+
+  <div class="middle" id="middle">
+    <main id="page-scroll">
+      <section id="view-projects" class="view wide" aria-labelledby="projects-title" hidden>
+        <div class="page-heading"><div><h1 id="projects-title">Projects</h1><p class="subtitle">Your organizations and project folders.</p></div><button class="button" id="new-project"><svg class="icon"><use href="#i-plus"/></svg>New project</button></div>
+        <section class="organization"><div class="section-heading"><h2>Acme</h2><span class="muted" id="project-count">1 project</span></div><div id="project-list"></div></section>
+      </section>
+
+      <section id="view-onboarding" class="view onboarding" aria-labelledby="onboarding-title" hidden>
+        <div class="onboarding-top"><ol class="setup-steps" aria-label="Project setup"><li id="step-brief" aria-current="step"><span>1</span>Brief</li><li id="step-review"><span>2</span>Review</li></ol><button class="text-button" id="cancel-project">Cancel</button></div>
+        <form id="project-form">
+          <h1 id="onboarding-title" tabindex="-1">What are we building?</h1>
+          <textarea id="project-goal" class="project-input" name="goal" aria-labelledby="onboarding-title" rows="4" placeholder="Customers are leaving during setup. Should we simplify it or add guidance?" maxlength="4000" minlength="20" required></textarea>
+          <button class="text-button project-context-note" type="button" id="add-project-context" aria-haspopup="dialog">Add website, pdf or text for your new project</button><span class="muted" id="project-context-count"></span>
+          <div class="setup-examples"><span class="field-label">Examples</span><div id="onboarding-examples"><button type="button" data-example="gummy-alpha"><strong>Gummy Alpha</strong><span>Mixer guidance</span></button><button type="button" data-example="northstar"><strong>Northstar</strong><span>Setup assistant</span></button></div></div>
+          <label class="field-label" for="project-name">Project name <span class="muted">Optional</span></label><input id="project-name" class="project-input" name="name" placeholder="Suggested from your challenge" maxlength="60" autocomplete="off">
+          <p class="form-error" id="onboarding-error" role="alert" hidden></p>
+          <div class="onboarding-footer"><button class="button" type="button" id="brief-add-metric">＋ Metric</button><span class="muted" id="brief-metric-count"></span><button type="submit" class="button primary compact-primary"><svg class="icon"><use href="#i-ai"/></svg>Build report</button></div>
+          <p class="footnote">Design preview · Prepared draft · No AI connected</p>
+        </form>
+        <section id="project-review" hidden aria-labelledby="project-review-title">
+          <div class="review-heading"><h1 id="project-review-title" tabindex="-1"></h1><a class="review-actions-link" href="#review-actions-title">Actions ↓</a></div>
+          <div id="review-editor"></div>
+          <section class="review-actions" aria-labelledby="review-actions-title"><div class="section-heading"><h2 id="review-actions-title">Actions</h2><button class="button" id="add-review-action" type="button">＋ Action</button></div><p class="footnote" id="review-action-count"></p><div id="review-action-list"></div></section>
+          <div class="selected-evidence" id="review-evidence" hidden><span class="eyebrow">Selected evidence</span><p id="review-evidence-list"></p><small>Not read or used to generate this preview.</small></div>
+
+          <div class="onboarding-footer"><button class="text-button" id="back-project">← Back</button><button class="button primary compact-primary" id="finish-project">Create project</button></div>
+          <p class="footnote">Local preview · New projects and edits last until reload.</p>
+        </section>
+      </section>
+
+      <section id="view-data" class="view wide" role="tabpanel" aria-labelledby="tab-data" hidden>
+        <div class="page-heading"><h1>Metric Library</h1><button class="button" id="data-add-metric">＋ Metric</button></div>
+        <div class="table-scroll" id="metric-table-wrap"><table class="metric-table"><caption class="sr-only">Project metrics</caption><thead><tr><th scope="col">Metric</th><th scope="col">Latest</th><th scope="col">L28 Avg</th><th scope="col">WoW Trend</th><th scope="col">Date Range</th></tr></thead><tbody id="metric-rows"></tbody></table></div>
+        <div class="empty-state" id="data-empty" hidden><svg class="icon"><use href="#i-data"/></svg><h2>Start with one metric.</h2><p>Choose the outcome that matters to this project.</p><button class="button" id="add-first-metric">Add metric</button></div>
+
+      </section>
+
+      <section id="view-reports" class="view reports-view" role="tabpanel" aria-labelledby="tab-reports">
+        <aside class="outline" aria-label="Report outline and library">
+          <nav id="report-outline" aria-label="Report sections"></nav>
+          <div class="library"><p class="eyebrow">Reports</p><div id="report-library"></div></div>
+        </aside>
+        <article class="report" id="report-document">
+          <h1 id="report-title" role="textbox" contenteditable="plaintext-only" aria-label="Report title" aria-multiline="false" spellcheck="true"></h1>
+          <div id="report-editor"></div>
+          <div class="selected-evidence" id="report-evidence" hidden><span class="eyebrow">Selected evidence</span><p id="report-evidence-list"></p><small>Not read or used to generate this preview.</small></div>
+
+        </article>
+      </section>
+
+      <section id="view-actions" class="view wide" role="tabpanel" aria-labelledby="tab-actions" hidden>
+        <h1 id="actions-title">First session: Implementation Plan</h1>
+        <div class="section-heading action-list-heading"><h2>Actions</h2><span class="muted" id="action-count">2 of 4 completed</span></div><div id="action-list"></div>
+        <p class="footnote" id="action-footnote">AI cost ranges use illustrative token budgets and rates. Edit the assumptions in each action.</p>
+      </section>
+
+      <section id="view-impact" class="view wide" role="tabpanel" aria-labelledby="tab-impact" hidden>
+        <div class="page-heading"><div><h1>Impact</h1><p class="subtitle" id="impact-subtitle">First session · Activation rate</p></div><label class="model-picker" id="model-picker">Model<select id="model-select"><option value="causal">Causal lift</option><option value="before-after">Before / after · 7d</option></select></label></div>
+        <div class="empty-state" id="impact-empty" hidden><svg class="icon"><use href="#i-impact"/></svg><h2>Results start with data.</h2><p>Add a metric and a measurement plan to begin.</p><button class="button" id="impact-add-metric">Add metric</button></div>
+        <div id="impact-results">
+        <div class="hero-tiles" id="impact-tiles"></div>
+        <figure class="impact-chart"><figcaption><div><strong id="impact-chart-title">Observed & expected</strong><span class="muted" id="impact-period"></span></div><div class="chart-legends"><span class="legend"><i></i>Observed</span><span class="legend expected" id="expected-legend"><i></i>Expected</span></div></figcaption><div id="impact-chart"></div><p id="impact-note" class="chart-note"></p></figure>
+        <div class="section-heading"><h2>Action results</h2><span class="muted" id="action-result-scope"></span></div>
+        <div class="table-scroll"><table class="impact-table"><caption class="sr-only">Action monitoring results for the selected model</caption><thead id="impact-table-head"></thead><tbody id="impact-table-body"></tbody></table></div>
+        <p class="footnote">Action completion is context, not proof of exposure or individual contribution.</p>
+        </div>
+      </section>
+      <div class="preview-note" id="preview-note">Proposal C · Sample data · Edits stay until reload</div>
+    </main>
+
+    <aside class="assistant" id="assistant" aria-label="Ask Causent" hidden>
+      <div class="assistant-heading"><h2><svg class="icon"><use href="#i-ai"/></svg>Ask Causent</h2><button class="icon-button" id="close-assistant" aria-label="Close Ask"><svg class="icon"><use href="#i-close"/></svg></button></div>
+      <div class="assistant-scroll"><p class="context" id="ask-context">First session · Report</p><div class="chat-intro"><h3 id="ask-heading">A little help with your report.</h3><p id="ask-description">Draft a paragraph, refine the plan, or explain a metric.</p></div><div class="suggested-prompts" id="suggested-prompts"></div><div id="conversation" aria-live="polite"></div><section class="ai-preview" id="ai-preview" hidden><span class="eyebrow">Proposed edit</span><p id="preview-text"></p><div class="preview-actions"><button class="button primary" id="keep-preview">Keep</button><button class="button" id="discard-preview">Discard</button></div></section></div>
+      <form class="composer" id="ask-form"><label class="sr-only" for="ask-input">Ask Causent</label><textarea id="ask-input" rows="3" placeholder="Ask about this page…" required></textarea><div><span>Prepared examples · No AI connected</span><button class="send-button" aria-label="Send request" type="submit"><svg class="icon"><use href="#i-send"/></svg></button></div></form>
+    </aside>
+  </div>
+
+  <button class="ask-fab" id="ask-button" aria-label="Ask" aria-expanded="false" aria-controls="assistant"><svg class="icon"><use href="#i-ai"/></svg><span>Ask</span></button>
+
+  <section class="drawer" id="drawer" aria-label="Core Metrics">
+    <div class="drawer-bar"><button id="drawer-toggle" aria-expanded="false" aria-controls="drawer-panel"><svg class="icon drawer-chevron"><use href="#i-chevron"/></svg><span class="metric-dot"></span><strong id="drawer-label">Core Metrics</strong><span id="drawer-count">4 metrics</span></button><span class="drawer-hint" id="drawer-hint">Project timeline</span></div>
+    <div class="drawer-panel" id="drawer-panel" hidden><div class="metric-tabs" id="drawer-metric-tabs" aria-label="Core metric selection"></div><div class="drawer-content" id="drawer-content"><section class="metric-summary" id="metric-summary" aria-label="Metric summary"></section><figure class="drawer-chart"><figcaption><strong id="drawer-chart-title">Activation rate</strong><span class="muted" id="drawer-chart-subtitle">Daily · Jul 26 – Sep 19</span></figcaption><div id="drawer-chart"></div></figure></div></div>
+  </section>
+  <dialog class="workbench-dialog" id="project-context-dialog" aria-labelledby="project-context-title">
+    <div class="dialog-heading"><h2 id="project-context-title">Project context</h2><button class="icon-button" id="close-project-context" aria-label="Close project context">×</button></div>
+    <label class="block-label" for="project-source-url">Website<input id="project-source-url" type="url" placeholder="https://example.com" inputmode="url"></label>
+    <label class="block-label" for="project-source-pdf">PDF<input id="project-source-pdf" type="file" accept=".pdf,application/pdf" aria-describedby="source-preview-note"></label><button class="text-button" type="button" id="remove-project-pdf" hidden>Remove PDF</button>
+    <label class="block-label" for="project-source-text">Text<textarea id="project-source-text" rows="4" maxlength="12000" placeholder="Paste notes or project context"></textarea></label>
+    <p class="footnote" id="source-preview-note">PDF limit: 5 MiB. Context stays in this tab; websites and PDFs are not read in this preview.</p>
+    <p class="form-error" id="project-context-error" role="alert" hidden></p>
+    <button class="button primary compact-primary" id="done-project-context" type="button">Done</button>
+  </dialog>
+  <dialog id="source-dialog" aria-labelledby="source-dialog-title"><div class="dialog-heading"><h2 id="source-dialog-title">Reconnect source</h2><button class="icon-button" id="close-source" aria-label="Close source details"><svg class="icon"><use href="#i-close"/></svg></button></div><p id="source-dialog-copy"></p><p class="footnote">Connection controls are a preview. No credentials are requested and no connection is changed.</p><button class="button primary" id="done-source">Done</button></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
