@@ -22,4 +22,4 @@ python3 -m http.server 3135 --bind 127.0.0.1 --directory docs/reviews/2026-09-07
 
 ## Verification
 
-Browser checks passed for the comparison page, A's report library and full report editor, and B's Data/Reports switching and Ask drawer. Both preview tabs reported no console errors during the checked flows. The original stalled development and static preview servers were restarted. The app, backend, schema, and workers were not edited for this comparison setup. No commit, push, or deployment was performed.
+Initial A/B browser checks passed for the comparison page, A's report library and full report editor, and B's Data/Reports switching and Ask drawer, with no console errors in those flows. The app, backend, schema, and workers were not edited for this comparison setup. The complete proposal package is now in [draft PR #36](https://github.com/Causent-AI/causent-ai/pull/36); see the [delivery review](../../2026-09-21/PROPOSAL_D_REVIEW.md) for current verification. No production deployment was performed.

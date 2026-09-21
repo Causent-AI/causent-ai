@@ -4,6 +4,8 @@
 
 Proposal D captures the agreed Causent interface in an interactive local prototype: editable reports, shared onboarding, five navigation tabs, a decision network, and Data Workshop connections, harnesses, and task cost. This PR preserves the earlier engineering work and records the GA4 backend handoff. It does not connect customer accounts or deploy the redesign.
 
+[Draft PR #36 and current checks](https://github.com/Causent-AI/causent-ai/pull/36).
+
 ## Executive summary
 
 - **UI delivery:** A/B/C comparisons and D are packaged with local assets, editor sources, and review captures. D includes the final labels and removes Instances and the redundant Metric sources section.

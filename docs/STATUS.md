@@ -9,7 +9,8 @@ database, workers, and existing Impact models retain the parent engineering impl
 See the [delivery review](reviews/2026-09-21/PROPOSAL_D_REVIEW.md) and
 [prototype review steps](reviews/2026-09-07/ui-proposals/d/README.md). Local verification:
 12 prototype tests, both editor builds, typecheck, zero-warning lint, and browser interaction checks.
-The UI PR is based on the still-open [PR #35](https://github.com/Causent-AI/causent-ai/pull/35).
+[UI PR #36](https://github.com/Causent-AI/causent-ai/pull/36) is based on the still-open
+[engineering PR #35](https://github.com/Causent-AI/causent-ai/pull/35); current hosted checks are on #36.
 
 The [GA4 handoff](handoffs/ga4-core-metrics.md) defines the next PR: user-owned Google Analytics
 connections, real daily core metrics through existing analysis, and a data infrastructure/frontend
