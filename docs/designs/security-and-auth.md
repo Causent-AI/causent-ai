@@ -13,6 +13,8 @@ conversion, retention). Security is a first-class deliverable, not polish.
 ## 1. Authentication (current design-partner preview)
 
 The implemented login surface is **invite-only Google OAuth through Supabase Auth**.
+The login button requests Google's account chooser so users can choose a different
+identity without silently reusing their current Google session.
 An operator first adds the email and intended org role to `allowed_emails`. Supabase's
 Before User Created hook rejects any email not on that allowlist before an
 `auth.users` row is created; the post-create trigger then materializes the invited
