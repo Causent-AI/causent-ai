@@ -175,7 +175,7 @@ export function DecisionReportsIndex({ reports }: { reports: DashboardDecisionRe
                   Version {selected.iterationNumber} · {lifecycleLabel(selected)}
                 </p>
                 <h1 className="mt-1 text-[24px] font-semibold tracking-tight">{selected.title}</h1>
-                <p className="mt-1 text-[12px] text-[var(--text-muted)]">Core metric: {selected.metricProjection.metricName}</p>
+                <p className="mt-1 text-[12px] text-[var(--text-muted)]">Core metric: {selected.status === "active" ? selected.activeMetricName ?? "Metric unavailable" : selected.metricProjection.metricName}</p>
               </div>
               <div className="flex flex-wrap items-start gap-2">
                 <Link href={`/onboarding?report=${selected.id}`} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--brand-blue)]">
