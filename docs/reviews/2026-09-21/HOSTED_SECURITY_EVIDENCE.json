@@ -1,0 +1,76 @@
+{
+  "observed_at_utc": "2026-09-22T01:11:47.500207+00:00",
+  "target": "Existing hosted Causent AI project; not the new GA4 schema",
+  "operations": "Read-only security advisors and catalog/Storage metadata; no customer rows queried",
+  "advisor_counts": {
+    "INFO": 2,
+    "WARN": 33
+  },
+  "advisor_categories": {
+    "rls_enabled_no_policy": 2,
+    "authenticated_security_definer_function_executable": 32,
+    "auth_leaked_password_protection": 1
+  },
+  "flagged_rpc_names": [
+    "public.abandon_decision_report_asset_v1(p_asset_id uuid, p_authored_by uuid)",
+    "public.action_scope(t_action uuid)",
+    "public.activate_decision_report_v1(p_report_id uuid, p_revision_id uuid, p_metric_id uuid, p_prediction_direction text, p_prediction_magnitude_pct_mean real, p_prediction_resolution_date date, p_selected_action_source_ids text[], p_activated_by uuid)",
+    "public.activate_decision_report_v2(p_report_id uuid, p_revision_id uuid, p_metric_id uuid, p_prediction_direction text, p_prediction_magnitude_pct_mean real, p_prediction_resolution_date date, p_selected_action_source_ids text[], p_primary_lever_source_id text, p_activated_by uuid)",
+    "public.activate_decision_report_v3(p_report_id uuid, p_revision_id uuid, p_primary_metric_id uuid, p_selected_metric_ids uuid[], p_prediction_direction text, p_prediction_magnitude_pct_mean real, p_prediction_resolution_date date, p_selected_action_source_ids text[], p_action_metric_assignments jsonb, p_primary_lever_source_id text, p_activated_by uuid)",
+    "public.append_decision_report_revision_v1(p_report_id uuid, p_base_revision_id uuid, p_title text, p_status text, p_snapshot jsonb, p_metric_projection jsonb, p_authored_by uuid)",
+    "public.append_metric_csv_import_chunk_v2(p_import_id uuid, p_chunk_index integer, p_chunk_digest text, p_observations jsonb, p_authored_by uuid)",
+    "public.attach_decision_report_asset_v1(p_asset_id uuid, p_report_id uuid, p_base_revision_id uuid, p_title text, p_status text, p_snapshot jsonb, p_metric_projection jsonb, p_media_type text, p_byte_size integer, p_width integer, p_height integer, p_content_hash text, p_authored_by uuid)",
+    "public.begin_report_metric_csv_import_v2(p_scope_id uuid, p_report_id uuid, p_metric_id uuid, p_content_hash text, p_total_rows integer, p_start_date date, p_end_date date, p_authored_by uuid)",
+    "public.begin_workspace_metric_csv_import_v2(p_scope_id uuid, p_name text, p_unit text, p_content_hash text, p_total_rows integer, p_start_date date, p_end_date date, p_authored_by uuid)",
+    "public.complete_manual_action_v1(p_scope_id uuid, p_action_id uuid, p_completed_on date, p_explanation text, p_authored_by uuid)",
+    "public.create_decision_report_v1(p_scope_id uuid, p_title text, p_status text, p_snapshot jsonb, p_metric_projection jsonb, p_authored_by uuid)",
+    "public.create_decision_report_v2(p_scope_id uuid, p_title text, p_status text, p_snapshot jsonb, p_metric_projection jsonb, p_authored_by uuid, p_source_receipt_id uuid)",
+    "public.decision_scope(t_decision uuid)",
+    "public.delete_decision_report_v1(p_scope_id uuid, p_report_id uuid, p_authored_by uuid)",
+    "public.detach_decision_report_asset_v1(p_asset_id uuid, p_report_id uuid, p_base_revision_id uuid, p_title text, p_status text, p_snapshot jsonb, p_metric_projection jsonb, p_authored_by uuid)",
+    "public.finalize_metric_csv_import_v2(p_import_id uuid, p_authored_by uuid)",
+    "public.get_current_causal_recompute_status_v1(p_scope_id uuid)",
+    "public.get_current_prediction_drift_v1(p_scope_id uuid)",
+    "public.has_org_access(t_org uuid, min_role text)",
+    "public.has_project_access(t_project uuid, min_role text)",
+    "public.has_scope_access(target_scope uuid, min_role text)",
+    "public.has_scope_grant(t_org uuid, t_project uuid, t_workspace uuid, min_role text)",
+    "public.import_active_report_metric_csv_v1(p_scope_id uuid, p_report_id uuid, p_metric_id uuid, p_observations jsonb, p_authored_by uuid)",
+    "public.import_workspace_metric_csv_v1(p_scope_id uuid, p_name text, p_unit text, p_observations jsonb, p_authored_by uuid)",
+    "public.list_decision_report_activation_metrics_v1(p_scope_id uuid)",
+    "public.list_decision_report_activation_metrics_v2(p_scope_id uuid)",
+    "public.metric_scope(t_metric uuid)",
+    "public.prediction_scope(t_prediction uuid)",
+    "public.reserve_decision_report_asset_v1(p_report_id uuid, p_base_revision_id uuid, p_extension text, p_authored_by uuid)",
+    "public.set_workspace_core_metric_v1(p_scope_id uuid, p_metric_id uuid, p_is_core boolean, p_authored_by uuid)",
+    "public.start_decision_report_iteration_v1(p_scope_id uuid, p_parent_report_id uuid, p_reason text, p_authored_by uuid)"
+  ],
+  "catalog": {
+    "anon_executable_definers": [
+      "private.initialize_decision_report_series()"
+    ],
+    "data_api_schemas": [],
+    "definers_without_fixed_search_path": [],
+    "latest_migrations": [
+      "20260819053842",
+      "20260819044116",
+      "20260817062102",
+      "20260817062057",
+      "20260817062054"
+    ],
+    "public_definer_views": [],
+    "public_tables_without_rls": [],
+    "storage_buckets": [
+      {
+        "allowed_mime_types": [
+          "image/png",
+          "image/jpeg"
+        ],
+        "file_size_limit": 5242880,
+        "name": "decision-report-assets",
+        "public": false
+      }
+    ]
+  },
+  "interpretation": "Data API schema exposure remains unverified: an empty database-role-setting result is not proof that private schemas are unexposed. Function warnings require per-RPC review; no exploit is established by the warning count."
+}

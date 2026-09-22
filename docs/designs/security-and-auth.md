@@ -1,7 +1,7 @@
 # Causent Security & Auth
 
-Status: LIVING DOCUMENT (current implementation reviewed 2026-08-12; pending release)
-Next review: the [GA4 implementation handoff](../handoffs/ga4-core-metrics.md) requires a data infrastructure/frontend security check in the next PR. This is planned work, not a completed audit.
+Status: LIVING DOCUMENT (GA4 source/local review updated 2026-09-21; pending release).
+[SEC01 findings and unchecked hosted surfaces](../reviews/2026-09-21/SECURITY_REVIEW.md).
 
 Owner: founder
 Related: `docs/designs/did-it-ship-did-it-work.md` (PRD), `docs/designs/decision-graph.md` (data model / RBAC tables)
@@ -13,18 +13,19 @@ conversion, retention). Security is a first-class deliverable, not polish.
 ## 1. Authentication (current design-partner preview)
 
 The implemented login surface is **invite-only Google OAuth through Supabase Auth**.
+The login button requests Google's account chooser so users can choose a different
+identity without silently reusing their current Google session.
 An operator first adds the email and intended org role to `allowed_emails`. Supabase's
 Before User Created hook rejects any email not on that allowlist before an
 `auth.users` row is created; the post-create trigger then materializes the invited
 org membership idempotently. The OAuth callback exchanges the code for a cookie-backed
 Supabase session and clamps any `next` destination to a same-origin relative path.
 
-Email magic-link/password login, GitHub login, SAML/enterprise OIDC, account-level
-connector OAuth, and member-management UI are **not implemented** in the current
-preview. The longer-term design still separates login identity from data connections,
+Email magic-link/password login, GitHub login, SAML/enterprise OIDC and member-management UI are **not implemented** in the current
+preview. GA4 connector OAuth is implemented behind a disabled flag; live acceptance is pending. The longer-term design still separates login identity from data connections,
 but configured GitHub/Jira credentials, prefilled issue links, paste attribution, and
-strict CSV upload are the current connector surfaces. Do not describe those as an
-interactive OAuth connection flow.
+strict CSV upload remain the existing connector surfaces. GA4 has a separate admin-owned
+OAuth lifecycle described in the [operator guide](../integrations/google-analytics.md).
 
 ```
 CURRENT LOGIN                    CURRENT DATA INPUTS
@@ -70,8 +71,9 @@ membership whose scope covers the row's `scope_id` at a sufficient role.
 
 ## 4. Secrets & credential management
 
-Secrets are deployment-managed environment variables today; Supabase Vault-backed
-per-connection credentials are a future design, not a shipped capability. The public
+Secrets are deployment-managed environment variables today. GA4 refresh tokens use
+AES-256-GCM ciphertext in `private.ga4_credentials`, bound to workspace/connection;
+its encryption key and scoped worker JWT are server-only. Vault is not used by this implementation. The public
 Supabase URL and anon key may be browser-visible, but the service-role key and every
 worker/provider/connector secret remain server-only.
 
@@ -84,6 +86,7 @@ worker/provider/connector secret remain server-only.
 | `DATABASE_URL`, `CAUSENT_RECOMPUTE_SECRET` | stateful recompute worker environment | private queue and graph materialization; matching secret/URL live on the app side |
 | resolve-worker DSN/shared secret | stateful resolve worker environment | scheduled prediction resolution, separate from the stateless engine |
 | `CRON_SECRET` | app server environment | authenticates scheduled drain/reconciliation routes |
+| GA4 OAuth client secret, encryption key and scoped worker JWT | server environment | separate from login; worker RPC only; expiring token renewal required |
 | GitHub/Jira tokens and webhook secrets | server environment | operator-configured connector seam; no user OAuth token lifecycle yet |
 
 Release checks validate required variable names and URL classes without printing values,

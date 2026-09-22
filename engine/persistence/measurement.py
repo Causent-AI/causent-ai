@@ -85,14 +85,27 @@ def load_measurement_input(
     *,
     today: date | None = None,
 ) -> MeasurementInput:
-    today = (
-        today or conn.execute("select (now() at time zone 'UTC')::date").fetchone()[0]
-    )
     metric = conn.execute(
-        "select scope_id from public.metrics where metric_id=%s", (metric_id,)
+        "select scope_id,tz from public.metrics where metric_id=%s", (metric_id,)
     ).fetchone()
     if metric is None or str(metric[0]) != str(scope_id):
         raise ValueError("Metric is unavailable in the requested workspace")
+    today = today or conn.execute("select (now() at time zone %s)::date", (metric[1],)).fetchone()[0]
+    provider_row = conn.execute(
+        "select jsonb_build_object('property_id',c.property_id,'timezone',c.timezone,'status',c.status,"
+        "'mapping_id',m.mapping_id,'provider_metric',m.provider_metric,'event_name',m.event_name,"
+        "'generation',c.generation,'receipt',to_jsonb(r),'authorized',exists("
+        "select 1 from public.workspaces w join public.projects p on p.project_id=w.project_id "
+        "join public.memberships a on a.org_id=p.org_id and a.user_id=c.actor_id "
+        "and (a.project_id is null or a.project_id=w.project_id) "
+        "and (a.workspace_id is null or a.workspace_id=w.workspace_id) "
+        "where w.workspace_id=c.scope_id and w.archived_at is null and a.role in ('owner','admin'))) "
+        "from public.ga4_metric_mappings m join public.ga4_connections c using(connection_id) "
+        "left join public.ga4_sync_receipts r on r.receipt_id=m.last_receipt_id "
+        "where m.metric_id=%s and m.scope_id=%s",
+        (metric_id, scope_id),
+    ).fetchone()
+    provider = provider_row[0] if provider_row else None
     definition_row = conn.execute(
         "select to_jsonb(d) from public.metric_definitions d where metric_id=%s and scope_id=%s",
         (metric_id, scope_id),
@@ -147,7 +160,14 @@ def load_measurement_input(
     )
     exposures = [row[0] for row in exposure_rows]
     refusal, resume_at, exposure_date, observations = None, None, None, []
-    if definition is None:
+    if provider and (not provider["authorized"] or provider["status"] != "connected" or not provider["receipt"]
+                     or provider["receipt"]["generation"] != provider["generation"]):
+        refusal = "GA4_SYNC_REQUIRED"
+    elif provider and provider["receipt"]["status"] != "accepted":
+        refusal = "GA4_QUALITY_RESTRICTED"
+    elif provider and today > date.fromisoformat(provider["receipt"]["end_date"]) + timedelta(days=3):
+        refusal = "GA4_DATA_STALE"
+    elif definition is None:
         refusal = "METRIC_DEFINITION_REQUIRED"
     elif plan is None:
         refusal = "MEASUREMENT_PLAN_REQUIRED"
@@ -215,6 +235,7 @@ def load_measurement_input(
         "activation_id": str(activation_id) if activation_id else None,
         "report_id": str(activation_row[2]) if activation_row else None,
         "definition": definition,
+        **({"ga4_provenance": provider} if provider else {}),
         "plan": plan,
         "exposures": exposures,
         "family": {

@@ -1,5 +1,55 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-09-22 — Production infrastructure released; final app pending
+
+The user merged #35 (`3b25913`), which Vercel deployed automatically. The five pending
+migrations were rehearsed on a production-data copy and applied: production is now at 47.
+Matching drift, recompute and resolve workers from `906dd7a` are promoted. The database
+update restored the live app's signed-in Data, Reports, Actions and Impact routes.
+
+The final #37 application candidate is Ready, with GA4 explicitly off, but has not been
+promoted. A narrow Supabase callback allowlist fix now keeps sign-in on the candidate.
+Existing-account navigation and a new report with two uploaded metrics, three actions,
+activation and all six handoff previews pass. The synthetic workspace is archived; original
+data counts/digests are unchanged. After the owner added Gateway credits, live Sonnet 5
+generation, autosave and reload passed for $0.0231. Gateway recovered through Bedrock after
+two provider schema-size rejections; schema simplification remains a reliability follow-up.
+The Reports metric-label fix and navigation pass on candidate `239a245`. The final candidate
+`e6fe2c8` adds a Google account chooser after repeated login reused the old browser session;
+its chooser, security headers, hosted CI and both previews pass. Fresh-account OAuth,
+live generation, autosave/reload, two CSV metrics, four-action activation and all eight
+Claude/Codex previews now pass on that candidate. One earlier AI response failed validation
+and preserved the brief as a safe fallback; a normal retry passed. Both synthetic workspaces
+are archived, with original data/audit digests unchanged. #37 is ready for final review and
+merge with GA4 disabled; post-merge deployment verification remains required. #36's parent
+conflict was resolved with an identical reviewed tree; fresh CI passed and #36 is merged
+as `87d3128`. Its automatic deployment is now on `app.causent.ai`; signed-in Impact
+loads successfully. #37 targets main. See the
+[release record](releases/2026-09-22-production.md) for exact IDs, security findings and rollback.
+The dated entries below describe earlier checkpoints, not the current production state.
+
+## 2026-09-21 — GA4 core metrics and security
+
+[Draft PR #37](https://github.com/Causent-AI/causent-ai/pull/37) follows #36.
+GA01–GA04 are implemented behind `CAUSENT_GA4_ENABLED` (off by default): admin OAuth,
+property preview/import, daily sync, private encrypted credentials, core metric selection
+and existing analysis with property-local dates/provenance. Source/local SEC01 review
+patched vulnerable dependencies and added frontend protections. Hosted CI passed with
+726 app tests (19 optional skips), 1,338 engine tests and both preview builds. Read-only
+hosted catalog/Storage checks passed; 33 advisor warnings are documented for deployment
+follow-through.
+
+Google account creation is deferred at the user's request. The disabled **Setup required**
+card remains the placeholder. [Account/property setup and live acceptance](integrations/google-analytics.md#setup-pending)
+remain pending before enablement; review of the disabled connector can continue.
+
+See the [engineering review](reviews/2026-09-21/GA4_ENGINEERING_REVIEW.md),
+[security findings](reviews/2026-09-21/SECURITY_REVIEW.md),
+[decision record](reviews/2026-09-21/GA4_DECISIONS.md), and
+[setup/acceptance/rollback guide](integrations/google-analytics.md). Real Google property
+acceptance and hosted infrastructure verification remain release gates. No production
+migration, connector enablement, merge or deployment was performed.
+
 ## 2026-09-21 — Proposal D and GA4 implementation handoff
 
 Proposal D packages the agreed document editor/onboarding, five-tab navigation, Decision
@@ -14,7 +64,8 @@ See the [delivery review](reviews/2026-09-21/PROPOSAL_D_REVIEW.md) and
 
 The [GA4 handoff](handoffs/ga4-core-metrics.md) defines the next PR: user-owned Google Analytics
 connections, real daily core metrics through existing analysis, and a data infrastructure/frontend
-security review. GA4 backend, live provider acceptance, and that security review remain pending.
+security review. The implementation and local review are recorded above; live provider
+acceptance and hosted security verification remain pending.
 
 ## 2026-09-07 — T11–T14 implemented; document UX proposal prepared
 

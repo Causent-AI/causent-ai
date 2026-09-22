@@ -1,13 +1,28 @@
 # Causent active backlog
 
+## 2026-09-22 production release
+
+- [x] Rehearse and apply migrations 43–47; preserve report/audit/membership invariants, promote matching workers and verify live authenticated requests to all three.
+- [x] Fix the candidate OAuth return with its exact allowed callback; verify existing-account navigation, six handoff previews, GA4 placeholder, logs and unchanged data.
+- [x] Verify new-report autosave/reopen, two uploaded metrics, secondary-metric action, activation and all six handoff previews; archive the isolated synthetic workspace and preserve original production data.
+- [x] Verify live Sonnet 5 generation after the owner added Gateway credits; draft autosave/reload passes, cost $0.0231.
+- [ ] Improve structured-output reliability: simplify/test the schema across provider routes and investigate malformed output. Two providers rejected the compiled grammar; one fresh-account response failed validation safely, then a normal retry passed.
+- [x] Verify the activated Reports metric-label fix, navigation and all six handoff previews on candidate `239a245`.
+- [x] Verify new-account creation and isolated member provisioning; fix silent Google-account reuse and verify the chooser on candidate `e6fe2c8`, with hosted checks passing.
+- [x] Finish fresh-account candidate acceptance: real OAuth, generation, saved edits/reload, two uploaded metrics, four-action activation, eight handoff previews, route continuity and unchanged navigation counters; archive the synthetic workspace.
+- [ ] User merges #37; verify its automatic deployment, alias and signed-in behavior, then remove the three temporary candidate callbacks. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
+- [ ] Resolve the existing hosted leaked-password protection warning; email/password auth is enabled.
+- [x] Remove the new `causent-release-20260922` rehearsal branch after retaining its evidence; leave the older preflight branch alone.
+
 ## 2026-09-21 UI delivery and next PR
 
 - [x] Package [Proposal D and comparisons](docs/reviews/2026-09-07/ui-proposals/d/README.md),
   document the final design, and add prototype data tests to CI.
 - [ ] Review/merge the UI PR after engineering PR #35; no production redesign is deployed.
-- [ ] GA01–04: implement [GA4 authorization, sync, core metrics, and analysis](docs/handoffs/ga4-core-metrics.md).
-- [ ] SEC01: run the data infrastructure/frontend security review in that next PR, fix verified
-  findings, and attach evidence plus any unchecked surfaces.
+- [x] GA01–04: implement [GA4 authorization, sync, core metrics, and analysis](docs/integrations/google-analytics.md) behind a disabled flag.
+- [x] SEC01: complete [source/local infrastructure and frontend review](docs/reviews/2026-09-21/SECURITY_REVIEW.md), patch verified findings, and record unchecked hosted surfaces.
+- [ ] Deferred: create the Google account, GA4 property and connector OAuth client when ready; retain the disabled [setup placeholder](docs/integrations/google-analytics.md#setup-pending).
+- [ ] Review the 32 existing hosted privileged-RPC warnings and leaked-password protection setting; complete auth/Storage delivery/CORS/API exposure, secret separation, worker-token rotation and header checks before GA4 enablement.
 - [ ] Verify the complete flow against an authorized real GA4 property before connector release.
 
 ## 2026-09-07 T11–T14 and UX review

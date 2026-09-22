@@ -19,6 +19,7 @@ export type DashboardDecisionReport = {
   decisionId: string | null;
   predictionId: string | null;
   metricId: string | null;
+  activeMetricName: string | null;
   seriesId: string;
   iterationNumber: number;
   predecessorReportId: string | null;
@@ -87,12 +88,19 @@ export const getDecisionReports = cache(async function getDecisionReports(scopeI
     .filter((id): id is string => id !== null);
   if (revisionIds.length === 0) return [];
 
-  const revisionsRes = await sb
-    .from("decision_report_revisions")
-    .select("revision_id, snapshot, metric_projection")
-    .eq("scope_id", scopeId)
-    .in("revision_id", revisionIds);
+  const metricIds = [...new Set(rows.flatMap((row) => row.active_metric_id ? [row.active_metric_id] : []))];
+  const [revisionsRes, metricsRes] = await Promise.all([
+    sb.from("decision_report_revisions")
+      .select("revision_id, snapshot, metric_projection")
+      .eq("scope_id", scopeId)
+      .in("revision_id", revisionIds),
+    metricIds.length > 0
+      ? sb.from("metrics").select("metric_id, name").eq("scope_id", scopeId).in("metric_id", metricIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
   if (revisionsRes.error) throw revisionsRes.error;
+  if (metricsRes.error) throw metricsRes.error;
+  const metricNames = new Map((metricsRes.data ?? []).map((metric) => [metric.metric_id, metric.name]));
   const revisionById = new Map(
     ((revisionsRes.data ?? []) as RevisionRow[]).map((row) => [row.revision_id, row]),
   );
@@ -116,6 +124,7 @@ export const getDecisionReports = cache(async function getDecisionReports(scopeI
       decisionId: row.active_decision_id,
       predictionId: row.active_prediction_id,
       metricId: row.active_metric_id,
+      activeMetricName: row.active_metric_id ? metricNames.get(row.active_metric_id) ?? null : null,
       seriesId: row.series_id,
       iterationNumber: row.iteration_number,
       predecessorReportId: row.predecessor_report_id,

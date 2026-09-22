@@ -1,0 +1,475 @@
+{
+  "runtimeSource": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
+  "productionProject": "royftsqyawtyfjolfabd",
+  "migrationCountBefore": 42,
+  "migrationCountAfter": 47,
+  "appliedMigrations": [
+    "20260907035048",
+    "20260907053500",
+    "20260908070000",
+    "20260908071000",
+    "20260922000213"
+  ],
+  "migrationBoundaryCounts": {
+    "reports": 7,
+    "revisions": 22,
+    "activations": 6,
+    "memberships": 4,
+    "workspaces": 1,
+    "metrics": 11,
+    "observations": 1504,
+    "predictions": 17,
+    "evidence": 244
+  },
+  "productionInvariantsPreserved": {
+    "reports": true,
+    "revisions": true,
+    "activations": true,
+    "memberships": true,
+    "workspaces": true,
+    "metrics": true,
+    "observations": true,
+    "predictions": true,
+    "evidence": true,
+    "revision_digest": true,
+    "activation_digest": true,
+    "membership_digest": true
+  },
+  "rehearsalInvariantsPreserved": true,
+  "catalog": {
+    "anonymous_callable_nontrigger_public_definers": 0,
+    "definers_without_fixed_search_path": 0,
+    "ga4_connections": 0,
+    "ga4_credentials": 0,
+    "ga4_worker": {
+      "bypass_rls": false,
+      "inherit": false,
+      "login": false,
+      "superuser": false
+    },
+    "image_bucket": {
+      "allowed_mime_types": [
+        "image/png",
+        "image/jpeg"
+      ],
+      "file_size_limit": 5242880,
+      "public": false
+    },
+    "private_ga4_read_privileges": [
+      {
+        "read": false,
+        "role": "anon",
+        "table": "private.ga4_credentials"
+      },
+      {
+        "read": false,
+        "role": "authenticated",
+        "table": "private.ga4_credentials"
+      },
+      {
+        "read": false,
+        "role": "causent_ga4_worker",
+        "table": "private.ga4_credentials"
+      },
+      {
+        "read": false,
+        "role": "anon",
+        "table": "private.ga4_oauth_states"
+      },
+      {
+        "read": false,
+        "role": "authenticated",
+        "table": "private.ga4_oauth_states"
+      },
+      {
+        "read": false,
+        "role": "causent_ga4_worker",
+        "table": "private.ga4_oauth_states"
+      }
+    ],
+    "public_tables_without_rls": 0,
+    "public_views_without_security_invoker": 0,
+    "rollouts": {
+      "disabled": 0,
+      "enabled": 1,
+      "rows": 1
+    }
+  },
+  "advisors": [
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "count": 7
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "count": 32
+    },
+    {
+      "name": "auth_leaked_password_protection",
+      "level": "WARN",
+      "count": 1
+    }
+  ],
+  "workers": {
+    "drift": {
+      "httpRequests": [
+        {
+          "timestamp": 1790044840357,
+          "deploymentId": "dpl_CdKNvUQVm2RiGhH6tdQXyxhS8KBm",
+          "path": "/api/drift",
+          "status": 200
+        },
+        {
+          "timestamp": 1790044579834,
+          "deploymentId": "dpl_CdKNvUQVm2RiGhH6tdQXyxhS8KBm",
+          "path": "/api/drift",
+          "status": 401
+        }
+      ]
+    },
+    "recompute": {
+      "httpRequests": [
+        {
+          "timestamp": 1790044816192,
+          "deploymentId": "dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4",
+          "path": "/api/recompute",
+          "status": 200
+        },
+        {
+          "timestamp": 1790044580226,
+          "deploymentId": "dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4",
+          "path": "/api/recompute",
+          "status": 401
+        }
+      ]
+    },
+    "resolve": {
+      "httpRequests": [
+        {
+          "timestamp": 1790045594449,
+          "deploymentId": "dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt",
+          "path": "/api/resolve",
+          "status": 200
+        },
+        {
+          "timestamp": 1790045540943,
+          "deploymentId": "dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt",
+          "path": "/api/resolve",
+          "status": 401
+        }
+      ],
+      "canaryScope": "empty_sentinel",
+      "canonicalAliasUnchanged": true
+    }
+  },
+  "liveApp": {
+    "deploymentId": "dpl_9Grirzn3BB6NDVXjPnbKjbmmFsUy",
+    "source": "87d3128d04bd0e93a618d40400ff9b4af84cf564",
+    "alias": "app.causent.ai",
+    "existingAccountImpact": "passed"
+  },
+  "candidate": {
+    "deploymentId": "dpl_B4zioUX25QJiujFjPvty4eD8aew1",
+    "source": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
+    "ga4Enabled": false,
+    "promoted": false,
+    "authentication": "Real fresh-account Google OAuth returned to this candidate; only the isolated member workspace was accessible. Existing-account acceptance passed on the prior runtime-equivalent candidate.",
+    "existingAccountChecks": {
+      "onboarding": true,
+      "dataWorkshop": true,
+      "reports": true,
+      "savedReportDirectOpen": true,
+      "actions": true,
+      "impact": true,
+      "ga4SetupPlaceholder": true,
+      "ga4ConnectAbsent": true,
+      "claudeAndCodexPreviews": 6,
+      "exportedReportData": false,
+      "errorLogRecordsDuringReadOnlyChecks": 0,
+      "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
+    },
+    "navigationInvariantsPreserved": {
+      "activation_digest": true,
+      "activations": true,
+      "evidence": true,
+      "membership_digest": true,
+      "memberships": true,
+      "metrics": true,
+      "migrations": true,
+      "observations": true,
+      "predictions": true,
+      "reports": true,
+      "revision_digest": true,
+      "revisions": true,
+      "workspaces": true
+    },
+    "freshAccountActivation": "passed on e6fe2c8; two metrics, four actions, eight handoff previews",
+    "syntheticActivation": {
+      "workspaceId": "b1af84ee-ca9e-46fc-9943-99dc8ebb3f07",
+      "reportId": "1f1fabb0-5bd2-4696-a403-ac4ee7da8667",
+      "existingAccount": true,
+      "freshAccount": false,
+      "archived": true,
+      "originalWorkspaceSelectionRestored": true,
+      "autosaveAndDirectReopen": true,
+      "paragraphAndTitleEdits": true,
+      "csvUploadThroughAuthenticatedUi": true,
+      "metrics": 2,
+      "observations": 100,
+      "actions": 3,
+      "secondaryMetricSupportAction": true,
+      "claudeAndCodexPreviews": 6,
+      "exportedHandoff": false,
+      "browserWarningsOrErrors": 0,
+      "navigationCountersBeforeAndAfter": {
+        "actions": 3,
+        "activation_digest": "dc143a3b8b32b1f9bf41d28bf7787815",
+        "activations": 1,
+        "predictions": 1,
+        "recompute_jobs": 0,
+        "recompute_requested": null,
+        "reports": 1,
+        "revisions": 8,
+        "telemetry": 5,
+        "transitions": 0
+      },
+      "navigationCountersUnchanged": true,
+      "preexistingProductionCountsAndDigestsUnchanged": true,
+      "durableResidue": "Archived synthetic workspace, organization/project, owner membership, report/revisions, activation, metrics/observations, actions, prediction and audit receipts retained.",
+      "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
+    },
+    "priorAcceptedDeployment": {
+      "id": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu",
+      "source": "906dd7ab2b2f57e33e1db7367b256b735d1ebd11",
+      "acceptance": "Existing-account navigation and synthetic multi-metric activation; Gateway AI generation blocked."
+    },
+    "updatedCandidateChecks": {
+      "verifiedDeploymentId": "dpl_BNr2Rqugsjmp5AkhveamFFVRH4r2",
+      "authentication": true,
+      "correctActivatedMetricLabel": true,
+      "savedReportDirectOpen": true,
+      "dataWorkshop": true,
+      "ga4SetupPlaceholder": true,
+      "ga4ConnectAbsent": true,
+      "reports": true,
+      "actions": true,
+      "impact": true,
+      "claudeAndCodexPreviews": 6,
+      "browserWarningsOrErrors": 0,
+      "navigationCountersUnchanged": true,
+      "productionAliasUnchanged": true,
+      "aiGenerationRetried": true
+    },
+    "aiGenerationBeforeCreditTopUp": {
+      "passed": false,
+      "safeFallbackPreservedBrief": true,
+      "model": "anthropic/claude-sonnet-5",
+      "providerStatus": 403,
+      "attempts": 2,
+      "tokens": 0,
+      "costUsd": 0,
+      "gatewayRequestId": "gen_01M33NQHB3XRT90AERFN09W9T9",
+      "cause": "Team Gateway plan excludes the configured model; free credit does not cover it.",
+      "userAction": "Add paid Gateway credits, then rerun generation.",
+      "modelChanged": false,
+      "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
+    },
+    "aiGeneration": {
+      "passed": true,
+      "verifiedDeploymentId": "dpl_BNr2Rqugsjmp5AkhveamFFVRH4r2",
+      "reportId": "5d92b803-c597-43c1-afed-049630928be7",
+      "requestId": "08c329b5-6a8e-4dbc-b588-529c2610bd12",
+      "mode": "live",
+      "status": "completed",
+      "model": "anthropic/claude-sonnet-5",
+      "modelChanged": false,
+      "slotReleased": true,
+      "completedAt": "2026-09-22 05:06:15.132685+00",
+      "telemetry": {
+        "attempts": 1,
+        "inputTokens": 5134,
+        "latencyMs": 18365,
+        "model": "anthropic/claude-sonnet-5",
+        "outputTokens": 1286,
+        "totalTokens": 6420
+      },
+      "gatewayRequestId": "gen_01M33R3DYF7AYN5899F0T65RQT",
+      "gatewayStatus": 200,
+      "gatewayProvider": "bedrock",
+      "gatewayRoutingAttempts": 3,
+      "gatewayCostUsdDisplayed": 0.0231,
+      "providerRecoveries": [
+        {
+          "provider": "Claude Platform on AWS",
+          "status": 400,
+          "reason": "Compiled structured-output grammar too large"
+        },
+        {
+          "provider": "Anthropic",
+          "status": 400,
+          "reason": "Compiled structured-output grammar too large"
+        }
+      ],
+      "autosaveAndReloadPassed": true,
+      "unknownImpactRemainedUnset": true,
+      "draftOnly": true,
+      "preexistingProductionCountsAndDigestsUnchanged": true
+    },
+    "syntheticWorkspaceAfterPaidGeneration": {
+      "archived": true,
+      "reportCount": 2,
+      "revisionCount": 9,
+      "activationCount": 1,
+      "actionCount": 3,
+      "predictionCount": 1,
+      "telemetryCount": 9,
+      "recomputeJobs": 0,
+      "transitionCount": 0,
+      "activationDigestUnchanged": true,
+      "originalWorkspaceSelectionRestored": true
+    },
+    "accountChooserChecks": {
+      "verifiedDeploymentId": "dpl_B4zioUX25QJiujFjPvty4eD8aew1",
+      "source": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
+      "sourceMetadataVerified": true,
+      "googleChooserVisible": true,
+      "useAnotherAccountVisible": true,
+      "normalGooglePasswordStepHandedToOwner": true,
+      "securityHeadersPassed": true,
+      "productionAliasUnchanged": true,
+      "ciRunId": 35696751128,
+      "ciPassed": true,
+      "bothPreviewsPassed": true,
+      "localTestsPassed": 678,
+      "localTestsSkipped": 67,
+      "hostedAppTestsPassed": 726,
+      "hostedAppTestsSkipped": 19,
+      "engineTestsPassed": 1338,
+      "typecheck": true,
+      "lint": true,
+      "webpackBuildNode22": true,
+      "dashboardBuildContract": true,
+      "normalOAuthReturnedToCandidate": true
+    },
+    "freshAccountSignup": {
+      "accountCreated": true,
+      "createdAt": "2026-09-22T06:20:36.155133Z",
+      "workspaceId": "ef921cfb-87ed-4669-9047-c108ef38e5a6",
+      "organizationId": "9f4604f4-d6f5-40e5-baa3-89f3c1ad0ecd",
+      "role": "member",
+      "membershipCount": 1,
+      "explicitRolloutAssignments": 0,
+      "workspaceProvisionedEmpty": true,
+      "archived": true,
+      "preexistingProductionCountsAndDigestsUnchanged": true,
+      "browserAcceptancePassed": true
+    },
+    "freshAccountAcceptance": {
+      "verifiedDeploymentId": "dpl_B4zioUX25QJiujFjPvty4eD8aew1",
+      "source": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
+      "workspaceId": "ef921cfb-87ed-4669-9047-c108ef38e5a6",
+      "reportId": "0c694a3e-1adf-4035-b8eb-d7eb2f3b5a55",
+      "oauthReturnedToCandidate": true,
+      "onlyIsolatedWorkspaceAccessible": true,
+      "liveGenerationReceipt": {
+        "created_at": "2026-09-22 07:15:58.722516+00",
+        "finished_at": "2026-09-22 07:16:09.026857+00",
+        "generation_mode": "live",
+        "request_id": "c2563150-ba97-4aa7-84fd-35111a237c5f",
+        "slot_released": true,
+        "status": "completed",
+        "telemetry": {
+          "attempts": 1,
+          "inputTokens": 4876,
+          "latencyMs": 10204,
+          "model": "anthropic/claude-sonnet-5",
+          "outputTokens": 1080,
+          "totalTokens": 5956
+        }
+      },
+      "previousValidationFailure": "bc691001-c583-49a6-83d2-f76e011d959a safely returned fallback; normal retry passed, reliability follow-up remains",
+      "autosaveReloadAndDirectReopen": true,
+      "editedTitlePersisted": true,
+      "commitmentAndMetricBindingsPersisted": true,
+      "metrics": 2,
+      "observations": 100,
+      "actions": 4,
+      "secondaryMetricSupportAction": true,
+      "claudeAndCodexPreviews": 8,
+      "exportedHandoff": false,
+      "dataReportsActionsImpact": true,
+      "canonicalMetricLabelCorrect": true,
+      "primaryVersusMonitoringLanguage": true,
+      "noMeasuredOutcomeClaimed": true,
+      "browserWarningOrErrorCount": 0,
+      "candidateLogSample": {
+        "records": 100,
+        "levels": [
+          "info"
+        ]
+      },
+      "navigationCountersBeforeAndAfter": {
+        "actions": 4,
+        "activation_digest": "1e3fe5bb49a968e1cf93cfbbc3d3095b",
+        "activations": 1,
+        "predictions": 1,
+        "recompute_jobs": 0,
+        "recompute_requested": null,
+        "reports": 3,
+        "revisions": 7,
+        "telemetry": 16,
+        "transitions": 0
+      },
+      "navigationCountersUnchanged": true,
+      "preexistingProductionCountsAndDigestsUnchanged": true,
+      "archived": true,
+      "earlierUserDraftAndFallbackPreserved": true
+    }
+  },
+  "rehearsalBranchDeleted": true,
+  "authRedirectFix": {
+    "project": "royftsqyawtyfjolfabd",
+    "added_callback": "https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "site_url_unchanged": true,
+    "changed_fields": [
+      "uri_allow_list"
+    ],
+    "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**",
+    "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback"
+  },
+  "reportMetricLabelFix": {
+    "reason": "Activated report still displayed original draft metric name.",
+    "updatedCandidateVerified": true,
+    "source": "239a245b852f70f841101afce0532c07be5210b4",
+    "localTestsPassed": 678,
+    "localTestsSkipped": 67,
+    "typecheck": true,
+    "lint": true,
+    "webpackBuildNode22": true,
+    "dashboardBuildContract": true
+  },
+  "updatedCandidateAuthRedirect": {
+    "project": "royftsqyawtyfjolfabd",
+    "added_callback": "https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "site_url_unchanged": true,
+    "changed_fields": [
+      "uri_allow_list"
+    ],
+    "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback"
+  },
+  "accountChooserAuthRedirect": {
+    "project": "royftsqyawtyfjolfabd",
+    "added_callback": "https://causent-2oidideiw-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "site_url_unchanged": true,
+    "changed_fields": [
+      "uri_allow_list"
+    ],
+    "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-2oidideiw-adamdavidowens-1984s-projects.vercel.app/auth/callback"
+  },
+  "releaseVerdict": "READY_TO_PROMOTE; user merge and post-merge source/alias/signed-in verification remain",
+  "temporaryCallbackCleanup": "After post-merge production acceptance; preserve existing allowlist entries."
+}

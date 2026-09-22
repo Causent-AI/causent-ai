@@ -33,6 +33,7 @@ function report(): DashboardDecisionReport {
     metricProjection: GUMMY_ALPHA_GOLDEN_EXAMPLE.metricProjection,
     activeActivationId: "activation",
     decisionId: "report-decision", predictionId: "prediction", metricId: "metric-uuid",
+    activeMetricName: "completion",
     seriesId: "series", iterationNumber: 1, predecessorReportId: null,
     iterationReason: null, isCurrent: true,
   };

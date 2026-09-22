@@ -241,8 +241,9 @@ def _finish(
     if resume_at is not None:
         conn.execute(
             "update private.causal_recompute_jobs set requested_generation=requested_generation+1, "
-            "next_attempt_at=(%s::date::timestamp at time zone 'UTC') where activation_id=%s",
-            (resume_at, job.activation_id),
+            "next_attempt_at=(%s::date::timestamp at time zone "
+            "(select tz from public.metrics where metric_id=%s)) where activation_id=%s",
+            (resume_at, job.metric_id, job.activation_id),
         )
     conn.commit()
 
