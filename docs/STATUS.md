@@ -2,6 +2,7 @@
 
 ## 2026-09-21 — GA4 core metrics and security
 
+[Draft PR #37](https://github.com/Causent-AI/causent-ai/pull/37) follows #36.
 GA01–GA04 are implemented behind `CAUSENT_GA4_ENABLED` (off by default): admin OAuth,
 property preview/import, daily sync, private encrypted credentials, core metric selection
 and existing analysis with property-local dates/provenance. Source/local SEC01 review

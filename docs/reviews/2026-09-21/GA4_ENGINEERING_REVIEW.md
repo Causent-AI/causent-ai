@@ -4,6 +4,8 @@
 
 The next implementation slice connects customer GA4 daily observations to Causent's existing metric and analysis contracts. Data Workshop now has an admin-only connection, preview/import and sync/disconnect flow. Credentials and provider writes stay behind dedicated server/database boundaries. The analysis models are unchanged; property-local dates and provenance now survive the pipeline.
 
+Submission: [draft PR #37](https://github.com/Causent-AI/causent-ai/pull/37), implementation `1bea0928e0be0c8e77e8c8c674a5880a596c63b0`. Hosted results are attached to the PR head.
+
 Baseline: `01535f2`, parent [PR #36](https://github.com/Causent-AI/causent-ai/pull/36). This delivery is implemented and locally tested, with hosted checks attached to the submitted draft PR. It is not merged, enabled or deployed to production. Real Google consent/property acceptance remains pending operator setup.
 
 ## Executive summary
