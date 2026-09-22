@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { NetworkNode } from "@/lib/data/decision-network";
 import type { AccessibleWorkspace } from "@/lib/auth/workspace-selection";
+import { layoutDecisionNetwork } from "@/lib/data/decision-network-layout";
 export function DecisionNetwork({
   nodes,
   metrics,
@@ -55,25 +56,7 @@ export function DecisionNetwork({
         .includes(query.toLowerCase()),
   );
   const selected = visible.find((node) => node.id === selectedId);
-  const groups = [...new Set(visible.map((node) => node.workspaceId))];
-  const start = Math.min(...visible.map((node) => Date.parse(node.date)));
-  const end = Math.max(...visible.map((node) => Date.parse(node.date)));
-  const width = Math.max(1000, visible.length * 155);
-  const height = Math.max(420, groups.length * 155 + 120);
-  const coordinates = new Map(
-    visible.map((node, i) => [
-      node.id,
-      {
-        x:
-          260 +
-          (end > start
-            ? (Date.parse(node.date) - start) / (end - start)
-            : i / Math.max(1, visible.length - 1)) *
-            (width - 380),
-        y: 130 + groups.indexOf(node.workspaceId) * 155 + (i % 2) * 45,
-      },
-    ]),
-  );
+  const { groups, width, height, coordinates } = layoutDecisionNetwork(visible);
   return (
     <div className="network-page">
       <div className="network-heading">
@@ -223,10 +206,10 @@ export function DecisionNetwork({
               </defs>
               <rect width={width} height={height} fill="url(#network-stars)" />
               {groups.map((group) => {
-                const node = visible.find((n) => n.workspaceId === group)!;
-                const y = 145 + groups.indexOf(group) * 155;
+                const node = visible.find((n) => n.workspaceId === group.workspaceId)!;
+                const y = group.y;
                 return (
-                  <g key={group}>
+                  <g key={group.workspaceId}>
                     <line
                       x1="120"
                       y1={y}
@@ -273,7 +256,7 @@ export function DecisionNetwork({
                 return (
                   <g key={`edge-${node.id}`}>
                     <path
-                      d={`M175,${145 + groups.indexOf(node.workspaceId) * 155} Q${point.x - 60},${145 + groups.indexOf(node.workspaceId) * 155} ${point.x},${point.y}`}
+                      d={`M175,${groups.find((g) => g.workspaceId === node.workspaceId)!.y} Q${point.x - 60},${groups.find((g) => g.workspaceId === node.workspaceId)!.y} ${point.x},${point.y}`}
                       fill="none"
                       stroke="#71aaa844"
                     />

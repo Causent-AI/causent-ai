@@ -2,7 +2,7 @@
 
 ## 2026-09-22 — Proposal D production implementation
 
-#37 is merged as `9dcc20b` and deployed on `app.causent.ai` (`dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`). The owner authorized the design rollout with GA4 deferred. The new branch implements the real application shell, pageless reports/onboarding, Data Workshop and Decision Network. Local verification passes; candidate and promotion are still pending. See the [engineering review](reviews/2026-09-22/PRODUCTION_DESIGN_REVIEW.md) and [release manifest](releases/2026-09-22-proposal-d-production.md). Older entries below are historical.
+#37 is merged as `9dcc20b` and deployed on `app.causent.ai` (`dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`). The owner authorized the design rollout with GA4 deferred. [PR #38](https://github.com/Causent-AI/causent-ai/pull/38) implements the real application shell, pageless reports/onboarding, Data Workshop and Decision Network. Local gates and hosted CI pass. Both accounts can sign in to the candidate; saved reports, fourteen handoff previews, route continuity and mobile checks pass. Navigation counters and original data digests are unchanged. Graph pointer and dense-date layout issues found during acceptance are corrected. Automatic approval review blocked new synthetic report generation/activation and paid AI calls; bounded test approval is pending, so production is unchanged. Test workspaces are archived again. See the [engineering review](reviews/2026-09-22/PRODUCTION_DESIGN_REVIEW.md) and [release manifest](releases/2026-09-22-proposal-d-production.md). Older entries below are historical.
 
 ## 2026-09-22 — Production infrastructure released; final app pending
 

@@ -1,5 +1,12 @@
 # Causent active backlog
 
+## Proposal D production design — PR #38
+
+- [x] Implement the authenticated application design; preserve backend contracts, default models and disabled GA4.
+- [x] Run local gates and candidate checks for both accounts, saved reports, all handoff previews, mobile views and unchanged navigation/data invariants.
+- [ ] Finish approved synthetic create/edit/reload/rewrite/activate acceptance on the final candidate; automatic approval review requires explicit consent for persistent records and paid AI requests.
+- [ ] Merge #38, promote the verified candidate, verify `app.causent.ai`, archive test workspaces and close the [release record](docs/releases/2026-09-22-proposal-d-production.md).
+
 ## 2026-09-22 production release
 
 - [x] Rehearse and apply migrations 43–47; preserve report/audit/membership invariants, promote matching workers and verify live authenticated requests to all three.
@@ -10,7 +17,8 @@
 - [x] Verify the activated Reports metric-label fix, navigation and all six handoff previews on candidate `239a245`.
 - [x] Verify new-account creation and isolated member provisioning; fix silent Google-account reuse and verify the chooser on candidate `e6fe2c8`, with hosted checks passing.
 - [x] Finish fresh-account candidate acceptance: real OAuth, generation, saved edits/reload, two uploaded metrics, four-action activation, eight handoff previews, route continuity and unchanged navigation counters; archive the synthetic workspace.
-- [ ] User merges #37; verify its automatic deployment, alias and signed-in behavior, then remove the three temporary candidate callbacks. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
+- [x] User merged #37; its automatic deployment and signed-in production alias are verified.
+- [ ] Remove the three temporary PR #37 callbacks when authentication-setting changes are authorized. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
 - [ ] Resolve the existing hosted leaked-password protection warning; email/password auth is enabled.
 - [x] Remove the new `causent-release-20260922` rehearsal branch after retaining its evidence; leave the older preflight branch alone.
 
@@ -18,7 +26,7 @@
 
 - [x] Package [Proposal D and comparisons](docs/reviews/2026-09-07/ui-proposals/d/README.md),
   document the final design, and add prototype data tests to CI.
-- [ ] Review/merge the UI PR after engineering PR #35; no production redesign is deployed.
+- [x] Merge prototype PR #36 after engineering PR #35; actual application rollout is tracked in #38 above.
 - [x] GA01–04: implement [GA4 authorization, sync, core metrics, and analysis](docs/integrations/google-analytics.md) behind a disabled flag.
 - [x] SEC01: complete [source/local infrastructure and frontend review](docs/reviews/2026-09-21/SECURITY_REVIEW.md), patch verified findings, and record unchecked hosted surfaces.
 - [ ] Deferred: create the Google account, GA4 property and connector OAuth client when ready; retain the disabled [setup placeholder](docs/integrations/google-analytics.md#setup-pending).
