@@ -26,10 +26,27 @@ Gateway recovered through Bedrock after Claude Platform on AWS and direct Anthro
 rejected the compiled output grammar. Record schema simplification as a reliability
 follow-up; do not claim every provider route passed. No model or routing setting changed.
 The Reports metric-name fix is verified on candidate `239a245`, with saved content, all six handoffs and unchanged counters; production still serves #36. Fresh-account
-acceptance is still unverified and unwaived. #36 merged as `87d3128`; do not merge #37 for the user.
+application acceptance remains unverified and unwaived. #36 merged as `87d3128`; do not merge #37 for the user.
 
 Use the [release manifest](../docs/releases/2026-09-22-production.md) for exact deployment
 IDs, security findings, rollback and cleanup. Preserve the current workers/additive
 schema during app rollback. The new rehearsal branch was removed after its aggregate evidence was saved;
 the older preflight branch remains untouched. Google Analytics stays off and
 Proposal D remains a prototype.
+
+The new test identity completed real Google signup in Chrome and received exactly one
+member grant to isolated workspace `ef921cfb-87ed-4669-9047-c108ef38e5a6`
+(organization `9f4604f4-d6f5-40e5-baa3-89f3c1ad0ecd`), with zero rollout assignments.
+The connected browser retained the original Google session. Source `e6fe2c8` fixes silent
+reuse by requesting `prompt=select_account`; local checks, hosted CI run `35696751128` and
+both previews pass. Candidate `dpl_B4zioUX25QJiujFjPvty4eD8aew1` has verified source metadata,
+passing headers and a visible Google account chooser. Its exact callback is the third
+temporary allowlist entry; production still serves #36. The owner has been handed the
+normal Google password step for the test identity. No new-account report or activation
+has been tested yet. Retain both isolated workspaces and their audit history; archive
+the fresh-account workspace after acceptance. Remove the three temporary callbacks only
+after acceptance and any rollback retest are complete.
+
+Operational note: a failed archive export briefly created an empty Vercel project named
+`app-account-chooser`; it was removed completely. The final export excludes repository
+tooling links and is pinned to the existing verified Causent project.

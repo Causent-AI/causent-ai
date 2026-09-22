@@ -1,12 +1,12 @@
 # Production release · 2026-09-22
 
-Status: **existing-account activation and paid Sonnet 5 generation passed. Fresh-account acceptance remains open.**
+Status: **existing-account activation, paid Sonnet 5 generation and new-account creation passed. Fresh-account browser acceptance remains open.**
 
 ## Scope and source
 
-Authorized: required migrations, matching workers, candidate verification and production promotion/rollback. Google Analytics stays disabled with its setup placeholder. No Google account, provider import, production seed, or Proposal D replacement of the live interface. The later acceptance test added one isolated synthetic workspace and its owner membership for the confirmed existing user; the original workspace was preserved.
+Authorized: required migrations, matching workers, candidate verification and production promotion/rollback. Google Analytics stays disabled with its setup placeholder. No Google Analytics setup, provider import, production seed, or Proposal D replacement of the live interface. Acceptance tests added two isolated synthetic workspaces with operator/test memberships; the original workspace was preserved.
 
-Application candidate source: `239a245b852f70f841101afce0532c07be5210b4` adds the Reports metric-label correction described below. Its local verification passed: 678 tests with 67 environment/optional skips, typecheck, zero-warning lint, Node 22 webpack build and the dashboard build contract. [Hosted CI on `58ac350`](https://github.com/Causent-AI/causent-ai/actions/runs/35688373657) and both previews passed, including the complete integration suite. Worker source remains `906dd7ab2b2f57e33e1db7367b256b735d1ebd11`. Its [CI](https://github.com/Causent-AI/causent-ai/actions/runs/35676698650) passed: 726 app tests, 19 optional live-model skips, 1,338 engine tests, 12 prototype tests, schema/worker gates and production build. The unrelated untracked `ai-instances-desktop.png` is excluded.
+Application candidate source: `e6fe2c80641389f9ea683db73ad4524ad8e13e1d` adds explicit Google account selection and includes the earlier Reports metric-label fix (`239a245`). Local verification passed: 678 app tests with 67 environment/optional skips, typecheck, zero-warning lint, Node 22 webpack build and the dashboard build contract. [Hosted CI on `e6fe2c8`](https://github.com/Causent-AI/causent-ai/actions/runs/35696751128) and both previews passed: 726 app tests, 19 optional live-model skips, 1,338 engine tests, 12 prototype tests, 15 load contracts, schema/worker gates and production build. Worker source remains `906dd7ab2b2f57e33e1db7367b256b735d1ebd11`. The unrelated untracked `ai-instances-desktop.png` is excluded.
 
 The user merged [#35](https://github.com/Causent-AI/causent-ai/pull/35) as `3b25913c0a2ce699157f734d08fc77673e2e6e30`. [#36](https://github.com/Causent-AI/causent-ai/pull/36) was retargeted to main; merge commit `961025a` resolves the squashed-parent conflicts with a tree identical to reviewed `01535f2`. [Fresh checks](https://github.com/Causent-AI/causent-ai/actions/runs/35680481325) passed and #36 merged as `87d3128d04bd0e93a618d40400ff9b4af84cf564`. [#37](https://github.com/Causent-AI/causent-ai/pull/37) remains a draft, now targeting main. Main merges trigger Vercel automatically; no manual production pull is needed.
 
@@ -19,11 +19,11 @@ The user merged [#35](https://github.com/Causent-AI/causent-ai/pull/35) as `3b25
 | Recompute | `dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4` — promoted, runtime source `906dd7a` |
 | Resolve | `dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt` — promoted, runtime source `906dd7a` |
 | Live app | `app.causent.ai` → `dpl_9Grirzn3BB6NDVXjPnbKjbmmFsUy`, source **#36 / `87d3128`**; alias and signed-in Impact verified |
-| Final app candidate | `dpl_BNr2Rqugsjmp5AkhveamFFVRH4r2`, runtime source **#37 / `239a245`**, Ready but not promoted |
+| Final app candidate | `dpl_B4zioUX25QJiujFjPvty4eD8aew1`, runtime source **#37 / `e6fe2c8`**, Ready but not promoted |
 | GA4 | Candidate build/runtime flag explicitly `0`; production has zero connections and credentials |
 | Report exposure | Existing `default-on-with-explicit-rollback` resolver; one enabled assignment, no assignment changes |
 
-Candidate: [immutable preview](https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app). The preceding `906dd7a` candidate, `dpl_4L33WGPe2DteezReXNcJg2cmBkXu`, supplied the full activation evidence below. The live alias remains on #36 after the new build.
+Candidate: [immutable preview](https://causent-2oidideiw-adamdavidowens-1984s-projects.vercel.app). Earlier candidates `906dd7a` and `239a245` supplied the activation, corrected-label and paid-generation evidence below. The final candidate changes only the login account prompt; its browser chooser and security headers pass, while authenticated application acceptance remains pending. The live alias is still on #36.
 
 ## Database and security evidence
 
@@ -79,7 +79,27 @@ before claiming those two provider routes are compatible. This check proves succ
 end-to-end generation through the recovered Bedrock route, not success on every provider.
 No model, routing rule or budget setting was changed.
 
-Fresh-account acceptance has not been exercised or waived. A new workspace for an existing identity does not satisfy that check. Automated tests cover the enabled/unassigned/disabled/unavailable rollout matrix and secondary-metric handoff assembly. Live Google account/property acceptance remains deferred while GA4 stays disabled.
+### Fresh-account signup and account selection
+
+A previously unused address completed real Google signup in Chrome at `2026-09-22T06:20:36Z`.
+The invitation produced exactly one member grant to a new isolated organization, with zero
+explicit rollout assignments. The new workspace is `ef921cfb-87ed-4669-9047-c108ef38e5a6`
+(**Fresh signup / PR 37 fresh-account check**); it was provisioned empty through the operator
+workflow. Pre-existing data counts and report/activation/membership digests are unchanged.
+The existing owner retains an administrative membership for test cleanup.
+
+The connected browser still held the original Google session. Repeated sign-in reused it
+without a choice, so source `e6fe2c8` adds `prompt=select_account` to the existing Supabase
+OAuth request. On the final candidate, Google now shows **Choose an account** and **Use
+another account**. The test address is at the normal Google password step, handed to the
+owner. No Google account-management settings, credentials, auth bypass, or model settings
+were changed. Only this candidate's exact callback was added to the existing allowlist;
+the production Site URL and other auth settings are unchanged.
+
+New-account creation and scoped provisioning have passed; fresh-account report creation,
+activation and handoff acceptance remain pending and are not waived. Automated tests cover
+the enabled/unassigned/disabled/unavailable rollout matrix and secondary-metric handoff
+assembly. Live Google Analytics property acceptance remains deferred while GA4 stays disabled.
 
 ## Rollback and next steps
 
@@ -87,6 +107,6 @@ Keep the additive database schema, audit records and current worker set. The ret
 
 The new rehearsal branch was deleted after its aggregate [evidence](2026-09-22-evidence.json) was retained. The older preflight branch was left untouched.
 
-Next: complete or explicitly defer fresh-account acceptance. Then finish #37, verify the final source, promote, prove alias identity and repeat signed-in checks. Founder/partner and representative-load validation remain separate gates.
+Next: complete fresh-account browser acceptance on `e6fe2c8` (or record an explicit deferral). Then finish #37, verify the final source, promote, prove alias identity and repeat signed-in checks. Founder/partner and representative-load validation remain separate gates.
 
-Remove both temporary exact preview callbacks after release acceptance and any rollback retest are complete; preserve the pre-existing allowlist entries. Final PR merge and application promotion remain with the user/operator.
+Remove all three temporary exact preview callbacks after release acceptance and any rollback retest are complete; preserve the pre-existing allowlist entries. Final PR merge and application promotion remain with the user/operator.

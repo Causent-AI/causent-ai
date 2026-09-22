@@ -14,8 +14,11 @@ activation and all six handoff previews pass. The synthetic workspace is archive
 data counts/digests are unchanged. After the owner added Gateway credits, live Sonnet 5
 generation, autosave and reload passed for $0.0231. Gateway recovered through Bedrock after
 two provider schema-size rejections; schema simplification remains a reliability follow-up.
-The Reports metric-label fix and navigation pass on updated candidate `239a245`; fresh-account acceptance
-remains open pending an explicit scope decision. #36's parent
+The Reports metric-label fix and navigation pass on candidate `239a245`. The final candidate
+`e6fe2c8` adds a Google account chooser after repeated login reused the old browser session;
+its chooser, security headers, hosted CI and both previews pass. Real new-account creation
+and isolated member provisioning passed in Chrome. Fresh-account report/activation acceptance
+awaits the owner completing Google sign-in in the connected preview. #36's parent
 conflict was resolved with an identical reviewed tree; fresh CI passed and #36 is merged
 as `87d3128`. Its automatic deployment is now on `app.causent.ai`; signed-in Impact
 loads successfully. #37 remains a draft targeting main. See the

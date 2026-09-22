@@ -8,7 +8,8 @@
 - [x] Verify live Sonnet 5 generation after the owner added Gateway credits; draft autosave/reload passes, cost $0.0231.
 - [ ] Simplify the report output schema and test direct Anthropic / Claude Platform on AWS; both rejected its compiled grammar, while Gateway recovered successfully through Bedrock.
 - [x] Verify the activated Reports metric-label fix, navigation and all six handoff previews on candidate `239a245`.
-- [ ] Complete or explicitly defer fresh-account acceptance; then finish #37 and promote the final app. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
+- [x] Verify new-account creation and isolated member provisioning; fix silent Google-account reuse and verify the chooser on candidate `e6fe2c8`, with hosted checks passing.
+- [ ] Finish fresh-account browser acceptance on the final candidate; then ready #37 for the user to merge and promote. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
 - [ ] Resolve the existing hosted leaked-password protection warning; email/password auth is enabled.
 - [x] Remove the new `causent-release-20260922` rehearsal branch after retaining its evidence; leave the older preflight branch alone.
 

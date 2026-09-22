@@ -1,5 +1,5 @@
 {
-  "runtimeSource": "239a245b852f70f841101afce0532c07be5210b4",
+  "runtimeSource": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
   "productionProject": "royftsqyawtyfjolfabd",
   "migrationCountBefore": 42,
   "migrationCountAfter": 47,
@@ -171,11 +171,11 @@
     "existingAccountImpact": "passed"
   },
   "candidate": {
-    "deploymentId": "dpl_BNr2Rqugsjmp5AkhveamFFVRH4r2",
-    "source": "239a245b852f70f841101afce0532c07be5210b4",
+    "deploymentId": "dpl_B4zioUX25QJiujFjPvty4eD8aew1",
+    "source": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
     "ga4Enabled": false,
     "promoted": false,
-    "authentication": "passed: fresh OAuth returned to the immutable candidate onboarding",
+    "authentication": "Google account chooser verified; authenticated acceptance pending on this candidate. Historical accepted deployments are identified below.",
     "existingAccountChecks": {
       "onboarding": true,
       "dataWorkshop": true,
@@ -205,7 +205,7 @@
       "revisions": true,
       "workspaces": true
     },
-    "freshAccountActivation": "not exercised; scope decision pending",
+    "freshAccountActivation": "pending browser acceptance; new account created in Chrome, connected browser awaits the owner at the Google password step",
     "syntheticActivation": {
       "workspaceId": "b1af84ee-ca9e-46fc-9943-99dc8ebb3f07",
       "reportId": "1f1fabb0-5bd2-4696-a403-ac4ee7da8667",
@@ -329,6 +329,41 @@
       "transitionCount": 0,
       "activationDigestUnchanged": true,
       "originalWorkspaceSelectionRestored": true
+    },
+    "accountChooserChecks": {
+      "verifiedDeploymentId": "dpl_B4zioUX25QJiujFjPvty4eD8aew1",
+      "source": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
+      "sourceMetadataVerified": true,
+      "googleChooserVisible": true,
+      "useAnotherAccountVisible": true,
+      "normalGooglePasswordStepHandedToOwner": true,
+      "securityHeadersPassed": true,
+      "productionAliasUnchanged": true,
+      "ciRunId": 35696751128,
+      "ciPassed": true,
+      "bothPreviewsPassed": true,
+      "localTestsPassed": 678,
+      "localTestsSkipped": 67,
+      "hostedAppTestsPassed": 726,
+      "hostedAppTestsSkipped": 19,
+      "engineTestsPassed": 1338,
+      "typecheck": true,
+      "lint": true,
+      "webpackBuildNode22": true,
+      "dashboardBuildContract": true
+    },
+    "freshAccountSignup": {
+      "accountCreated": true,
+      "createdAt": "2026-09-22T06:20:36.155133Z",
+      "workspaceId": "ef921cfb-87ed-4669-9047-c108ef38e5a6",
+      "organizationId": "9f4604f4-d6f5-40e5-baa3-89f3c1ad0ecd",
+      "role": "member",
+      "membershipCount": 1,
+      "explicitRolloutAssignments": 0,
+      "workspaceProvisionedEmpty": true,
+      "archived": false,
+      "preexistingProductionCountsAndDigestsUnchanged": true,
+      "browserAcceptancePassed": false
     }
   },
   "rehearsalBranchDeleted": true,
@@ -362,5 +397,15 @@
     ],
     "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback",
     "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback"
+  },
+  "accountChooserAuthRedirect": {
+    "project": "royftsqyawtyfjolfabd",
+    "added_callback": "https://causent-2oidideiw-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "site_url_unchanged": true,
+    "changed_fields": [
+      "uri_allow_list"
+    ],
+    "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-2oidideiw-adamdavidowens-1984s-projects.vercel.app/auth/callback"
   }
 }
