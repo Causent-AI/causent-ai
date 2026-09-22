@@ -35,7 +35,7 @@ export function ReportRewrite({
   function rewrite() {
     if (!claim?.text.trim() || disabled) return;
     const original = claim.text;
-    const brief = `Prepare a complete Decision Report object for a paragraph rewrite. Put the rewritten paragraph in the nested decision.decision claim, following the instruction below. Keep the required report envelope and leave unrelated unsupported claims null and lists empty. Do not add facts, numerical results, or claims of evidence.\nInstruction: ${instruction}\nParagraph: ${original}`;
+    const brief = `Prepare a complete Decision Report object for a paragraph rewrite. Put the rewritten paragraph in the nested decision.decision claim, following the instruction below. Keep the required report envelope and leave unrelated unsupported claims missing and lists empty. Do not add facts, numerical results, or claims of evidence.\nInstruction: ${instruction}\nParagraph: ${original}`;
     if (brief.length > 6000) {
       setError("Choose a shorter paragraph (under 5,000 characters).");
       return;

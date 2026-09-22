@@ -223,6 +223,58 @@ export const MODEL_DECISION_REPORT_JSON_SCHEMA: JSONSchema7 = {
   ],
 };
 
+function providerSchema(schema: JSONSchema7): JSONSchema7 {
+  const result = { ...schema };
+  // Nullable objects multiply the provider's grammar states. Missing claims have
+  // an equivalent, already supported representation: kind=missing, empty text.
+  if (Array.isArray(result.type) && result.type.includes("object")) {
+    result.type = "object";
+  }
+  // These bounds are not supported by Anthropic's native structured output.
+  // Report validation and materialization still enforce the application contract.
+  delete result.minLength;
+  delete result.maxLength;
+  delete result.minimum;
+  delete result.maximum;
+  delete result.maxItems;
+  if (result.properties) {
+    result.properties = Object.fromEntries(Object.entries(result.properties).map(([key, value]) =>
+      [key, typeof value === "object" ? providerSchema(value) : value],
+    ));
+  }
+  if (result.items && typeof result.items === "object" && !Array.isArray(result.items)) {
+    result.items = providerSchema(result.items);
+  }
+  return result;
+}
+
+export const PROVIDER_DECISION_REPORT_JSON_SCHEMA = providerSchema(MODEL_DECISION_REPORT_JSON_SCHEMA);
+
+function withinSchemaBounds(value: unknown, schema: JSONSchema7): boolean {
+  if (typeof value === "string") {
+    const length = [...value].length;
+    return (schema.minLength === undefined || length >= schema.minLength) &&
+      (schema.maxLength === undefined || length <= schema.maxLength);
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) &&
+      (schema.minimum === undefined || value >= schema.minimum) &&
+      (schema.maximum === undefined || value <= schema.maximum);
+  }
+  if (Array.isArray(value)) {
+    const itemSchema = schema.items;
+    return (schema.maxItems === undefined || value.length <= schema.maxItems) &&
+      (!itemSchema || typeof itemSchema !== "object" || Array.isArray(itemSchema) ||
+        value.every((item) => withinSchemaBounds(item, itemSchema)));
+  }
+  if (isRecord(value) && schema.properties) {
+    return Object.entries(schema.properties).every(([key, child]) =>
+      typeof child !== "object" || withinSchemaBounds(value[key], child),
+    );
+  }
+  return true;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -250,6 +302,9 @@ export function validateModelDecisionReportDraft(
 ): { success: true; value: ModelDecisionReportDraft } | { success: false; error: Error } {
   if (!isRecord(value) || typeof value.projectName !== "string" || typeof value.title !== "string") {
     return { success: false, error: new Error("Generated report metadata is malformed.") };
+  }
+  if (!withinSchemaBounds(value, MODEL_DECISION_REPORT_JSON_SCHEMA)) {
+    return { success: false, error: new Error("Generated report exceeds the generation bounds.") };
   }
 
   const decision = value.decision;
