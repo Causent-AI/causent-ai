@@ -1,6 +1,6 @@
 # Production release · 2026-09-22
 
-Status: **infrastructure released; final application promotion pending authenticated acceptance**.
+Status: **BLOCKED — infrastructure released; final application promotion awaits authenticated acceptance**.
 
 ## Scope and source
 
@@ -39,7 +39,7 @@ Hosted advisors: zero errors, **33 existing warnings** (32 authenticated-executa
 
 All four protected remote build configuration gates passed. Worker builds used Python 3.12 and the explicit Python framework; build-time probes connected as each exact project-qualified worker role and exercised the real handler against an empty scope. Every deployed worker rejected a request without its shared secret with 401.
 
-Live drift and recompute deployments received successful authenticated scheduled requests (HTTP 200). App cron routes for drift, recompute, resolve and connector inbox returned 200 after the database update. No due resolve job reached the new resolver during the captured window; its bounded handler/database success is build-time evidence, not a successful live HTTP canary. Real retry/queue processing is not claimed from an empty scope.
+Live drift and recompute deployments received successful authenticated scheduled requests (HTTP 200). App cron routes for drift, recompute, resolve and connector inbox returned 200 after the database update. A separate protected verification build used the stored resolver secret to send an empty-scope request to its live canonical endpoint: HTTP 200 at `2026-09-22T02:53:14Z`, confirmed in the promoted deployment logs. The canonical alias remained on `dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt`. Real retry/queue processing is not claimed from an empty scope.
 
 The #35 automatic deployment initially failed because the old database lacked `workspaces.archived_at`. Applying the rehearsed schema restored the existing signed-in Data, Reports, Actions and Impact routes. All three existing action rows expose both Claude and Codex controls. No report was edited or activated during this read-only check. After #36 merged, its automatic deployment was verified on the custom alias and the existing signed-in Impact route. Its runtime application files match #35. This is existing-account continuity, not fresh-user or secondary-metric activation acceptance.
 
@@ -51,4 +51,4 @@ Keep the additive database schema, audit records and current worker set. The ret
 
 The new rehearsal branch was deleted after its aggregate [evidence](2026-09-22-evidence.json) was retained. The older preflight branch was left untouched.
 
-Next: authenticate to the immutable candidate inside Codex; exercise the required account/action matrix and resolver canary; finish #37; verify the final source, promote, prove alias identity and repeat signed-in checks. Founder/partner and representative-load validation remain separate gates.
+Next: authenticate to the immutable candidate inside Codex; exercise the required account/action matrix; finish #37; verify the final source, promote, prove alias identity and repeat signed-in checks. Founder/partner and representative-load validation remain separate gates.

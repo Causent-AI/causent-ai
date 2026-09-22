@@ -148,12 +148,20 @@
     "resolve": {
       "httpRequests": [
         {
-          "timestamp": 1790044610488,
+          "timestamp": 1790045594449,
+          "deploymentId": "dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt",
+          "path": "/api/resolve",
+          "status": 200
+        },
+        {
+          "timestamp": 1790045540943,
           "deploymentId": "dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt",
           "path": "/api/resolve",
           "status": 401
         }
-      ]
+      ],
+      "canaryScope": "empty_sentinel",
+      "canonicalAliasUnchanged": true
     }
   },
   "liveApp": {
