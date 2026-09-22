@@ -240,20 +240,6 @@
       "durableResidue": "Archived synthetic workspace, organization/project, owner membership, report/revisions, activation, metrics/observations, actions, prediction and audit receipts retained.",
       "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
     },
-    "aiGeneration": {
-      "passed": false,
-      "safeFallbackPreservedBrief": true,
-      "model": "anthropic/claude-sonnet-5",
-      "providerStatus": 403,
-      "attempts": 2,
-      "tokens": 0,
-      "costUsd": 0,
-      "gatewayRequestId": "gen_01M33NQHB3XRT90AERFN09W9T9",
-      "cause": "Team Gateway plan excludes the configured model; free credit does not cover it.",
-      "userAction": "Add paid Gateway credits, then rerun generation.",
-      "modelChanged": false,
-      "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
-    },
     "priorAcceptedDeployment": {
       "id": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu",
       "source": "906dd7ab2b2f57e33e1db7367b256b735d1ebd11",
@@ -274,7 +260,75 @@
       "browserWarningsOrErrors": 0,
       "navigationCountersUnchanged": true,
       "productionAliasUnchanged": true,
-      "aiGenerationRetried": false
+      "aiGenerationRetried": true
+    },
+    "aiGenerationBeforeCreditTopUp": {
+      "passed": false,
+      "safeFallbackPreservedBrief": true,
+      "model": "anthropic/claude-sonnet-5",
+      "providerStatus": 403,
+      "attempts": 2,
+      "tokens": 0,
+      "costUsd": 0,
+      "gatewayRequestId": "gen_01M33NQHB3XRT90AERFN09W9T9",
+      "cause": "Team Gateway plan excludes the configured model; free credit does not cover it.",
+      "userAction": "Add paid Gateway credits, then rerun generation.",
+      "modelChanged": false,
+      "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
+    },
+    "aiGeneration": {
+      "passed": true,
+      "verifiedDeploymentId": "dpl_BNr2Rqugsjmp5AkhveamFFVRH4r2",
+      "reportId": "5d92b803-c597-43c1-afed-049630928be7",
+      "requestId": "08c329b5-6a8e-4dbc-b588-529c2610bd12",
+      "mode": "live",
+      "status": "completed",
+      "model": "anthropic/claude-sonnet-5",
+      "modelChanged": false,
+      "slotReleased": true,
+      "completedAt": "2026-09-22 05:06:15.132685+00",
+      "telemetry": {
+        "attempts": 1,
+        "inputTokens": 5134,
+        "latencyMs": 18365,
+        "model": "anthropic/claude-sonnet-5",
+        "outputTokens": 1286,
+        "totalTokens": 6420
+      },
+      "gatewayRequestId": "gen_01M33R3DYF7AYN5899F0T65RQT",
+      "gatewayStatus": 200,
+      "gatewayProvider": "bedrock",
+      "gatewayRoutingAttempts": 3,
+      "gatewayCostUsdDisplayed": 0.0231,
+      "providerRecoveries": [
+        {
+          "provider": "Claude Platform on AWS",
+          "status": 400,
+          "reason": "Compiled structured-output grammar too large"
+        },
+        {
+          "provider": "Anthropic",
+          "status": 400,
+          "reason": "Compiled structured-output grammar too large"
+        }
+      ],
+      "autosaveAndReloadPassed": true,
+      "unknownImpactRemainedUnset": true,
+      "draftOnly": true,
+      "preexistingProductionCountsAndDigestsUnchanged": true
+    },
+    "syntheticWorkspaceAfterPaidGeneration": {
+      "archived": true,
+      "reportCount": 2,
+      "revisionCount": 9,
+      "activationCount": 1,
+      "actionCount": 3,
+      "predictionCount": 1,
+      "telemetryCount": 9,
+      "recomputeJobs": 0,
+      "transitionCount": 0,
+      "activationDigestUnchanged": true,
+      "originalWorkspaceSelectionRestored": true
     }
   },
   "rehearsalBranchDeleted": true,

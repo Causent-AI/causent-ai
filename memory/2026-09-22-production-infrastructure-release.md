@@ -17,11 +17,15 @@ three-action activation and all six handoff previews passed, including a seconda
 support action. Navigation counters stayed unchanged. The workspace is archived and the
 original selection restored; all pre-existing production counts/audit digests match.
 
-AI generation is blocked by Gateway plan access: Claude Sonnet 5 is excluded from this
-team's free tier, despite free credit being available. Two attempts returned 403 with zero
-usage/charge; safe fallback preserved the brief. Keep the default model and wait for the
-owner to add Gateway credits before retrying. Do not purchase credits or retrieve privileged
-keys. The Reports metric-name fix is verified on candidate `239a245`, with saved content, all six handoffs and unchanged counters; production still serves #36. Fresh-account
+The owner added Gateway credits and retained Sonnet 5. Live generation passed on candidate
+`239a245`: one application attempt, 18.365 seconds, 5,134 input / 1,286 output tokens and
+$0.0231 displayed Gateway cost. The generated draft autosaved/reloaded with three actions
+and unknown impact left unset. The synthetic workspace was archived again; its active
+report, actions, prediction and all pre-existing production invariants are preserved.
+Gateway recovered through Bedrock after Claude Platform on AWS and direct Anthropic
+rejected the compiled output grammar. Record schema simplification as a reliability
+follow-up; do not claim every provider route passed. No model or routing setting changed.
+The Reports metric-name fix is verified on candidate `239a245`, with saved content, all six handoffs and unchanged counters; production still serves #36. Fresh-account
 acceptance is still unverified and unwaived. #36 merged as `87d3128`; do not merge #37 for the user.
 
 Use the [release manifest](../docs/releases/2026-09-22-production.md) for exact deployment

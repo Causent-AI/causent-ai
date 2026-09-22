@@ -11,8 +11,9 @@ The final #37 application candidate is Ready, with GA4 explicitly off, but has n
 promoted. A narrow Supabase callback allowlist fix now keeps sign-in on the candidate.
 Existing-account navigation and a new report with two uploaded metrics, three actions,
 activation and all six handoff previews pass. The synthetic workspace is archived; original
-data counts/digests are unchanged. AI generation is blocked: the Gateway free plan excludes
-the configured Claude Sonnet 5 model. Paid Gateway credits and a successful retry are needed.
+data counts/digests are unchanged. After the owner added Gateway credits, live Sonnet 5
+generation, autosave and reload passed for $0.0231. Gateway recovered through Bedrock after
+two provider schema-size rejections; schema simplification remains a reliability follow-up.
 The Reports metric-label fix and navigation pass on updated candidate `239a245`; fresh-account acceptance
 remains open pending an explicit scope decision. #36's parent
 conflict was resolved with an identical reviewed tree; fresh CI passed and #36 is merged
