@@ -13,7 +13,7 @@ export function WorkshopTabs({
 }) {
   const [tab, setTab] = useState(initialTab);
   return (
-    <div className="workspace-page workshop-page">
+    <div className="workspace-page workshop-page" data-workshop-tab={tab}>
       <header className="workspace-heading">
         <h1>Data Workshop</h1>
         <nav className="subtabs" aria-label="Data Workshop">

@@ -2,15 +2,15 @@
 
 ## Overview
 
-This release brings the approved Proposal D layout into the authenticated Next.js application. It uses saved reports, real imported observations and authorized workspace data. Existing activation, measurement, provenance and AI budget controls remain in force. Google Analytics stays disabled. Implementation and local verification are complete; candidate, PR and production evidence are recorded in the [release manifest](../../releases/2026-09-22-proposal-d-production.md).
+This release ports Proposal D into the authenticated Next.js application. A fidelity correction restores the approved page layouts after the initial port proved incomplete. It uses saved reports, real imported observations and authorized workspace data. Existing activation, measurement, provenance and AI budget controls remain in force. Google Analytics stays disabled. The correction passes local verification; final candidate acceptance and promotion remain pending. Release evidence is recorded in the [release manifest](../../releases/2026-09-22-proposal-d-production.md).
 
 ## Executive Summary
 
 - **D01 — Navigation:** Five pill tabs, Causent colors, compact blue Create, yellow Ask, synchronized report title and bottom Core Metrics. Onboarding uses the same shell.
 - **D02 — Documents:** Pageless paragraph editing, persistent formatting tools, renamed sections, added notes, observed-data charts and explicitly reviewed AI rewrites. Active reports remain immutable; create a new version to edit their plan.
-- **D03 — Data Workshop:** Metrics, Connections and AI; AI contains Connections, Harnesses and Cost. The cost calculator requires supplied rates. Custom runtime connections, saved custom harnesses and automatic execution remain unimplemented and are labeled accordingly.
-- **D04 — Decision Network:** Authorized project/decision nodes, explicit version links, core metric and period filters, search, zoom/pan and decision summaries. No combined causal-impact claim is introduced.
-- **D05 — Continuity:** Existing action handoffs, manual completion, metric imports and default Impact models remain. Imported GitHub source links are constrained to HTTPS GitHub PR/issue paths. No schema or worker change is required.
+- **D03 — Data Workshop:** A single metric library with latest value, complete-calendar L28 average and WoW trend, a metric upload dialog and bottom history drawer. Metrics, Connections and AI; AI contains Connections, Harnesses and Cost. The cost calculator requires supplied rates. Custom runtime connections, saved custom harnesses and automatic execution remain unimplemented and are labeled accordingly.
+- **D04 — Decision Network:** Full dark canvas with a linked core-metric node, project diamonds and authorized decision nodes, explicit version links, core metric and period filters, search, zoom/pan and decision summaries. No combined causal-impact claim is introduced.
+- **D05 — Continuity:** Compact expandable actions, four impact tiles and an action-results table retain existing handoffs, manual completion, metric imports and default Impact models remain. Imported GitHub source links are constrained to HTTPS GitHub PR/issue paths. No schema or worker change is required.
 
 ## Next Steps
 
@@ -19,6 +19,12 @@ This release brings the approved Proposal D layout into the authenticated Next.j
 3. Treat custom harness persistence, local execution, additional connections, cross-project metric identity and portfolio attribution as separate backend work. The current interface does not simulate these capabilities.
 
 ## Analysis
+
+### Design decisions
+
+The approved prototype defines spacing, hierarchy, color and controls. Real records replace sample content. Reports keep meaningful immutable-version controls; measurement views keep attribution caveats. Healthy background status moves into details, while queued/failed updates remain visible. Connections do not claim success without a configured service. Manual harness guides retain the Build, Review and UX review card layout without fabricating saved configurations or provider prices.
+
+Latest local checks: 735 application/database tests, 1,338 engine/RLS/bridge tests, 27 prototype/load tests, types, zero-warning lint and the production build pass. Browser checks cover desktop navigation and mobile Data/onboarding/Graph, source and upload dialogs, and graph details/Fit. The hosted AI/create/edit/activation matrix is still a release gate.
 
 ### Build and verification method
 

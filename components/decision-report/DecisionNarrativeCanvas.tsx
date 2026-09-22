@@ -146,7 +146,7 @@ export function DecisionNarrativeCanvas({
         </div>
       ) : null}
 
-      <div className="mt-6">
+      <details className="report-attachment" open={Boolean(asset || assetError)}><summary>Image</summary>
         <SuppliedMockup
           asset={asset}
           readOnly={readOnly}
@@ -156,7 +156,7 @@ export function DecisionNarrativeCanvas({
           onUpload={onAssetUpload}
           onRemove={onAssetRemove}
         />
-      </div>
+      </details>
     </section></>
   );
 }

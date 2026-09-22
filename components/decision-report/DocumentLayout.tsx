@@ -8,7 +8,10 @@ import {
   type ReportDocumentLayout,
   type ReportSectionKey,
 } from "@/lib/decision-reports/schema";
-import { useWorkspaceMetrics } from "@/components/shell/WorkspaceMetrics";
+import {
+  useWorkspaceMetrics,
+  useWorkspaceReports,
+} from "@/components/shell/WorkspaceMetrics";
 
 type Layout = Pick<
   ReportDocumentLayout,
@@ -70,6 +73,7 @@ export function DocumentSectionTitle({
   );
 }
 export function DocumentOutline() {
+  const reports = useWorkspaceReports();
   const context = useContext(Context);
   return (
     <aside className="report-outline">
@@ -86,7 +90,14 @@ export function DocumentOutline() {
         ))}
       </nav>
       <div className="report-library">
-        <Link href="/reports?library=1">Report library</Link>
+        <p>Reports</p>
+        {reports.slice(0, 8).map((report) => (
+          <Link key={report.id} href={`/reports?report=${report.id}`}>
+            {report.title}
+            <small>{report.status === "active" ? "Active" : "Draft"}</small>
+          </Link>
+        ))}
+        <Link href="/reports?library=1">View all →</Link>
       </div>
     </aside>
   );
@@ -187,7 +198,7 @@ export function DocumentNotes() {
     </div>
   );
 }
-export function DocumentCharts() {
+export function DocumentChartPicker() {
   const context = useContext(Context);
   const metrics = useWorkspaceMetrics();
   const [metricId, setMetricId] = useState(metrics[0]?.id ?? "");
@@ -195,66 +206,76 @@ export function DocumentCharts() {
   if (!context) return null;
   const { layout, update, readOnly } = context;
   const charts = layout.charts ?? [];
+  if (readOnly) return null;
+  return (
+    <>
+      <details className="chart-picker">
+        <summary className="button">Chart</summary>
+        <div className="flex flex-wrap items-end gap-3 py-3">
+          <label className="text-sm">
+            Metric
+            <select
+              aria-label="Chart metric"
+              className="block rounded border p-2"
+              value={metricId}
+              onChange={(e) => setMetricId(e.target.value)}
+            >
+              {metrics.map((metric) => (
+                <option key={metric.id} value={metric.id}>
+                  {metric.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            Style
+            <select
+              aria-label="Chart style"
+              className="block rounded border p-2"
+              value={type}
+              onChange={(e) => setType(e.target.value as "line" | "bar")}
+            >
+              <option value="line">Line</option>
+              <option value="bar">Bar</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button"
+            disabled={!metricId || charts.length >= 4}
+            onClick={() =>
+              update({
+                ...layout,
+                charts: [
+                  ...charts,
+                  { id: crypto.randomUUID(), metricId, type },
+                ],
+              })
+            }
+          >
+            Generate
+          </button>
+          {metrics.length === 0 && (
+            <Link
+              href="/data-workshop?add=metric"
+              className="text-sm underline"
+            >
+              Add metric data
+            </Link>
+          )}
+        </div>
+      </details>
+    </>
+  );
+}
+export function DocumentCharts() {
+  const context = useContext(Context);
+  const metrics = useWorkspaceMetrics();
+  if (!context) return null;
+  const { layout, update, readOnly } = context;
+  const charts = layout.charts ?? [];
   return (
     <div className="document-charts">
-      {!readOnly && (
-        <details className="chart-picker">
-          <summary className="button">＋ Chart</summary>
-          <div className="flex flex-wrap items-end gap-3 py-3">
-            <label className="text-sm">
-              Metric
-              <select
-                aria-label="Chart metric"
-                className="block rounded border p-2"
-                value={metricId}
-                onChange={(e) => setMetricId(e.target.value)}
-              >
-                {metrics.map((metric) => (
-                  <option key={metric.id} value={metric.id}>
-                    {metric.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm">
-              Style
-              <select
-                aria-label="Chart style"
-                className="block rounded border p-2"
-                value={type}
-                onChange={(e) => setType(e.target.value as "line" | "bar")}
-              >
-                <option value="line">Line</option>
-                <option value="bar">Bar</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="button"
-              disabled={!metricId || charts.length >= 4}
-              onClick={() =>
-                update({
-                  ...layout,
-                  charts: [
-                    ...charts,
-                    { id: crypto.randomUUID(), metricId, type },
-                  ],
-                })
-              }
-            >
-              Generate
-            </button>
-            {metrics.length === 0 && (
-              <Link
-                href="/data-workshop?add=metric"
-                className="text-sm underline"
-              >
-                Add metric data
-              </Link>
-            )}
-          </div>
-        </details>
-      )}
       {charts.map((chart) => {
         const metric = metrics.find((metric) => metric.id === chart.metricId);
         const series =

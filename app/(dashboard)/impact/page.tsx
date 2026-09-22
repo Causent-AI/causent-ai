@@ -18,23 +18,30 @@ export default async function ImpactPage() {
     decisions,
     activeDecisionReport,
     causalRecomputeStatus,
-  } =
-    await loadDashboardData();
+  } = await loadDashboardData();
   const activeDecision = activeDecisionReport
-    ? decisions.find((decision) => decision.id === activeDecisionReport.decisionId) ?? null
+    ? (decisions.find(
+        (decision) => decision.id === activeDecisionReport.decisionId,
+      ) ?? null)
     : null;
   const activeMetric = activeDecisionReport
-    ? impactMetrics.find(
-        (metric) => metric.name === activeDecisionReport.metricProjection.metricName,
-      ) ?? impactMetrics[0] ?? null
+    ? (impactMetrics.find(
+        (metric) =>
+          metric.name === activeDecisionReport.metricProjection.metricName,
+      ) ??
+      impactMetrics[0] ??
+      null)
     : null;
   const hasReportImpactView = Boolean(
     activeDecisionReport && activeDecision && activeMetric,
   );
 
   return (
-    <div className="mx-auto max-w-[1360px] space-y-4 p-5">
-      {activeDecisionReport && causalRecomputeStatus ? (
+    <div className="workspace-page impact-page space-y-5">
+      {!hasReportImpactView && <h1>Impact</h1>}
+      {activeDecisionReport &&
+      causalRecomputeStatus &&
+      causalRecomputeStatus.state !== "current" ? (
         <CausalRecomputeStatus status={causalRecomputeStatus} />
       ) : null}
       {activeDecisionReport && activeDecision && activeMetric ? (
@@ -52,7 +59,9 @@ export default async function ImpactPage() {
           stats={aggregatedImpact}
           impactByMetric={impactByMetric}
           metrics={impactMetrics}
-          scopeLabel={activeDecisionReport ? "in this report" : "in this workspace"}
+          scopeLabel={
+            activeDecisionReport ? "in this report" : "in this workspace"
+          }
         />
       )}
 
@@ -70,10 +79,17 @@ export default async function ImpactPage() {
           <Panel>
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-[15px] font-semibold text-[var(--text)]">Impact by Metric</h2>
-                <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">Observed level change</p>
+                <h2 className="text-[15px] font-semibold text-[var(--text)]">
+                  Impact by Metric
+                </h2>
+                <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+                  Observed level change
+                </p>
               </div>
-              <Link href="/data-workshop" className="min-h-9 rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50">
+              <Link
+                href="/data-workshop"
+                className="min-h-9 rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50"
+              >
                 Data →
               </Link>
             </div>
@@ -81,12 +97,20 @@ export default async function ImpactPage() {
           </Panel>
 
           <Panel>
-            <h2 className="mb-4 text-[15px] font-semibold text-[var(--text)]">Impact by Actions</h2>
+            <h2 className="mb-4 text-[15px] font-semibold text-[var(--text)]">
+              Impact by Actions
+            </h2>
             <ActionsTable actions={actions} metrics={impactMetrics} />
           </Panel>
         </div>
       ) : null}
 
+      {causalRecomputeStatus?.state === "current" && (
+        <details>
+          <summary className="quiet-summary">Measurement status</summary>
+          <CausalRecomputeStatus status={causalRecomputeStatus} />
+        </details>
+      )}
       <TrustCaveat />
     </div>
   );

@@ -3,7 +3,8 @@
 ## Proposal D production design — PR #38
 
 - [x] Implement the authenticated application design; preserve backend contracts, default models and disabled GA4.
-- [x] Run local gates and candidate checks for both accounts, saved reports, all handoff previews, mobile views and unchanged navigation/data invariants.
+- [x] Correct design fidelity against Proposal D and pass local checks for the revised layout. Earlier candidate checks cover both accounts and unchanged data; repeat affected acceptance on the replacement.
+- [ ] Verify the corrected hosted candidate, including the unified chart toolbar and compact action handoffs.
 - [ ] Finish approved synthetic create/edit/reload/rewrite/activate acceptance on the final candidate; automatic approval review requires explicit consent for persistent records and paid AI requests.
 - [ ] Merge #38, promote the verified candidate, verify `app.causent.ai`, archive test workspaces and close the [release record](docs/releases/2026-09-22-proposal-d-production.md).
 

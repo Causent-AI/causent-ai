@@ -2,29 +2,10 @@ import Link from "next/link";
 
 import { ReportImpactTimeline } from "@/components/charts/ReportImpactTimeline";
 import { PredictionPanel } from "@/components/impact/PredictionPanel";
-import { Panel } from "@/components/ui/Panel";
 import type { MetricProjection } from "@/lib/decision-reports/schema";
 import { formatLongDate } from "@/lib/format";
-import {
-  buildReportImpactViewModel,
-  type ReportImpactActionState,
-} from "@/lib/impact/report-impact";
+import { buildReportImpactViewModel } from "@/lib/impact/report-impact";
 import type { Action, Decision, Metric } from "@/lib/types";
-
-function stateClasses(state: ReportImpactActionState): string {
-  if (state === "measured") return "border-teal-200 bg-teal-50 text-teal-900";
-  if (state === "preliminary") return "border-blue-200 bg-blue-50 text-blue-900";
-  if (state === "gathering") return "border-amber-200 bg-amber-50 text-amber-900";
-  return "border-[var(--border)] bg-slate-50 text-[var(--text-muted)]";
-}
-
-function predictionStateClasses(
-  state: "measured" | "unresolved" | "no-signal",
-): string {
-  if (state === "measured") return "border-teal-200 bg-teal-50 text-teal-900";
-  if (state === "no-signal") return "border-amber-200 bg-amber-50 text-amber-900";
-  return "border-[var(--border)] bg-slate-50 text-[var(--text-muted)]";
-}
 
 export function ReportImpactOverview({
   reportTitle,
@@ -52,159 +33,110 @@ export function ReportImpactOverview({
     metrics,
     actions,
   });
-  const observationDetail = view.nPre !== null && view.nPost !== null
-    ? `${view.nPre} pre · ${view.nPost} post`
-    : `${view.observationCount} connected daily observations`;
-  const confidentMeasurement = view.predictionState === "measured";
-
+  const primary = view.actionTraces.find((trace) => trace.isPrimary);
   return (
     <>
-      <Panel>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-3xl">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-              Decision outcome
-            </p>
-            <h1 className="mt-1 text-[19px] font-semibold tracking-tight text-[var(--text)]">
-              {view.reportTitle}
-            </h1>
-            <p className="mt-1 text-[12px] leading-5 text-[var(--text-muted)]">
-              {view.decisionTitle}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[10px] font-semibold text-teal-900">
-              {view.metricName}
-            </span>
-            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${predictionStateClasses(view.predictionState)}`}>
-              {view.predictionStatus}
-            </span>
-          </div>
+      <header className="impact-heading">
+        <div>
+          <h1>Impact</h1>
+          <p>
+            {view.reportTitle} · {view.metricName}
+          </p>
         </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-800">Plan (% baseline)</p>
-            <p className="mt-2 text-[22px] font-semibold tabular-nums text-blue-950">{view.plannedLabel}</p>
-          </div>
-          <div className={`rounded-xl border p-3 ${confidentMeasurement ? "border-teal-200 bg-teal-50/60" : view.hasMeasurement ? "border-amber-200 bg-amber-50/60" : "border-[var(--border)] bg-slate-50"}`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wide ${confidentMeasurement ? "text-teal-800" : view.hasMeasurement ? "text-amber-800" : "text-[var(--text-subtle)]"}`}>
-              Measured (% baseline)
-            </p>
-            <p className={`mt-2 text-[22px] font-semibold tabular-nums ${confidentMeasurement ? "text-teal-950" : view.hasMeasurement ? "text-amber-950" : "text-[var(--text)]"}`}>
-              {view.measuredLabel}
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--border)] bg-slate-50 p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Variance</p>
-            <p className="mt-2 text-[22px] font-semibold tabular-nums text-[var(--text)]">{view.varianceLabel}</p>
-          </div>
-          <div className="rounded-xl border border-[var(--border)] bg-slate-50 p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Observations</p>
-            <p className="mt-2 text-[22px] font-semibold tabular-nums text-[var(--text)]">{view.analysisObservationCount}</p>
-            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">{observationDetail}</p>
-          </div>
-          <div className="col-span-2 rounded-xl border border-[var(--border)] bg-slate-50 p-3 lg:col-span-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Actions complete</p>
-            <p className="mt-2 text-[22px] font-semibold tabular-nums text-[var(--text)]">
-              {view.completedActions}/{view.plannedActions}
-            </p>
-            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">
-              {view.primaryActionId ? "Primary action set" : "No primary action"}
-            </p>
-          </div>
-        </div>
-
-        <p className="mt-3 text-[11px] leading-5 text-[var(--text-muted)]">
-          {view.predictionDetail}
-        </p>
-      </Panel>
-
-      <PredictionPanel
-        decision={decision}
-        predictionId={predictionId}
-        projection={projection}
-        metric={metric}
-      />
-
+        <label>
+          Model
+          <select aria-label="Impact model" value="its" disabled>
+            <option value="its">Causal lift</option>
+          </select>
+        </label>
+      </header>
+      <div className="impact-tiles">
+        <article>
+          <h2>Estimated lift</h2>
+          <p>{view.measuredLabel}</p>
+        </article>
+        <article>
+          <h2>95% interval</h2>
+          <p>{primary?.ci95Label ?? "—"}</p>
+        </article>
+        <article>
+          <h2>Readout</h2>
+          <p className="readout-value">{view.predictionStatus}</p>
+        </article>
+        <article>
+          <h2>Actions complete</h2>
+          <p>
+            {view.completedActions}/{view.plannedActions}
+          </p>
+        </article>
+      </div>
+      <p className="impact-readout-detail">{view.predictionDetail}</p>
       <ReportImpactTimeline
         metric={metric}
         actions={actions}
         primaryActionId={view.primaryActionId}
         levels={view.timelineLevels}
       />
-
-      <Panel>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-[15px] font-semibold text-[var(--text)]">Actions and metric</h2>
-            <p className="mt-1 max-w-3xl text-[11px] leading-5 text-[var(--text-muted)]">
-              The primary outcome is measured around registered customer exposure. Completion markers describe execution; individual work and AI contribution are not identified.
-            </p>
-          </div>
-          <Link
-            href="/actions"
-            className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-semibold text-[var(--brand-blue)] hover:bg-blue-50"
-          >
-            Open actions →
-          </Link>
+      <section className="impact-results">
+        <div className="section-heading">
+          <h2>Action results</h2>
+          <Link href="/actions">Actions →</Link>
         </div>
-
-        <ol className="mt-4 divide-y divide-[var(--border)] border-y border-[var(--border)]">
-          {view.actionTraces.map((trace) => (
-            <li key={trace.actionId} className="grid gap-3 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(170px,0.65fr)_minmax(190px,0.75fr)] lg:items-start">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
-                    {trace.displayCode}
-                  </span>
-                  {trace.isPrimary ? (
-                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
-                      Primary action
-                    </span>
-                  ) : (
-                    <span className="rounded-full border border-[var(--border)] bg-slate-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
-                      Support action
-                    </span>
-                  )}
-                </div>
-                <Link
-                  href={trace.href}
-                  className="mt-1 flex min-h-11 items-center truncate text-[13px] font-semibold text-[var(--brand-blue)] hover:underline"
-                >
-                  {trace.title}
-                </Link>
-                <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
-                  {trace.completedOn ? `Completed ${formatLongDate(trace.completedOn)}` : "Completion date not recorded"}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
-                  {trace.isPrimary ? "Outcome metric" : "Monitoring metric"}
-                </p>
-                <p className="mt-1 text-[12px] font-semibold text-[var(--text)]">{trace.metricName}</p>
-                <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[9px] font-semibold ${stateClasses(trace.state)}`}>
-                  {trace.stateLabel}
-                </span>
-              </div>
-
-              <div className="rounded-lg border border-[var(--border)] bg-slate-50/70 p-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">{trace.isPrimary ? "Observed outcome" : "Individual contribution"}</p>
-                  <p className="text-[16px] font-semibold tabular-nums text-[var(--text)]">{trace.impactLabel}</p>
-                </div>
-                <p className="mt-2 text-[10px] leading-4 text-[var(--text-muted)]">{trace.detail}</p>
-                {trace.ci95Label || trace.sampleLabel ? (
-                  <p className="mt-2 text-[9px] font-medium tabular-nums text-[var(--text-subtle)]">
-                    {[trace.ci95Label, trace.sampleLabel].filter(Boolean).join(" · ")}
-                  </p>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ol>
-      </Panel>
+        <div className="overflow-auto">
+          <table className="metric-library-table" aria-label="Action results">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Completed</th>
+                <th>Individual lift</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {view.actionTraces.map((trace) => (
+                <tr key={trace.actionId}>
+                  <td>
+                    <Link href={trace.href}>{trace.title}</Link>
+                  </td>
+                  <td>
+                    {trace.completedOn
+                      ? formatLongDate(trace.completedOn)
+                      : "—"}
+                  </td>
+                  <td>
+                    {trace.isPrimary ? "Not isolated" : trace.impactLabel}
+                  </td>
+                  <td>
+                    <details>
+                      <summary>{trace.stateLabel}</summary>
+                      <p>{trace.detail}</p>
+                      {trace.ci95Label && <p>{trace.ci95Label}</p>}
+                      {trace.sampleLabel && <p>{trace.sampleLabel}</p>}
+                    </details>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="impact-readout-detail">
+          The registered intervention is measured as a whole. Individual action
+          and AI contributions are not isolated.
+        </p>
+      </section>
+      <details className="impact-model-details">
+        <summary>Model &amp; estimate</summary>
+        <p>
+          Interrupted Time Series · {view.nPre ?? "—"} days before ·{" "}
+          {view.nPost ?? "—"} days after
+        </p>
+        <PredictionPanel
+          decision={decision}
+          predictionId={predictionId}
+          projection={projection}
+          metric={metric}
+        />
+      </details>
     </>
   );
 }

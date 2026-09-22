@@ -14,7 +14,7 @@ export function AiWorkspace({
     time: string;
   }>;
 }) {
-  const [tab, setTab] = useState("connections");
+  const [tab, setTab] = useState("harnesses");
   const [inputTokens, setInputTokens] = useState(10000);
   const [outputTokens, setOutputTokens] = useState(2000);
   const [inputRate, setInputRate] = useState("");
@@ -37,9 +37,9 @@ export function AiWorkspace({
       runs
     : null;
   return (
-    <section>
+    <section className="ai-workspace">
       <div className="workspace-heading">
-        <h2>AI Workspace</h2>
+        <h2>AI workspace</h2>
         <nav className="subtabs" aria-label="AI Workspace">
           {["connections", "harnesses", "cost"].map((key) => (
             <button
@@ -89,37 +89,56 @@ export function AiWorkspace({
       )}
       {tab === "harnesses" && (
         <>
-          <div className="connection-grid">
-            <article className="connection-card">
-              <h2>Build · Test · Review</h2>
-              <p>
-                Recommended for implementation tasks: review the action brief,
-                build the change, run checks, and return a review with the PR
-                link.
-              </p>
-              <p className="mt-3">
-                Use the same approved handoff with Claude or Codex. Each action
-                retains its metric, owner, scope, and acceptance context.
-              </p>
-              <Link href="/actions" className="button mt-4">
-                Use in Actions
-              </Link>
-            </article>
-            <article className="connection-card">
-              <h2>Report generation</h2>
-              <p>{model}</p>
-              <p>
-                Bounded output, a team budget, explicit requests, and a saved
-                draft for review. Model settings are managed by the workspace
-                operator.
-              </p>
-              <Link href="/onboarding" className="button mt-4">
-                New report
-              </Link>
-            </article>
+          <div className="section-heading">
+            <h3>Harnesses</h3>
+            <span className="connection-state">Manual handoff</span>
           </div>
-          <p className="mt-5 text-xs text-[var(--text-muted)]">
-            Custom harnesses and runtime configuration are not connected yet.
+          <div className="connection-grid">
+            {[
+              {
+                name: "Build",
+                glyph: "B",
+                description: "Implement an approved action",
+                instructions:
+                  "Read the approved brief and acceptance criteria. Build the scoped change, run the required checks, review the diff, and return the PR link and validation results.",
+              },
+              {
+                name: "Review",
+                glyph: "R",
+                description: "Review code and evidence",
+                instructions:
+                  "Review the change against the approved action, metric, security constraints, and acceptance criteria. Report actionable findings with file references and validation gaps.",
+              },
+              {
+                name: "UX review",
+                glyph: "UX",
+                description: "Check the complete user flow",
+                instructions:
+                  "Review desktop and mobile flows against the approved design. Check editing, navigation, keyboard access, empty states, errors, and data clarity. Return concrete recommendations and screenshots.",
+              },
+            ].map((harness) => (
+              <article className="connection-card" key={harness.name}>
+                <div className="connection-card-top">
+                  <span className="connection-glyph">{harness.glyph}</span>
+                  <span className="connection-state">Guide</span>
+                </div>
+                <h3>{harness.name}</h3>
+                <p>{harness.description}</p>
+                <code>Claude / Codex · model selected in partner</code>
+                <details className="harness-guide">
+                  <summary>Instructions</summary>
+                  <p>{harness.instructions}</p>
+                </details>
+                <footer>
+                  <span>Cost on request</span>
+                  <Link href="/actions">Use in Actions ↗</Link>
+                </footer>
+              </article>
+            ))}
+          </div>
+          <p className="ai-setup-note">
+            Partner connections, saved custom harnesses, and automatic execution
+            are not configured.
           </p>
         </>
       )}

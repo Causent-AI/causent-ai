@@ -420,7 +420,7 @@ function ReportActionRows({
 
   return (
     <section className="shrink-0">
-      <h2 className="text-[15px] font-semibold text-[var(--text)]">Actions</h2>
+      <div className="section-heading"><h2>Actions</h2><span className="text-xs text-[var(--text-muted)]">{actions.filter((action) => action.shippedAt).length} of {actions.length} completed</span></div>
       <div className="mt-3 space-y-2">
         {actions.map((action) => {
           const detail = reportActionFor(action, report);
@@ -441,7 +441,7 @@ function ReportActionRows({
             <article
               key={action.id}
               id={action.id}
-              className="scroll-mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+              className="production-action-row scroll-mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
             >
               <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch">
                 <button
@@ -484,24 +484,7 @@ function ReportActionRows({
                 </button>
                 <div className="flex min-h-16 flex-wrap items-center gap-2 border-t border-[var(--border)] px-4 py-2 sm:justify-end sm:border-l sm:border-t-0 sm:px-3">
                   <ActionSourceLink action={action}/>
-                  {loopHandoff ? (
-                    <>
-                      <span className="text-[10px] font-medium text-[var(--text-subtle)]">
-                        Copy Task Instructions to:
-                      </span>
-                      {(["claude", "codex"] as const).map((target) => (
-                        <button
-                          key={target}
-                          type="button"
-                          aria-label={`Copy ${action.displayCode ?? action.title} task instructions to ${target === "claude" ? "Claude" : "Codex"}`}
-                          onClick={() => setHandoffSelection({ actionId: action.id, target })}
-                          className="min-h-11 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-[10px] font-semibold text-indigo-800 hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                        >
-                          {target === "claude" ? "Claude" : "Codex"}
-                        </button>
-                      ))}
-                    </>
-                  ) : null}
+                  <span className="action-row-owner">{detail?.owner?.text || action.ownerLabel || "Unassigned"}</span><span className="action-row-cost">{detail?.estimatedCost || "—"}</span>
                   <span className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-[10px] font-semibold ${
                     action.shippedAt
                       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
@@ -519,6 +502,25 @@ function ReportActionRows({
                 hidden={!expanded}
                 className="border-t border-[var(--border)] px-4 py-4 sm:pl-[58px]"
               >
+                <div className="action-row-handoff">                  {loopHandoff ? (
+                    <>
+                      <span className="text-[10px] font-medium text-[var(--text-subtle)]">
+                        Copy Task Instructions to:
+                      </span>
+                      {(["claude", "codex"] as const).map((target) => (
+                        <button
+                          key={target}
+                          type="button"
+                          aria-label={`Copy ${action.displayCode ?? action.title} task instructions to ${target === "claude" ? "Claude" : "Codex"}`}
+                          onClick={() => setHandoffSelection({ actionId: action.id, target })}
+                          className="min-h-11 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-[10px] font-semibold text-indigo-800 hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                        >
+                          {target === "claude" ? "Claude" : "Codex"}
+                        </button>
+                      ))}
+                    </>
+                  ) : null}
+</div>
                 {summaries.length > 0 ? (
                   <div>
                     <h3 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Details</h3>
@@ -624,37 +626,7 @@ export function DecisionDetail({
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto">
-      {report ? <DecisionSummary report={report} reportId={reportId} /> : <div>
-        <h2 className="text-[22px] font-semibold tracking-tight text-[var(--text)]">
-          {decision.title}
-        </h2>
-        <p className="mt-0.5 text-[12px] text-[var(--text-subtle)]">
-          decided {decision.createdAt}
-          {decision.rationale.mechanismCategory && (
-            <> · {decision.rationale.mechanismCategory}</>
-          )}
-        </p>
-      </div>}
-
-      {report ? (
-        <ReportCommitmentHeader
-          decision={decision}
-          prediction={reportPrediction}
-          metric={reportMetric}
-          actions={reportActions}
-        />
-      ) : null}
-
-      {report && reportMetric ? (
-        <div className="shrink-0">
-          <MetricHistoryExplorer
-            metric={reportMetric}
-            actions={reportActions}
-            primaryActionId={decision.leverActionId}
-          />
-        </div>
-      ) : null}
-
+      {report ? <details className="action-context order-last"><summary>Decision &amp; measurement</summary><DecisionSummary report={report} reportId={reportId}/><ReportCommitmentHeader decision={decision} prediction={reportPrediction} metric={reportMetric} actions={reportActions}/>{reportMetric && <MetricHistoryExplorer metric={reportMetric} actions={reportActions} primaryActionId={decision.leverActionId}/>}</details> : <div><h2>{decision.title}</h2><p className="text-xs text-[var(--text-muted)]">Decided {decision.createdAt}</p></div>}
       {!report && decision.rationale.body.length > 0 && (
         <div className="flex flex-col gap-2">
           {decision.rationale.body.map((para, i) => (

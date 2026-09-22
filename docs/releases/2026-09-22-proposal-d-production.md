@@ -1,6 +1,6 @@
 # Proposal D production rollout
 
-Status: PR #38 candidate verification in progress. Google Analytics remains disabled. Production still runs PR #37.
+Status: PR #38 design-fidelity correction verified locally; replacement candidate pending. Google Analytics remains disabled. Production still runs PR #37.
 
 ## Authority and baseline
 
@@ -24,7 +24,23 @@ The owner requested the approved Proposal D design in production, preserving the
 
 Run focused contract tests, complete app/engine/integration gates, typecheck, lint and production build. Inspect desktop/mobile UI and real authenticated candidate flows with both existing and fresh accounts, two metrics, supporting actions and every Claude/Codex control. Compare navigation counters and existing-data digests. Publish concise PR/docs evidence, confirm the exact candidate, promote, verify the live alias and signed-in pages, and retain the baseline rollback artifact. Google Analytics provider acceptance remains deferred.
 
-## Local evidence
+## Design-fidelity correction
+
+The initial application port did not match the approved prototype closely enough. This correction restores its actual layout instead of treating shared colors as design acceptance.
+
+| Surface | Correction | Production behavior retained |
+| --- | --- | --- |
+| Shell | Approved logo/icons, five pills, compact blue Create, round yellow Ask, regular type | Verified account and workspace switching |
+| Data | Single metric library, L28 average and WoW columns, upload dialog, bottom history drawer | Authorized complete history, definition/scale checks and core selection |
+| Reports / onboarding | Inline library, one editing/chart/rewrite toolbar, continuous paragraphs, source dialog, Brief/Review flow | Saved revisions, immutable active plans, activation and explicit AI requests |
+| Actions / Impact | Compact expandable rows, four outcome tiles, action results table | Completion, PR links, partner handoffs and guarded ITS readouts |
+| Graph | Full dark canvas, linked metric node, project diamonds, dates, pan/zoom/Fit | Scoped real records, explicit version edges, no invented aggregate effect |
+
+Calendar averages require complete windows. Missing dates and zero baselines produce no growth claim. The prototype’s sample costs, custom harness defaults/editing, automatic partner connections, portfolio creation and combined impact are not backed by production services; these are not simulated. GA4 remains a setup placeholder.
+
+Correction checks: **735 application/database tests, 1,338 engine/RLS/bridge tests, and 27 prototype/load tests pass**. Types, zero-warning lint, clean Node 22 build and six-route manifest checks pass. Desktop browser checks cover all five views and onboarding; the visible browser confirms Data, onboarding and Graph at 390px without page overflow. Upload/source dialogs and graph selection/Fit work. A local successor creation attempt correctly rejected an already-existing successor; this is not new-draft acceptance. Hosted write/AI acceptance remains pending.
+
+## Earlier local evidence
 
 - Application/integration: 731 passed, 19 optional paid-model tests skipped. All database cases ran against the isolated 47-migration stack; no database skips. The saved-layout metadata round trip is covered by the append-only persistence integration test.
 - Engine/RLS/bridge: 1,338 passed against the same isolated database.

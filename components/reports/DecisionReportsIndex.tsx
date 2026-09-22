@@ -33,7 +33,7 @@ export function StartIterationControl({ reportId }: { reportId: string }) {
     if (state.status === "created") router.push(`/onboarding?report=${state.reportId}`);
   }, [router, state]);
   return (
-    <details className="relative">
+    <details className="iteration-menu relative">
       <summary className="cursor-pointer list-none rounded-lg bg-[var(--brand-blue)] px-3 py-2 text-[12px] font-semibold text-white marker:hidden">Create next version</summary>
       <form action={action} className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-[var(--border)] bg-white p-4 shadow-xl">
         <input type="hidden" name="parentReportId" value={reportId} />

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { NetworkNode } from "@/lib/data/decision-network";
 import type { AccessibleWorkspace } from "@/lib/auth/workspace-selection";
@@ -25,7 +25,12 @@ export function DecisionNetwork({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const viewport = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ x: number; scroll: number } | null>(null);
+  const drag = useRef<{
+    x: number;
+    y: number;
+    scroll: number;
+    top: number;
+  } | null>(null);
   const periods = useMemo(
     () =>
       [
@@ -55,15 +60,37 @@ export function DecisionNetwork({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+  useEffect(() => {
+    const element = viewport.current;
+    if (!element) return;
+    const wheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+      setZoom((value) =>
+        Math.min(3, Math.max(0.05, value * Math.exp(-event.deltaY * 0.001))),
+      );
+    };
+    element.addEventListener("wheel", wheel, { passive: false });
+    return () => element.removeEventListener("wheel", wheel);
+  }, [visible.length]);
   const selected = visible.find((node) => node.id === selectedId);
   const { groups, width, height, coordinates } = layoutDecisionNetwork(visible);
+  const dateTicks = [...new Set(visible.map((node) => node.date))]
+    .sort()
+    .filter((_, i, dates) => i % Math.max(1, Math.ceil(dates.length / 6)) === 0)
+    .map((date) => ({
+      date,
+      x: coordinates.get(visible.find((node) => node.date === date)!.id)!.x,
+    }));
+  const metricName =
+    metrics.find((metric) => metric.id === metricId)?.name ?? "Core metric";
   return (
     <div className="network-page">
       <div className="network-heading">
         <h1>Decision Network</h1>
         <div className="network-filters">
           <label>
-            <span className="sr-only">Project scope</span>
+            <span>Project scope</span>
             <select
               aria-label="Project scope"
               value={scope}
@@ -83,6 +110,32 @@ export function DecisionNetwork({
               ))}
             </select>
           </label>
+          <label>
+            <span>Period</span>
+            <select
+              aria-label="Period"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+            >
+              <option value="all">All time</option>
+              {periods.map((p) => (
+                <option key={p}>{p}</option>
+              ))}
+            </select>
+          </label>
+          <input
+            type="search"
+            aria-label="Search decisions"
+            placeholder="Search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="network-toolbar">
+        <div className="network-metric">
+          <span className="metric-orb" aria-hidden="true" />
+          <span>Core metric</span>
           <label>
             <span className="sr-only">Core metric</span>
             <select
@@ -104,30 +157,14 @@ export function DecisionNetwork({
               ))}
             </select>
           </label>
-          <select
-            aria-label="Period"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-          >
-            <option value="all">All time</option>
-            {periods.map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-          <input
-            type="search"
-            aria-label="Search decisions"
-            placeholder="Search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
         </div>
-      </div>
-      <div className="network-stage">
+        <span className="network-count">
+          {visible.length} decisions · {groups.length} projects
+        </span>
         <div className="network-zoom">
           <button
             aria-label="Zoom out"
-            onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+            onClick={() => setZoom((z) => Math.max(0.05, z / 1.25))}
           >
             −
           </button>
@@ -142,11 +179,27 @@ export function DecisionNetwork({
           </button>
           <button
             aria-label="Zoom in"
-            onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
+            onClick={() => setZoom((z) => Math.min(3, z * 1.25))}
           >
             ＋
           </button>
+          <button
+            aria-label="Fit network"
+            onClick={() => {
+              const el = viewport.current;
+              if (el) {
+                setZoom(
+                  Math.min(1, el.clientWidth / width, el.clientHeight / height),
+                );
+                el.scrollTo({ left: 0, top: 0 });
+              }
+            }}
+          >
+            Fit
+          </button>
         </div>
+      </div>
+      <div className="network-stage">
         {visible.length === 0 ? (
           <div className="network-empty">
             <h2>
@@ -166,19 +219,24 @@ export function DecisionNetwork({
             className="network-viewport"
             ref={viewport}
             tabIndex={0}
-            aria-label="Decision timeline. Scroll to pan, use zoom controls to scale."
+            aria-label="Decision timeline. Drag to pan, scroll to zoom. Keyboard arrow keys pan; zoom controls are above."
             onPointerDown={(e) => {
               if ((e.target as Element).closest("[role=button]")) return;
               drag.current = {
                 x: e.clientX,
+                y: e.clientY,
+                top: e.currentTarget.scrollTop,
                 scroll: e.currentTarget.scrollLeft,
               };
               e.currentTarget.setPointerCapture(e.pointerId);
             }}
             onPointerMove={(e) => {
-              if (drag.current)
+              if (drag.current) {
                 e.currentTarget.scrollLeft =
                   drag.current.scroll - (e.clientX - drag.current.x);
+                e.currentTarget.scrollTop =
+                  drag.current.top - (e.clientY - drag.current.y);
+              }
             }}
             onPointerUp={() => {
               drag.current = null;
@@ -205,31 +263,75 @@ export function DecisionNetwork({
                 </pattern>
               </defs>
               <rect width={width} height={height} fill="url(#network-stars)" />
+              {dateTicks.map(({ date, x }) => (
+                <g key={date}>
+                  <line
+                    x1={x}
+                    x2={x}
+                    y1="55"
+                    y2={height - 45}
+                    stroke="#536174"
+                    opacity=".18"
+                    strokeDasharray="3 6"
+                  />
+                  <text
+                    x={x}
+                    y="32"
+                    textAnchor="middle"
+                    fill="#7f91a7"
+                    fontSize="12"
+                  >
+                    {date}
+                  </text>
+                </g>
+              ))}
+              <g aria-label={`Core metric: ${metricName}`}>
+                <circle
+                  cx="92"
+                  cy={height / 2}
+                  r="30"
+                  fill="#65d1b5"
+                  opacity=".08"
+                />
+                <circle cx="92" cy={height / 2} r="13" fill="#80d5d3" />
+                <text
+                  x="92"
+                  y={height / 2 + 45}
+                  fill="#c5d2e0"
+                  textAnchor="middle"
+                  fontSize="13"
+                >
+                  {metricName.slice(0, 25)}
+                </text>
+              </g>
               {groups.map((group) => {
-                const node = visible.find((n) => n.workspaceId === group.workspaceId)!;
+                const node = visible.find(
+                  (n) => n.workspaceId === group.workspaceId,
+                )!;
                 const y = group.y;
                 return (
                   <g key={group.workspaceId}>
                     <line
-                      x1="120"
+                      x1="310"
                       y1={y}
                       x2={width - 50}
                       y2={y}
                       stroke="#5b78954d"
                       strokeDasharray="3 7"
                     />
-                    <rect
-                      x="35"
-                      y={y - 24}
-                      width="140"
-                      height="48"
-                      rx="10"
-                      fill="#28384a"
-                      stroke="#649ae7"
+                    <path
+                      d={`M108,${height / 2} C200,${height / 2} 200,${y} 273,${y}`}
+                      fill="none"
+                      stroke="#6faaa459"
+                    />
+                    <path
+                      d={`M290,${y - 17} l17,17 -17,17 -17,-17 Z`}
+                      fill="#26323e"
+                      stroke="#8ca0b5"
                     />
                     <text
-                      x="105"
-                      y={y - 3}
+                      x="290"
+                      y={y + 42}
                       fill="#e1edfc"
                       textAnchor="middle"
                       fontSize="12"
@@ -237,8 +339,8 @@ export function DecisionNetwork({
                       {node.project.slice(0, 20)}
                     </text>
                     <text
-                      x="105"
-                      y={y + 13}
+                      x="290"
+                      y={y + 58}
                       fill="#9caebf"
                       textAnchor="middle"
                       fontSize="10"
@@ -256,7 +358,7 @@ export function DecisionNetwork({
                 return (
                   <g key={`edge-${node.id}`}>
                     <path
-                      d={`M175,${groups.find((g) => g.workspaceId === node.workspaceId)!.y} Q${point.x - 60},${groups.find((g) => g.workspaceId === node.workspaceId)!.y} ${point.x},${point.y}`}
+                      d={`M307,${groups.find((g) => g.workspaceId === node.workspaceId)!.y} Q${point.x - 60},${groups.find((g) => g.workspaceId === node.workspaceId)!.y} ${point.x},${point.y}`}
                       fill="none"
                       stroke="#71aaa844"
                     />
@@ -303,14 +405,14 @@ export function DecisionNetwork({
                     <circle
                       cx={point.x}
                       cy={point.y}
-                      r={selected ? 22 : 16}
+                      r={selected ? 29 : 25}
                       fill={node.status === "Current" ? "#80d5d3" : "#5a99f5"}
                       opacity=".18"
                     />
                     <circle
                       cx={point.x}
                       cy={point.y}
-                      r="9"
+                      r="11"
                       fill={node.status === "Current" ? "#80d5d3" : "#5a99f5"}
                       stroke={selected ? "white" : "none"}
                       strokeWidth="2"
@@ -407,9 +509,18 @@ export function DecisionNetwork({
           </aside>
         )}
       </div>
-      <p className="network-caption">
-        Lines show project membership and report versions. Impact stays per
-        decision; overlapping effects are not added together.
+      <footer className="network-caption">
+        <span>
+          <i className="legend-decision" />
+          Decision <i className="legend-current" />
+          Current <i className="legend-project" />
+          Project
+        </span>
+        <span>Drag to pan · Scroll to zoom</span>
+      </footer>
+      <p className="network-semantics">
+        Links show project membership and report versions. Overlapping impacts
+        are not added together.
       </p>
     </div>
   );

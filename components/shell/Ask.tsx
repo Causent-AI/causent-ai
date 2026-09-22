@@ -9,7 +9,18 @@ export function Ask() {
         className="ask-button"
         onClick={() => dialog.current?.showModal()}
       >
-        ✦ Ask
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+        >
+          <path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z" />
+        </svg>
+        <span>Ask</span>
       </button>
       <dialog ref={dialog} className="ask-dialog">
         <header className="flex items-center justify-between gap-4">

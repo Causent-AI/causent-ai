@@ -2,8 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export function AccountMenu({ name = "Account", detail = "Signed in" }: { name?: string; detail?: string }) {
-  const initials = name.split(/[ @._-]+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+export function AccountMenu({
+  name = "Account",
+  detail = "Signed in",
+}: {
+  name?: string;
+  detail?: string;
+}) {
+  const initials = name
+    .split(/[ @._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +45,7 @@ export function AccountMenu({ name = "Account", detail = "Signed in" }: { name?:
         aria-controls="account-details"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--brand-grey)] text-[12px] font-semibold text-white hover:brightness-110 sm:h-9 sm:w-9"
+        className="account-avatar"
       >
         {initials}
       </button>
@@ -49,9 +61,7 @@ export function AccountMenu({ name = "Account", detail = "Signed in" }: { name?:
             <div className="text-[13px] font-semibold text-[var(--text)]">
               {name}
             </div>
-            <div className="text-[12px] text-[var(--text-muted)]">
-              {detail}
-            </div>
+            <div className="text-[12px] text-[var(--text-muted)]">{detail}</div>
           </div>
         </div>
       )}

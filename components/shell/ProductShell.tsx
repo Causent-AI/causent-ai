@@ -29,13 +29,23 @@ export async function ProductShell({ children }: { children: ReactNode }) {
             : (user.email?.split("@")[0] ?? "Account"),
         detail: user.email ?? "Signed in",
       }
-    : { name: session.userId ? "Account" : "Demo", detail: session.userId ? "Signed in" : "Demo workspace" };
+    : {
+        name: session.userId ? "Account" : "Demo",
+        detail: session.userId ? "Signed in" : "Demo workspace",
+      };
   return (
     <WorkspaceTitleProvider
       key={session.workspaceId}
       title={data.activeDecisionReport?.title || data.scope.workspace}
     >
-      <WorkspaceMetricsProvider metrics={data.metrics}>
+      <WorkspaceMetricsProvider
+        metrics={data.metrics}
+        reports={data.decisionReports.map((report) => ({
+          id: report.id,
+          title: report.title,
+          status: report.status,
+        }))}
+      >
         <div className="causent-shell">
           <GlobalHeader
             activeWorkspaceId={session.workspaceId}

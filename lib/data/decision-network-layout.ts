@@ -1,7 +1,7 @@
 type DatedNode = { id: string; workspaceId: string; date: string };
 
 export function layoutDecisionNetwork(nodes: DatedNode[]) {
-  const width = Math.max(1000, nodes.length * 155);
+  const width = Math.max(1200, nodes.length * 155);
   const dates = nodes.map((node) => Date.parse(node.date));
   const start = Math.min(...dates);
   const end = Math.max(...dates);
@@ -16,7 +16,10 @@ export function layoutDecisionNetwork(nodes: DatedNode[]) {
       .filter((node) => node.workspaceId === workspaceId)
       .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
     for (const node of ordered) {
-      const x = 260 + (end > start ? (Date.parse(node.date) - start) / (end - start) : 0) * (width - 380);
+      const x =
+        480 +
+        (end > start ? (Date.parse(node.date) - start) / (end - start) : 0) *
+          (width - 600);
       let lane = laneEnds.findIndex((lastX) => x - lastX >= 240);
       if (lane === -1) lane = laneEnds.length;
       laneEnds[lane] = x;

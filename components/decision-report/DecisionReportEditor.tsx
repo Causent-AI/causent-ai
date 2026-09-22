@@ -13,7 +13,7 @@ import {
   type SaveDecisionReportActionResult,
 } from "@/app/(onboarding)/onboarding/decision-report-persistence-actions";
 import { startDecisionReportAction } from "@/app/(onboarding)/onboarding/decision-report-activation-actions";
-import { DocumentLayoutProvider, DocumentOutline, DocumentNotes, DocumentCharts } from "./DocumentLayout";
+import { DocumentLayoutProvider, DocumentOutline, DocumentNotes, DocumentCharts, DocumentChartPicker } from "./DocumentLayout";
 import { ReportRewrite } from "./ReportRewrite";
 import { ReportTitleSync } from "@/components/shell/WorkspaceTitle";
 import { ActionPlanCanvas } from "@/components/decision-report/ActionPlanCanvas";
@@ -1101,8 +1101,9 @@ export function DecisionReportEditor({
             aria-label="Decision report editor"
           >
             {!reportIsActive ? (
-              <div className="document-toolbar sticky top-0 z-20 min-w-0 max-w-full overflow-hidden border-b border-[var(--border)] bg-white/95 px-2 py-1.5 shadow-sm shadow-slate-200/30 backdrop-blur">
+              <div className="document-toolbar sticky top-0 z-20 min-w-0 max-w-full border-b border-[var(--border)] bg-white/95 px-2 py-1.5 shadow-sm shadow-slate-200/30 backdrop-blur">
                 <DocumentEditorToolbar readOnly={editorReadOnly} variant="mobile"/>
+                <DocumentChartPicker/>
                 <ReportRewrite report={report} disabled={editorReadOnly} onApply={updateClaim}/>
               </div>
             ) : null}
@@ -1123,6 +1124,7 @@ export function DecisionReportEditor({
               onAssetUpload={uploadAsset}
               onAssetRemove={removeAsset}
             />
+            <DocumentCharts/>
             <ActionPlanCanvas
               report={actionPlanReport}
               projection={projection}
@@ -1166,7 +1168,6 @@ export function DecisionReportEditor({
               onResolutionDateChange={updatePredictionResolutionDate}
               onStartAction={startReportAction}
             />
-            <DocumentCharts/>
             <DocumentNotes/>
           </div>
         </DocumentEditorProvider>

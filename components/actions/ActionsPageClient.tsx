@@ -113,7 +113,7 @@ export function ActionsPageClient({
   if (view.mode === "decision_report") {
     return (
       <div className="workspace-page actions-page">
-        <header className="workspace-heading"><h1>Actions</h1>{decisionReportId && <div className="flex gap-3"><Link className="button" href={`/reports?report=${decisionReportId}`}>Report</Link><StartIterationControl reportId={decisionReportId}/></div>}</header>
+        <header className="workspace-heading"><h1>{decisionReport?.title ?? "Project"}: Implementation Plan</h1>{decisionReportId && <div className="flex gap-3"><Link className="button" href={`/reports?report=${decisionReportId}`}>Report</Link><StartIterationControl reportId={decisionReportId}/></div>}</header>
         <Panel className="action-workbench">
           {selectedDecision ? (
             <DecisionDetail
