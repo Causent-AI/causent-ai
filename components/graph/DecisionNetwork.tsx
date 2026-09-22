@@ -309,6 +309,14 @@ export function DecisionNetwork({
                       }
                     }}
                   >
+                    <rect
+                      x={point.x - 112}
+                      y={point.y - 25}
+                      width="224"
+                      height="90"
+                      fill="transparent"
+                      pointerEvents="all"
+                    />
                     <circle
                       cx={point.x}
                       cy={point.y}

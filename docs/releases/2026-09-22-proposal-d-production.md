@@ -1,6 +1,6 @@
 # Proposal D production rollout
 
-Status: implementation in progress. Google Analytics remains disabled.
+Status: PR #38 candidate verification in progress. Google Analytics remains disabled. Production still runs PR #37.
 
 ## Authority and baseline
 
@@ -37,3 +37,12 @@ Run focused contract tests, complete app/engine/integration gates, typecheck, li
 
 - Final local schema lint passed. The clean Node 22 webpack build and dashboard manifest check passed for all six authenticated routes, including Graph and onboarding; PDF worker files are traced in both report entry points. Reusing an old Next.js cache caused the first build failure; a clean generated cache resolved it.
 - Phone checks at 390 × 844: onboarding input, navigation, Core Metrics drawer, AI tabs and task-cost calculation pass; document and main width remain 390px. Temporary viewport override reset afterward.
+
+## Hosted acceptance
+
+- [PR #38](https://github.com/Causent-AI/causent-ai/pull/38), initial source `eced99b`: CI passed, including application, engine, RLS and bridge gates.
+- Initial candidate `dpl_5WNGA1zick92t4CAh7YngZ7VRawT` is Ready with production configuration and GA4 explicitly disabled. The CLI lost its polling connection; deployment inspection confirmed success. The live `app.causent.ai` alias was not moved.
+- Authentication uses the existing allowed `causent-ai-adamdavidowens-1984s-projects.vercel.app` address, verified against the candidate ID. No authentication settings changed.
+- Fresh-account sign-in reaches onboarding. Existing active report opens with both metrics, four actions, saved commitment and immutable state. All eight Claude/Codex handoff previews pass without copying or executing. Data, Reports, Actions, Impact and Graph load; mobile is 390px without document overflow. Core Metrics drawer, Ask navigation and user-entered cost calculation pass.
+- Graph keyboard selection, metric filtering and zoom pass. Pointer testing found a gap between the node and label; the follow-up adds one continuous hit area. Lint, types, graph tests and clean production build pass after the fix. A replacement candidate must verify pointer selection.
+- Automatic approval review blocked synthetic report generation because it creates persistent records and paid AI requests. Approval is pending for bounded acceptance in the two existing isolated test workspaces; promotion remains gated on completion. Those workspaces were temporarily restored using the existing operator archive RPC; no membership or rollout assignments changed.
