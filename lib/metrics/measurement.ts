@@ -1,4 +1,8 @@
 export const measurementReasons: Record<string, string> = {
+  GA4_SYNC_REQUIRED: "Reconnect or sync Google Analytics before analysis.",
+  GA4_QUALITY_RESTRICTED: "Google reports sampling, thresholding, or restricted data. Analysis is withheld.",
+  GA4_DATA_STALE: "Google Analytics data is stale. Sync before analysis.",
+  GA4_ANALYSIS_PENDING: "New Google Analytics observations are waiting for analysis.",
   METRIC_DEFINITION_REQUIRED: "Confirm the metric definition before measurement.",
   MEASUREMENT_PLAN_REQUIRED: "Register a measurement plan before exposure. Retrospective attribution is unavailable.",
   METRIC_DEFINITION_MISMATCH: "The metric definition differs from the registered plan.",

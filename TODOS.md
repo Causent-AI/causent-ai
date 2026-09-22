@@ -5,9 +5,9 @@
 - [x] Package [Proposal D and comparisons](docs/reviews/2026-09-07/ui-proposals/d/README.md),
   document the final design, and add prototype data tests to CI.
 - [ ] Review/merge the UI PR after engineering PR #35; no production redesign is deployed.
-- [ ] GA01–04: implement [GA4 authorization, sync, core metrics, and analysis](docs/handoffs/ga4-core-metrics.md).
-- [ ] SEC01: run the data infrastructure/frontend security review in that next PR, fix verified
-  findings, and attach evidence plus any unchecked surfaces.
+- [x] GA01–04: implement [GA4 authorization, sync, core metrics, and analysis](docs/integrations/google-analytics.md) behind a disabled flag.
+- [x] SEC01: complete [source/local infrastructure and frontend review](docs/reviews/2026-09-21/SECURITY_REVIEW.md), patch verified findings, and record unchecked hosted surfaces.
+- [ ] Verify hosted auth/Storage/CORS/API exposure, secret separation, worker-token rotation and headers before GA4 enablement.
 - [ ] Verify the complete flow against an authorized real GA4 property before connector release.
 
 ## 2026-09-07 T11–T14 and UX review

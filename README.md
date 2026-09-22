@@ -158,7 +158,8 @@ recompute secret.
 
 - [Build status and resume guide](docs/STATUS.md)
 - [Proposal D review and local preview](docs/reviews/2026-09-21/PROPOSAL_D_REVIEW.md)
-- [GA4 core-metric integration and security handoff](docs/handoffs/ga4-core-metrics.md)
+- [GA4 setup, data contract and rollback](docs/integrations/google-analytics.md)
+- [GA4 engineering review](docs/reviews/2026-09-21/GA4_ENGINEERING_REVIEW.md) and [security findings](docs/reviews/2026-09-21/SECURITY_REVIEW.md)
 - [Active Decision Report design](docs/designs/ai-assisted-decision-report.md)
 - [Prospective prediction loop](docs/designs/prospective-prediction-loop.md)
 - [Decision graph](docs/designs/decision-graph.md)

@@ -1,5 +1,15 @@
 # Causent v1 Schema + RLS Report
 
+## GA4 connector addition · 2026-09-21
+
+Migration `20260922000213_ga4_core_metrics.sql` adds public connection/mapping/receipt
+metadata, private encrypted credentials and OAuth state, an RPC-only NOLOGIN worker
+role, provider-observation/metric guards, and security-invoker health/readout gates.
+Daily definitions and plan scheduling now honor each metric timezone. No historical
+customer backfill occurs during migration. Local schema lint and role/tenant tests pass;
+hosted application is pending. See [setup and rollback](../docs/integrations/google-analytics.md)
+and [security evidence](../docs/reviews/2026-09-21/SECURITY_REVIEW.md).
+
 Branch: `feat/schema-rls` · Migrations: `20260703223627_v1_schema.sql`, `20260703223628_v1_rls.sql`
 
 Historical note: this report records the original v1 schema review. Later Decision Report

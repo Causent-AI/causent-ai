@@ -1,5 +1,19 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-09-21 — GA4 core metrics and security
+
+GA01–GA04 are implemented behind `CAUSENT_GA4_ENABLED` (off by default): admin OAuth,
+property preview/import, daily sync, private encrypted credentials, core metric selection
+and existing analysis with property-local dates/provenance. Source/local SEC01 review
+patched vulnerable dependencies and added frontend protections.
+
+See the [engineering review](reviews/2026-09-21/GA4_ENGINEERING_REVIEW.md),
+[security findings](reviews/2026-09-21/SECURITY_REVIEW.md),
+[decision record](reviews/2026-09-21/GA4_DECISIONS.md), and
+[setup/acceptance/rollback guide](integrations/google-analytics.md). Real Google property
+acceptance and hosted infrastructure verification remain release gates. No production
+migration, connector enablement, merge or deployment was performed.
+
 ## 2026-09-21 — Proposal D and GA4 implementation handoff
 
 Proposal D packages the agreed document editor/onboarding, five-tab navigation, Decision
@@ -14,7 +28,8 @@ See the [delivery review](reviews/2026-09-21/PROPOSAL_D_REVIEW.md) and
 
 The [GA4 handoff](handoffs/ga4-core-metrics.md) defines the next PR: user-owned Google Analytics
 connections, real daily core metrics through existing analysis, and a data infrastructure/frontend
-security review. GA4 backend, live provider acceptance, and that security review remain pending.
+security review. The implementation and local review are recorded above; live provider
+acceptance and hosted security verification remain pending.
 
 ## 2026-09-07 — T11–T14 implemented; document UX proposal prepared
 

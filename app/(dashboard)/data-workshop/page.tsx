@@ -10,6 +10,7 @@ import { getSession } from "@/lib/auth/session";
 import { loadReportActivationMetrics } from "@/lib/decision-reports/materialization";
 import { getServerSupabase } from "@/lib/supabase-server";
 import { CausalRecomputeStatus } from "@/components/causal/CausalRecomputeStatus";
+import { Ga4Connections } from "@/components/data-workshop/Ga4Connections";
 
 // The workspace catalog is session-scoped and must never be prerendered at build time.
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function DataWorkshopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string | string[] }>;
+  searchParams: Promise<{ returnTo?: string | string[]; ga4?: string }>;
 }) {
   const params = await searchParams;
   const requestedReturn = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
@@ -30,6 +31,13 @@ export default async function DataWorkshopPage({
     getServerSupabase(),
   ]);
   const workspaceMetrics = await loadReportActivationMetrics(sb, session.workspaceId);
+  const ga4Enabled = process.env.CAUSENT_GA4_ENABLED === "1" && process.env.CAUSENT_LOCAL_DEMO !== "1" && process.env.CAUSENT_USE_SEED !== "1";
+  const [ga4Connections, ga4Access, ga4Health] = ga4Enabled ? await Promise.all([
+    sb.from("ga4_connections").select("connection_id,property_name,property_id,timezone,status,last_sync_at,error_code").eq("scope_id", session.workspaceId).order("created_at").limit(21),
+    sb.rpc("has_scope_access", { target_scope: session.workspaceId, min_role: "admin" }),
+    sb.from("ga4_metric_health").select("connection_id,metric_id,provider_metric,row_count,missing_days,start_date,end_date,reason").eq("scope_id", session.workspaceId).limit(61),
+  ]) : [null, null, null];
+  if (ga4Connections?.error || ga4Access?.error || ga4Health?.error || (ga4Connections?.data?.length ?? 0) > 20 || (ga4Health?.data?.length ?? 0) > 60) throw new Error("Google Analytics connections unavailable");
   const activationId = activeDecisionReport?.activeActivationId;
   const planResponse = activationId ? await sb.from("measurement_plans")
     .select("plan_id,exposure_start,window_start,window_end,lag_days,population,decision_threshold,concurrent_change_status")
@@ -61,12 +69,7 @@ export default async function DataWorkshopPage({
   const lockedMetricName = workspaceMetrics.find(
     (metric) => metric.metricId === activeDecisionReport?.metricId && !metric.isCore,
   )?.name ?? null;
-  const metricConnections = activeDecisionReport
-    ? {
-        connected: metrics.filter((metric) => metric.series.length > 0).length,
-        total: metrics.length,
-      }
-    : summarizeMetricConnections(metrics.length);
+  const metricConnections = summarizeMetricConnections(metrics);
 
   return (
     <div className="mx-auto flex max-w-[1360px] flex-col gap-4 p-4 sm:p-5">
@@ -87,6 +90,9 @@ export default async function DataWorkshopPage({
         threshold: Number(registered.decision_threshold), concurrentStatus: registered.concurrent_change_status,
       } : null} /></Panel> : null}
       <div className="space-y-4">
+          <Panel>
+            <Ga4Connections connections={ga4Connections?.data ?? []} health={ga4Health?.data ?? []} enabled={ga4Enabled} admin={ga4Access?.data === true} notice={params.ga4} />
+          </Panel>
           <Panel>
             <WorkspaceMetricCsvDropzone
               activeMetricName={activeMetric?.name ?? activeDecisionReport?.metricProjection.metricName ?? null}
