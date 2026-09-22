@@ -163,6 +163,10 @@ async function generateDraftWithGateway(
       model,
       instructions: GENERATION_INSTRUCTIONS,
       prompt,
+      // The nullable report schema exceeds Anthropic's native grammar limit.
+      providerOptions: model.startsWith("anthropic/")
+        ? { anthropic: { structuredOutputMode: "jsonTool" } }
+        : undefined,
       output: Output.object({
         schema: modelDraftSchema,
         name: "decision_report_draft",
