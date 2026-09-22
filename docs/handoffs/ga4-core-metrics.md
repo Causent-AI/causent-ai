@@ -2,6 +2,8 @@
 
 Status: GA01–GA04 implementation and SEC01 source/local review are delivered in the next stacked draft PR. [Engineering evidence](../reviews/2026-09-21/GA4_ENGINEERING_REVIEW.md) and the [operator runbook](../integrations/google-analytics.md) supersede the planning status below. Real Google acceptance and hosted security verification remain open. The original acceptance contract is retained here.
 
+Account creation is intentionally deferred. Keep the disabled **Setup required** placeholder; resume with the [pending setup steps](../integrations/google-analytics.md#setup-pending) when a Google account is available. Do not create a simulated live connection or import sample data as Google observations.
+
 ## Outcome and scope
 
 A workspace admin connects their own Google Analytics account, chooses a GA4 property and metrics, previews real daily observations, and confirms import. Those observations become selectable Core Metrics and feed the existing report, measurement, and Impact paths. Sync continues without the user being present. Disconnect stops further collection.
@@ -67,7 +69,7 @@ Use [security-and-auth.md](../designs/security-and-auth.md), `lib/decision-repor
 
 ## Completion and release
 
-The next PR must demonstrate consent → property → backfill → core selection → real analysis input → refresh → disconnect using an authorized GA4 property, with redacted evidence. Also test missing dates, thresholding, pagination, timezone boundaries, retries, late revisions, stale workers, and denied cross-tenant access. Mock tests alone do not establish provider acceptance.
+Before enablement, demonstrate consent → property → backfill → core selection → real analysis input → refresh → disconnect using an authorized GA4 property, with redacted evidence. This live acceptance is deferred until account setup is complete; the disabled connector PR can be reviewed now. Also test missing dates, thresholding, pagination, timezone boundaries, retries, late revisions, stale workers, and denied cross-tenant access. Mock tests alone do not establish provider acceptance.
 
 Operator setup: enable the Analytics Data/Admin APIs, register the connector OAuth client and redirect URLs, configure encrypted credential storage, and provide an authorized test property. Record any Google consent-screen verification requirement before public access. Keep these prerequisites separate from Causent's existing Google login setup.
 

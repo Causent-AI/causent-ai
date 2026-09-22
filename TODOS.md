@@ -7,6 +7,7 @@
 - [ ] Review/merge the UI PR after engineering PR #35; no production redesign is deployed.
 - [x] GA01–04: implement [GA4 authorization, sync, core metrics, and analysis](docs/integrations/google-analytics.md) behind a disabled flag.
 - [x] SEC01: complete [source/local infrastructure and frontend review](docs/reviews/2026-09-21/SECURITY_REVIEW.md), patch verified findings, and record unchecked hosted surfaces.
+- [ ] Deferred: create the Google account, GA4 property and connector OAuth client when ready; retain the disabled [setup placeholder](docs/integrations/google-analytics.md#setup-pending).
 - [ ] Review the 32 existing hosted privileged-RPC warnings and leaked-password protection setting; complete auth/Storage delivery/CORS/API exposure, secret separation, worker-token rotation and header checks before GA4 enablement.
 - [ ] Verify the complete flow against an authorized real GA4 property before connector release.
 

@@ -11,6 +11,10 @@ patched vulnerable dependencies and added frontend protections. Hosted CI passed
 hosted catalog/Storage checks passed; 33 advisor warnings are documented for deployment
 follow-through.
 
+Google account creation is deferred at the user's request. The disabled **Setup required**
+card remains the placeholder. [Account/property setup and live acceptance](integrations/google-analytics.md#setup-pending)
+remain pending before enablement; review of the disabled connector can continue.
+
 See the [engineering review](reviews/2026-09-21/GA4_ENGINEERING_REVIEW.md),
 [security findings](reviews/2026-09-21/SECURITY_REVIEW.md),
 [decision record](reviews/2026-09-21/GA4_DECISIONS.md), and

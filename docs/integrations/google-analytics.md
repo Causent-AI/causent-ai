@@ -2,6 +2,16 @@
 
 Implementation: GA01–GA04 on `codex/ga4-core-metrics-security`. Disabled by default. [Review and acceptance status](../reviews/2026-09-21/GA4_ENGINEERING_REVIEW.md).
 
+## Setup pending
+
+Google account creation is deferred at the user's request. Keep the existing **Setup required** card as the placeholder and leave `CAUSENT_GA4_ENABLED` unset or `0`. Do not populate account/property IDs or credentials with dummy values. No live Google data has been imported.
+
+- [ ] Create the Google account when ready.
+- [ ] Set up a GA4 property with observed data and the connector OAuth client described below.
+- [ ] Complete real-property acceptance and the hosted security checks before enablement.
+
+These steps are deferred release prerequisites; they do not block review of the disabled connector.
+
 ## Product flow
 
 A workspace owner/admin opens Data Workshop → Google Analytics → Connect, approves read-only Google access, then chooses a property, previews a metric, and confirms Import. After sync, the metric appears in Workspace Metrics and can be selected as a Core Metric. Existing report bindings and measurement plans consume its daily observations. Viewers can inspect connection health but cannot configure it.
