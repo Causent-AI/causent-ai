@@ -157,6 +157,8 @@ recompute secret.
 ## Documentation
 
 - [Build status and resume guide](docs/STATUS.md)
+- [Proposal D review and local preview](docs/reviews/2026-09-21/PROPOSAL_D_REVIEW.md)
+- [GA4 core-metric integration and security handoff](docs/handoffs/ga4-core-metrics.md)
 - [Active Decision Report design](docs/designs/ai-assisted-decision-report.md)
 - [Prospective prediction loop](docs/designs/prospective-prediction-loop.md)
 - [Decision graph](docs/designs/decision-graph.md)

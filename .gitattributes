@@ -1,0 +1,3 @@
+# Preserve whitespace emitted by the editor bundler, including Markdown strings.
+docs/reviews/**/ui-proposals/*/assets/workbench.js linguist-generated=true -whitespace
+docs/reviews/**/ui-proposals/*/assets/workbench.LICENSE.txt linguist-generated=true -whitespace

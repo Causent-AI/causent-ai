@@ -1,6 +1,8 @@
 # Causent Security & Auth
 
 Status: LIVING DOCUMENT (current implementation reviewed 2026-08-12; pending release)
+Next review: the [GA4 implementation handoff](../handoffs/ga4-core-metrics.md) requires a data infrastructure/frontend security check in the next PR. This is planned work, not a completed audit.
+
 Owner: founder
 Related: `docs/designs/did-it-ship-did-it-work.md` (PRD), `docs/designs/decision-graph.md` (data model / RBAC tables)
 

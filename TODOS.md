@@ -1,5 +1,15 @@
 # Causent active backlog
 
+## 2026-09-21 UI delivery and next PR
+
+- [x] Package [Proposal D and comparisons](docs/reviews/2026-09-07/ui-proposals/d/README.md),
+  document the final design, and add prototype data tests to CI.
+- [ ] Review/merge the UI PR after engineering PR #35; no production redesign is deployed.
+- [ ] GA01–04: implement [GA4 authorization, sync, core metrics, and analysis](docs/handoffs/ga4-core-metrics.md).
+- [ ] SEC01: run the data infrastructure/frontend security review in that next PR, fix verified
+  findings, and attach evidence plus any unchecked surfaces.
+- [ ] Verify the complete flow against an authorized real GA4 property before connector release.
+
 ## 2026-09-07 T11–T14 and UX review
 
 - [x] T11: instrument recompute phases and conservative lock duration; verify held-lock timing.

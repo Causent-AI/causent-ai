@@ -14,6 +14,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --test --test-concurrency=1 \"lib/**/*.test.ts\"",
+    "test:ui-proposals": "node --test docs/reviews/2026-09-07/ui-proposals/*/src/metric-data.test.mjs",
     "db:reset-demo": "bash scripts/reset-local-demo.sh",
     "check:release-config": "node scripts/check-release-config.mjs app",
     "check:recompute-config": "node scripts/check-release-config.mjs worker",
