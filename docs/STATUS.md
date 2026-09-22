@@ -1,5 +1,19 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-09-22 — Production infrastructure released; final app pending
+
+The user merged #35 (`3b25913`), which Vercel deployed automatically. The five pending
+migrations were rehearsed on a production-data copy and applied: production is now at 47.
+Matching drift, recompute and resolve workers from `906dd7a` are promoted. The database
+update restored the live app's signed-in Data, Reports, Actions and Impact routes.
+
+The final #37 application candidate is Ready, with GA4 explicitly off, but has not been
+promoted. Its authentication and fresh-account/action acceptance remain open. #36's parent
+conflict was resolved with an identical reviewed tree; fresh CI passed and #36 is merged
+as `87d3128`. #37 remains a draft targeting main. See the
+[release record](releases/2026-09-22-production.md) for exact IDs, security findings and rollback.
+The dated entries below describe earlier checkpoints, not the current production state.
+
 ## 2026-09-21 — GA4 core metrics and security
 
 [Draft PR #37](https://github.com/Causent-AI/causent-ai/pull/37) follows #36.

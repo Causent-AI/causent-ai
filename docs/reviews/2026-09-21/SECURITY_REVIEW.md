@@ -1,5 +1,7 @@
 # SEC01 · Data infrastructure and frontend
 
+**September 22 release follow-through:** production is now at migration 47. Catalog/grant checks and schema lint pass; hosted advisors report the same 33 warnings and seven expected default-deny notices. The 32 authenticated RPC definitions retain their actor/membership guards. Email/password auth is enabled and leaked-password protection remains disabled. Final-candidate security headers are verified, but candidate authentication and live provider acceptance remain open. See the [release record](../../releases/2026-09-22-production.md); earlier observations below are historical.
+
 Scope: delta from `01535f2`, plus existing auth, report/source ingestion, private-image Storage and dependency boundaries. This is a source/local integration review for the GA4 draft PR. Hosted Supabase catalog, Storage bucket settings and security advisors were also checked read-only. Remaining hosted configuration and real Google acceptance are release gates.
 
 ## Findings and remediation

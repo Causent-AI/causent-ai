@@ -1,5 +1,14 @@
 # Causent v1 Schema + RLS Report
 
+## Hosted release · 2026-09-22
+
+Production `royftsqyawtyfjolfabd` is at **47 migrations**, including the GA4 migration,
+after rehearsal on a private production-data copy. Error-level schema lint and hosted
+RLS/view/grant checks pass; report, revision, activation and membership invariants were
+preserved. Google Analytics remains disabled with no connections or credentials. The
+existing 33 hosted advisor warnings remain documented separately from the seven intended
+default-deny notices. [Release evidence](../docs/releases/2026-09-22-production.md).
+
 ## GA4 connector addition · 2026-09-21
 
 Migration `20260922000213_ga4_core_metrics.sql` adds public connection/mapping/receipt

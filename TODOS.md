@@ -1,5 +1,12 @@
 # Causent active backlog
 
+## 2026-09-22 production release
+
+- [x] Rehearse and apply migrations 43–47; preserve report/audit/membership invariants and promote matching workers.
+- [ ] Complete candidate authentication, fresh-account/action acceptance and the live resolver canary; then finish #37 and promote the final app. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
+- [ ] Resolve the existing hosted leaked-password protection warning; email/password auth is enabled.
+- [x] Remove the new `causent-release-20260922` rehearsal branch after retaining its evidence; leave the older preflight branch alone.
+
 ## 2026-09-21 UI delivery and next PR
 
 - [x] Package [Proposal D and comparisons](docs/reviews/2026-09-07/ui-proposals/d/README.md),

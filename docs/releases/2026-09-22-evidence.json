@@ -1,0 +1,159 @@
+{
+  "runtimeSource": "906dd7ab2b2f57e33e1db7367b256b735d1ebd11",
+  "productionProject": "royftsqyawtyfjolfabd",
+  "migrationCountBefore": 42,
+  "migrationCountAfter": 47,
+  "appliedMigrations": [
+    "20260907035048",
+    "20260907053500",
+    "20260908070000",
+    "20260908071000",
+    "20260922000213"
+  ],
+  "migrationBoundaryCounts": {
+    "reports": 7,
+    "revisions": 22,
+    "activations": 6,
+    "memberships": 4,
+    "workspaces": 1,
+    "metrics": 11,
+    "observations": 1504,
+    "predictions": 17,
+    "evidence": 244
+  },
+  "productionInvariantsPreserved": {
+    "reports": true,
+    "revisions": true,
+    "activations": true,
+    "memberships": true,
+    "workspaces": true,
+    "metrics": true,
+    "observations": true,
+    "predictions": true,
+    "evidence": true,
+    "revision_digest": true,
+    "activation_digest": true,
+    "membership_digest": true
+  },
+  "rehearsalInvariantsPreserved": true,
+  "catalog": {
+    "anonymous_callable_nontrigger_public_definers": 0,
+    "definers_without_fixed_search_path": 0,
+    "ga4_connections": 0,
+    "ga4_credentials": 0,
+    "ga4_worker": {
+      "bypass_rls": false,
+      "inherit": false,
+      "login": false,
+      "superuser": false
+    },
+    "image_bucket": {
+      "allowed_mime_types": [
+        "image/png",
+        "image/jpeg"
+      ],
+      "file_size_limit": 5242880,
+      "public": false
+    },
+    "private_ga4_read_privileges": [
+      {
+        "read": false,
+        "role": "anon",
+        "table": "private.ga4_credentials"
+      },
+      {
+        "read": false,
+        "role": "authenticated",
+        "table": "private.ga4_credentials"
+      },
+      {
+        "read": false,
+        "role": "causent_ga4_worker",
+        "table": "private.ga4_credentials"
+      },
+      {
+        "read": false,
+        "role": "anon",
+        "table": "private.ga4_oauth_states"
+      },
+      {
+        "read": false,
+        "role": "authenticated",
+        "table": "private.ga4_oauth_states"
+      },
+      {
+        "read": false,
+        "role": "causent_ga4_worker",
+        "table": "private.ga4_oauth_states"
+      }
+    ],
+    "public_tables_without_rls": 0,
+    "public_views_without_security_invoker": 0,
+    "rollouts": {
+      "disabled": 0,
+      "enabled": 1,
+      "rows": 1
+    }
+  },
+  "advisors": [
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "count": 7
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "count": 32
+    },
+    {
+      "name": "auth_leaked_password_protection",
+      "level": "WARN",
+      "count": 1
+    }
+  ],
+  "workers": {
+    "drift": {
+      "httpRequests": [
+        {
+          "timestamp": 1790044840357,
+          "deploymentId": "dpl_CdKNvUQVm2RiGhH6tdQXyxhS8KBm",
+          "path": "/api/drift",
+          "status": 200
+        },
+        {
+          "timestamp": 1790044579834,
+          "deploymentId": "dpl_CdKNvUQVm2RiGhH6tdQXyxhS8KBm",
+          "path": "/api/drift",
+          "status": 401
+        }
+      ]
+    },
+    "recompute": {
+      "httpRequests": [
+        {
+          "timestamp": 1790044816192,
+          "deploymentId": "dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4",
+          "path": "/api/recompute",
+          "status": 200
+        },
+        {
+          "timestamp": 1790044580226,
+          "deploymentId": "dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4",
+          "path": "/api/recompute",
+          "status": 401
+        }
+      ]
+    },
+    "resolve": {
+      "httpRequests": [
+        {
+          "timestamp": 1790044610488,
+          "deploymentId": "dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt",
+          "path": "/api/resolve",
+          "status": 401
+        }
+      ]
+    }
+  }
+}
