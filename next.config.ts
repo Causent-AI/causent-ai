@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
   // keeps its dependency outside the server bundle. Include that runtime tree
   // explicitly so standalone/Vercel output tracing ships the worker package.
   outputFileTracingIncludes: {
-    "/onboarding": [
+    "/{onboarding,reports}": [
       "./node_modules/pdf-parse/package.json",
       "./node_modules/pdf-parse/dist/pdf-parse/cjs/**/*",
       "./node_modules/@napi-rs/**/*",

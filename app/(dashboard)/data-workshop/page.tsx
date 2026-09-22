@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { WorkshopTabs } from "@/components/data-workshop/WorkshopTabs";
+import { AiWorkspace } from "@/components/data-workshop/AiWorkspace";
+import { GENERATION_MODEL } from "@/lib/decision-reports/generation-admission";
 import { MeasurementPlan } from "@/components/data-workshop/MeasurementPlan";
 import { loadDashboardData } from "@/lib/data/dashboard";
 import { Panel } from "@/components/ui/Panel";
@@ -18,14 +21,14 @@ export const dynamic = "force-dynamic";
 export default async function DataWorkshopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string | string[]; ga4?: string }>;
+  searchParams: Promise<{ returnTo?: string | string[]; ga4?: string; tab?: string; add?: string }>;
 }) {
   const params = await searchParams;
   const requestedReturn = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
   const returnTo = requestedReturn && /^\/onboarding\?report=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedReturn)
     ? requestedReturn
     : null;
-  const [{ metrics, activeDecisionReport, causalRecomputeStatus }, session, sb] = await Promise.all([
+  const [{ metrics, activeDecisionReport, decisionReports, causalRecomputeStatus }, session, sb] = await Promise.all([
     loadDashboardData(),
     getSession(),
     getServerSupabase(),
@@ -72,7 +75,12 @@ export default async function DataWorkshopPage({
   const metricConnections = summarizeMetricConnections(metrics);
 
   return (
-    <div className="mx-auto flex max-w-[1360px] flex-col gap-4 p-4 sm:p-5">
+    <WorkshopTabs key={`${params.tab ?? (params.ga4 ? "connections" : "metrics")}-${params.add ?? ""}-${returnTo ?? ""}`} initialTab={params.ga4 || params.tab === "connections" ? "connections" : params.tab === "ai" ? "ai" : "metrics"} connections={<div className="connection-grid">
+      <article className="connection-card"><Ga4Connections connections={ga4Connections?.data ?? []} health={ga4Health?.data ?? []} enabled={ga4Enabled} admin={ga4Access?.data === true} notice={params.ga4}/></article>
+      <article className="connection-card"><h2>GitHub</h2><p>Pull requests and action completion.</p><span className="status-label">Managed by workspace operator</span></article>
+      <article className="connection-card"><h2>BigQuery</h2><p>Warehouse metrics and daily observations.</p><span className="status-label">Setup required</span></article>
+      <article className="connection-card"><h2>CSV</h2><p>Upload existing metric history.</p><Link className="button mt-4" href="/data-workshop?add=metric">Import</Link></article>
+    </div>} ai={<AiWorkspace model={process.env.CAUSENT_DECISION_REPORT_MODEL?.trim() || GENERATION_MODEL} estimates={decisionReports.filter((r) => r.isCurrent || r.status !== "active").flatMap((r) => r.report.implementation.actions.map((a) => ({ reportId: r.id, report: r.title, action: a.title, cost: a.estimatedCost ?? "", time: a.estimatedTime ?? "" })))}/>} metrics={<div className="space-y-6">
       {returnTo ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/70 px-4 py-3">
           <p className="text-[12px] font-semibold text-teal-950">Choose report metrics</p>
@@ -84,21 +92,18 @@ export default async function DataWorkshopPage({
       {activeDecisionReport && causalRecomputeStatus ? (
         <CausalRecomputeStatus status={causalRecomputeStatus} />
       ) : null}
-      {activationId ? <Panel><MeasurementPlan activationId={activationId} actions={measurementActions} plan={registered ? {
+      {activationId ? <details><summary className="button">Measurement plan</summary><Panel><MeasurementPlan activationId={activationId} actions={measurementActions} plan={registered ? {
         planId: registered.plan_id, exposureStart: registered.exposure_start, windowStart: registered.window_start,
         windowEnd: registered.window_end, lagDays: registered.lag_days, population: registered.population,
         threshold: Number(registered.decision_threshold), concurrentStatus: registered.concurrent_change_status,
-      } : null} /></Panel> : null}
+      } : null} /></Panel></details> : null}
       <div className="space-y-4">
-          <Panel>
-            <Ga4Connections connections={ga4Connections?.data ?? []} health={ga4Health?.data ?? []} enabled={ga4Enabled} admin={ga4Access?.data === true} notice={params.ga4} />
-          </Panel>
-          <Panel>
+          <details open={params.add === "metric" || Boolean(returnTo)} className="metric-import"><summary className="button">＋ Add metric</summary><Panel>
             <WorkspaceMetricCsvDropzone
               activeMetricName={activeMetric?.name ?? activeDecisionReport?.metricProjection.metricName ?? null}
               activeMetricUnit={activeMetric?.unit ?? null}
             />
-          </Panel>
+          </Panel></details>
           <Panel>
             {activeDecisionReport ? (
               <>
@@ -122,6 +127,6 @@ export default async function DataWorkshopPage({
             )}
           </Panel>
       </div>
-    </div>
+    </div>}/>
   );
 }

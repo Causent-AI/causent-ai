@@ -10,6 +10,7 @@ import { METRIC_CONFIG_BY_NAME } from "@/lib/data/config";
 import { getMetricRecords } from "@/lib/data/metrics";
 import { edgeKey, loadEdgeReadouts } from "@/lib/data/graph";
 import { toImpactCell } from "@/lib/data/readout";
+import { safeActionSourceUrl } from "./action-source-url.ts";
 import { toActionIdentity } from "@/lib/data/action-identifiers";
 import { metricUiIdForExpectedName } from "@/lib/data/action-metric";
 import { loadCurrentDecisionReportActivationContract } from "@/lib/data/decision-report-activation-contract";
@@ -30,6 +31,7 @@ type RationaleDoc = {
   title?: string;
   content?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
   meta?: {
+    source_url?: string;
     expected_metric?: string;
     source_item_id?: string;
     owner_label?: string;
@@ -133,6 +135,7 @@ export async function getActions(scopeId: string): Promise<Action[]> {
       pr: identity.pr,
       source: identity.source,
       referenceLabel: identity.referenceLabel,
+      sourceUrl: safeActionSourceUrl(doc?.meta?.source_url),
       sourceItemId: doc?.meta?.source_item_id,
       ownerLabel: doc?.meta?.owner_label,
       title: doc?.title ?? row.external_ref ?? identity.referenceLabel,

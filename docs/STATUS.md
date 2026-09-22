@@ -1,5 +1,9 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-09-22 — Proposal D production implementation
+
+#37 is merged as `9dcc20b` and deployed on `app.causent.ai` (`dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`). The owner authorized the design rollout with GA4 deferred. The new branch implements the real application shell, pageless reports/onboarding, Data Workshop and Decision Network. Local verification passes; candidate and promotion are still pending. See the [engineering review](reviews/2026-09-22/PRODUCTION_DESIGN_REVIEW.md) and [release manifest](releases/2026-09-22-proposal-d-production.md). Older entries below are historical.
+
 ## 2026-09-22 — Production infrastructure released; final app pending
 
 The user merged #35 (`3b25913`), which Vercel deployed automatically. The five pending

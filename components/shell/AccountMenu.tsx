@@ -2,12 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// The header account chip. The demo menu only shows the available identity;
-// unavailable account actions stay out of the interface.
-
-const DEMO_USER = { initials: "AK", name: "Adam K.", detail: "Demo workspace" };
-
-export function AccountMenu() {
+export function AccountMenu({ name = "Account", detail = "Signed in" }: { name?: string; detail?: string }) {
+  const initials = name.split(/[ @._-]+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +35,7 @@ export function AccountMenu() {
         onClick={() => setOpen((v) => !v)}
         className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--brand-grey)] text-[12px] font-semibold text-white hover:brightness-110 sm:h-9 sm:w-9"
       >
-        {DEMO_USER.initials}
+        {initials}
       </button>
 
       {open && (
@@ -51,10 +47,10 @@ export function AccountMenu() {
         >
           <div className="border-b border-[var(--border)] px-3.5 pb-2.5 pt-1.5">
             <div className="text-[13px] font-semibold text-[var(--text)]">
-              {DEMO_USER.name}
+              {name}
             </div>
             <div className="text-[12px] text-[var(--text-muted)]">
-              {DEMO_USER.detail}
+              {detail}
             </div>
           </div>
         </div>

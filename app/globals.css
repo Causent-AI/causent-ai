@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./product.css";
 
 /*
  * Causent brand + dashboard tokens. The approved mockups are a light UI, so the

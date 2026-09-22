@@ -1,5 +1,6 @@
 import type {
   Claim,
+  ReportDocumentLayout,
   DecisionReportActivationDraft,
   DecisionReportV1,
   DraftAction,
@@ -42,6 +43,7 @@ type DataClassification =
 
 export type ReportEditCommandV1 =
   | { type: "edit_report_title"; title: string }
+  | { type: "edit_document_layout"; layout: Pick<ReportDocumentLayout, "sectionTitles" | "sections" | "charts"> }
   | {
       type: "edit_activation_draft";
       activationDraft: DecisionReportActivationDraft;
@@ -237,7 +239,7 @@ function removeClaimDocument(
     delete report.presentation;
     return;
   }
-  report.presentation = { version: 1, claimDocuments };
+  report.presentation = { ...report.presentation, version: 1, claimDocuments };
 }
 
 function setClaimDocument(
@@ -246,6 +248,7 @@ function setClaimDocument(
   document: PortableRichTextDocument,
 ): void {
   report.presentation = {
+    ...report.presentation,
     version: 1,
     claimDocuments: {
       ...(report.presentation?.claimDocuments ?? {}),
@@ -325,6 +328,10 @@ export function applyReportEditCommand(
   const next = cloneDecisionReport(report);
 
   switch (command.type) {
+    case "edit_document_layout": {
+      next.documentLayout = { ...structuredClone(command.layout), version: 1 };
+      break;
+    }
     case "edit_report_title": {
       if (command.title.trim() === "") {
         return editError("Report title cannot be empty.");

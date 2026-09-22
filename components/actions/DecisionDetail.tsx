@@ -19,6 +19,7 @@ import {
   resolveNow,
   recordScorecardView,
 } from "@/app/(dashboard)/actions/server-actions";
+import { ActionSourceLink } from "@/components/actions/ActionSourceLink";
 import { actionReferenceLabel } from "@/components/actions/ActionReference";
 import { LeverCreate } from "@/components/onboarding/LeverCreate";
 import { ManualCompletionForm } from "@/components/actions/ManualCompletionForm";
@@ -482,6 +483,7 @@ function ReportActionRows({
                   </span>
                 </button>
                 <div className="flex min-h-16 flex-wrap items-center gap-2 border-t border-[var(--border)] px-4 py-2 sm:justify-end sm:border-l sm:border-t-0 sm:px-3">
+                  <ActionSourceLink action={action}/>
                   {loopHandoff ? (
                     <>
                       <span className="text-[10px] font-medium text-[var(--text-subtle)]">

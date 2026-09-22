@@ -174,6 +174,7 @@ test("explicit saves are append-only, retry-safe, conflict-safe, and create no g
   assert.equal(retry.saved.revisionId, first.saved.revisionId);
 
   const editedReport = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  editedReport.documentLayout = { version: 1, sectionTitles: { overview: "Context" }, sections: [{ id: "note-1", title: "Review notes", document: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "A saved note." }] }] } }], charts: [{ id: "chart-1", metricId: "metric-1", type: "line" }] };
   editedReport.decision.decision[0] = {
     ...editedReport.decision.decision[0],
     text: "Deploy the assistant to a limited Gummy Alpha partner cohort first.",

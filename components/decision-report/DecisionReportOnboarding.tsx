@@ -258,7 +258,7 @@ export function DecisionReportOnboarding({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col py-6 sm:py-12">
+    <section className="onboarding-page">
       <div className="mb-8">
         <div className="mb-4 flex items-center gap-2 text-[11px] font-medium text-[var(--text-muted)]">
           <span className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1">{activeWorkspaceName}</span>
@@ -266,17 +266,15 @@ export function DecisionReportOnboarding({
           <span>New Decision Report</span>
         </div>
         <h1 className="max-w-2xl text-[30px] font-semibold leading-[1.15] tracking-[-0.02em] text-[var(--text)] sm:text-[38px]">
-          What&apos;s the biggest business challenge you&apos;re tackling today?
+          What are we building?
         </h1>
-        <p className="mt-3 max-w-2xl text-[15px] leading-6 text-[var(--text-muted)] sm:text-[16px]">
-          Causent helps you refine, measure, and track the decision behind it.
-        </p>
+
       </div>
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg shadow-slate-200/50 sm:p-5">
+      <div className="brief-card">
         <div className="mb-4">
-          <label className="text-[14px] font-semibold text-[var(--text)]" htmlFor="project-brief">
-            Business challenge
+          <label className="sr-only" htmlFor="project-brief">
+            Project brief
           </label>
         </div>
         <textarea
@@ -291,8 +289,8 @@ export function DecisionReportOnboarding({
           }}
           placeholder="For example: Customers are dropping out of our setup flow, and we&apos;re not sure whether to simplify it or add in-product guidance."
         />
-        <div className="mt-4 border-t border-[var(--border)] py-4">
-          <p className="text-[12px] font-semibold text-[var(--text)]">Examples</p>
+        <details className="mt-4 py-4">
+          <summary className="cursor-pointer text-[12px]">Examples</summary>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {DECISION_REPORT_REVIEW_EXAMPLES.map((example) => (
               <button
@@ -315,14 +313,14 @@ export function DecisionReportOnboarding({
               </button>
             ))}
           </div>
-        </div>
+        </details>
         <div className="border-t border-[var(--border)] py-4">
-          <p className="text-[12px] font-semibold text-[var(--text)]">Evidence (optional)</p>
+          <p className="text-[12px] font-semibold text-[var(--text)]">Add website, pdf or text for your new project</p>
         </div>
         <div className="grid gap-3 pb-4 sm:grid-cols-2">
           <div>
             <label className="text-[11px] font-semibold text-[var(--text)]" htmlFor="source-url">
-              Public URL
+              Website
             </label>
             <input
               id="source-url"
@@ -342,7 +340,7 @@ export function DecisionReportOnboarding({
           </div>
           <div>
             <label className="text-[11px] font-semibold text-[var(--text)]" htmlFor="source-pdf">
-              Text PDF
+              PDF
             </label>
             <input
               id="source-pdf"
@@ -366,11 +364,11 @@ export function DecisionReportOnboarding({
         <div className="flex flex-col items-end gap-2 border-t border-[var(--border)] pt-4">
           <button
             type="button"
-            className="rounded-lg bg-[var(--text)] px-5 py-2.5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="button primary disabled:opacity-40"
             disabled={prompt.trim().length < 20 || isPending}
             onClick={generateReport}
           >
-            {isPending ? "Building report…" : "Build Decision Report"}
+            {isPending ? "Building report…" : "Generate"}
           </button>
           {isPending ? (
             <button type="button" className="min-h-11 px-3 text-[13px]" onClick={async () => {
