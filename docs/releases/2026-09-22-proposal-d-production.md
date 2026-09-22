@@ -1,77 +1,56 @@
 # Proposal D production rollout
 
-Status: PR #38 hosted acceptance in progress; bounded synthetic tests approved. The replacement design is Ready; AI response correction pending hosted verification. Google Analytics remains disabled. Production still runs PR #37.
+Status: **held for live AI acceptance**. [PR #38](https://github.com/Causent-AI/causent-ai/pull/38) implements the approved design. Production still runs PR #37. Google Analytics stays disabled.
 
-## Authority and baseline
+## Release identity
 
-The owner requested the approved Proposal D design in production, preserving the backend and deferring Google Analytics. This authorizes implementation, checks, a release PR, candidate deployment and production rollout. Production data is preserved; acceptance uses isolated synthetic records.
+| State | Verified value |
+| --- | --- |
+| Branch | `codex/proposal-d-production`, based on main `9dcc20b5c74ae0633f88fe077aacec6c93ed2638` |
+| Production / rollback | `app.causent.ai` → `dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`, source `9dcc20b` |
+| Rollback URL | `https://causent-izflytjml-adamdavidowens-1984s-projects.vercel.app` |
+| Last tested candidate | `dpl_3Lb92ScWUqwVBX86TjuPJVbtt1Xf`, source `ab606bd9ed19c53f3a4fe128d09915fc364a6093` — live generation failed |
+| Candidate URL | `https://causent-dsz9tpqnm-adamdavidowens-1984s-projects.vercel.app` |
+| Review alias | `causent-ai-adamdavidowens-1984s-projects.vercel.app`; verify the exact deployment before acceptance |
+| Supabase | `royftsqyawtyfjolfabd`, 47 migrations; no schema changes |
+| Workers | Source `906dd7a`; drift `dpl_CdKNvUQVm2RiGhH6tdQXyxhS8KBm`, recompute `dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4`, resolve `dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt` |
+| Exposure | Existing authenticated default-on with explicit rollback; no membership or assignment changes |
 
-- Branch: `codex/proposal-d-production`, based on merged main `9dcc20b5c74ae0633f88fe077aacec6c93ed2638` (#37).
-- Live baseline: `app.causent.ai` → `dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`, source `9dcc20b`.
-- Database: `royftsqyawtyfjolfabd`, 47 migrations. Existing workers from `906dd7a` remain.
-- Exposure: existing authenticated default-on with explicit rollback; no assignment changes planned.
-- Preserve unrelated untracked `docs/reviews/2026-09-07/ui-proposals/d/evidence/ai-instances-desktop.png` and `plugins/`.
+The owner authorized implementation, PR updates, candidates and production rollout after verification. Synthetic acceptance was limited to two isolated workspaces and six normal AI requests. All six have run; no further AI requests are authorized. Both test workspaces are archived. Unrelated prototype evidence and `plugins/` remain untouched.
 
-## Build plan
+## Product changes
 
-1. Shared branded shell: five pill tabs, folder/title synchronization, compact blue Create, yellow Ask, bottom Core Metrics and regular typography.
-2. Pageless reports and onboarding: existing protected persistence, section naming/addition, paragraph tools, charts, metric selection, impact commitments and editable draft actions. Active decisions retain immutable version history.
-3. Data Workshop: Metrics, Connections and AI; AI contains Connections, Harnesses and Cost. Keep unsupported providers visibly unconnected and GA4 disabled.
-4. Decision Network: real authorized project/decision nodes, linear dates, metric/period filters, zoom/pan and decision details. Never sum decision lifts into invented portfolio impact.
-5. Preserve Actions handoffs, completion/PR context and existing Impact models; keep all backend authorization and measurement contracts.
-
-## Verification and release
-
-Run focused contract tests, complete app/engine/integration gates, typecheck, lint and production build. Inspect desktop/mobile UI and real authenticated candidate flows with both existing and fresh accounts, two metrics, supporting actions and every Claude/Codex control. Compare navigation counters and existing-data digests. Publish concise PR/docs evidence, confirm the exact candidate, promote, verify the live alias and signed-in pages, and retain the baseline rollback artifact. Google Analytics provider acceptance remains deferred.
-
-## Design-fidelity correction
-
-The initial application port did not match the approved prototype closely enough. This correction restores its actual layout instead of treating shared colors as design acceptance.
-
-| Surface | Correction | Production behavior retained |
+| Surface | Implemented design | Retained behavior |
 | --- | --- | --- |
-| Shell | Approved logo/icons, five pills, compact blue Create, round yellow Ask, regular type | Verified account and workspace switching |
-| Data | Single metric library, L28 average and WoW columns, upload dialog, bottom history drawer | Authorized complete history, definition/scale checks and core selection |
-| Reports / onboarding | Inline library, one editing/chart/rewrite toolbar, continuous paragraphs, source dialog, Brief/Review flow | Saved revisions, immutable active plans, activation and explicit AI requests |
-| Actions / Impact | Compact expandable rows, four outcome tiles, action results table | Completion, PR links, partner handoffs and guarded ITS readouts |
-| Graph | Full dark canvas, linked metric node, project diamonds, dates, pan/zoom/Fit | Scoped real records, explicit version edges, no invented aggregate effect |
+| Shell | Approved logo, five pills, regular type, blue Create, yellow Ask, synchronized folder title, bottom Core Metrics | Verified account/workspace access |
+| Reports / onboarding | Pageless paragraphs, one formatting/chart/rewrite toolbar, editable section names, added notes, Brief/Review flow | Autosave, append-only revisions, explicit AI review and immutable active plans |
+| Data | Single metric library, L28 average and WoW, upload dialog, bottom history drawer; Connections and AI Harnesses/Cost | Actual imported observations, semantic definitions, core selection and supplied-rate estimates |
+| Actions / Impact | Compact expandable actions, PR links, four impact tiles and results table | Claude/Codex handoffs, completion and existing guarded ITS models |
+| Graph | Full dark Decision Network, core metric/project/decision nodes, chronological lanes, filters, pan/zoom/Fit | Authorized records and explicit version links; no invented aggregate effect |
 
-Calendar averages require complete windows. Missing dates and zero baselines produce no growth claim. The prototype’s sample costs, custom harness defaults/editing, automatic partner connections, portfolio creation and combined impact are not backed by production services; these are not simulated. GA4 remains a setup placeholder.
+Calendar summaries require complete windows. GA4/BigQuery setup, custom saved harnesses, automatic partner execution, portfolio creation and combined attribution are not simulated. GA4 provider acceptance remains deferred.
 
-Correction checks: **735 application/database tests, 1,338 engine/RLS/bridge tests, and 27 prototype/load tests pass**. Types, zero-warning lint, clean Node 22 build and six-route manifest checks pass. Desktop browser checks cover all five views and onboarding; the visible browser confirms Data, onboarding and Graph at 390px without page overflow. Upload/source dialogs and graph selection/Fit work. A local successor creation attempt correctly rejected an already-existing successor; this is not new-draft acceptance. Hosted write/AI acceptance remains pending.
+## Acceptance evidence
 
-## Earlier local evidence
+- **Local:** 742 application/database tests pass, with 19 optional paid-model tests skipped; no database skips. The prior full design run passed 1,338 engine/RLS/bridge and 27 prototype/load cases. Types and changed-file lint pass. Hosted CI on `ab606bd` passed all app/engine/RLS/bridge gates and both Vercel builds: [run 35784300322](https://github.com/Causent-AI/causent-ai/actions/runs/35784300322). The compact-response follow-up needs its own hosted checks.
+- **Both accounts:** normal Google sign-in, create/edit/autosave/reload/direct reopen, synchronized title, section rename, added note, observed chart, two selected metrics, three actions, activation and every Claude/Codex preview pass. Each account has one registered primary action, one supporting primary-metric action and one secondary monitoring action. No external handoff was executed.
+- **UI:** all five routes, source/upload dialogs, graph pointer/keyboard selection, metric filter and Fit pass. Data, Reports, onboarding and Graph were inspected at 390px without document overflow. Mobile viewport override was reset.
+- **Navigation invariants:** owner remained at 3 reports / 20 revisions / 2 activations / 6 actions / 2 predictions / 16 telemetry events. Fresh account remained at 4 / 12 / 2 / 7 / 2 / 22 during its navigation-only comparison. Both had zero recompute jobs and transitions; activation digests matched. Later explicit generation requests added only synthetic drafts/receipts.
+- **Original data:** counts and revision/activation/membership digests match before/after the entire run, excluding only the two authorized test scopes: 8 reports, 23 revisions, 6 activations, 17 predictions, 11 metrics, 1,504 observations, 244 evidence rows, 4 memberships and 1 active workspace. Both synthetic scopes are confirmed archived through the existing archive RPC; their audit records remain intact.
 
-- Application/integration: 731 passed, 19 optional paid-model tests skipped. All database cases ran against the isolated 47-migration stack; no database skips. The saved-layout metadata round trip is covered by the append-only persistence integration test.
-- Engine/RLS/bridge: 1,338 passed against the same isolated database.
-- Focused document/graph/source-link contracts: 36 passed. Types, lint, 12 prototype and 15 load-contract tests pass.
-- Browser: actual saved report opens in the pageless editor; title-to-folder sync, section rename, note addition and observation chart survive reload. Graph filtering, keyboard node details and zoom work. Phone onboarding at 390px revealed a navigation overflow; compact icon tabs with accessible names fix it.
-- Compatibility: the exact PR37 report validator accepts and preserves the additive top-level `documentLayout` field. Existing rich-text `presentation` stays unchanged. No database migration or worker redeployment is needed.
-- Scope: custom harness/runtime persistence, automatic partner execution and combined portfolio attribution remain future backend work and are visibly unconfigured. Existing manual handoffs and default Impact models are retained.
+## AI release blocker and correction
 
-[Engineering review](../reviews/2026-09-22/PRODUCTION_DESIGN_REVIEW.md).
+Six user-triggered requests cost **$0.1129 total**. Requests 1–3 returned malformed structured output. Request 4 successfully rewrote a paragraph on `6a4041c`; Keep and reload passed. Request 5 still failed full-report validation. Request 6 on `ab606bd` failed before generation: Claude Platform on AWS and Anthropic rejected the compiled grammar; Bedrock rejected forced native output and Vertex returned 400. Its existing automatic retry also failed; both gateway attempts cost $0. No failed response was represented as a successful AI result, and every brief was preserved.
 
-- Final local schema lint passed. The clean Node 22 webpack build and dashboard manifest check passed for all six authenticated routes, including Graph and onboarding; PDF worker files are traced in both report entry points. Reusing an old Next.js cache caused the first build failure; a clean generated cache resolved it.
-- Phone checks at 390 × 844: onboarding input, navigation, Core Metrics drawer, AI tabs and task-cost calculation pass; document and main width remain 390px. Temporary viewport override reset afterward.
+The final correction uses a **1,404-byte flat transport schema** instead of the original 6,666-byte nested provider schema. It describes a single repeated claim shape. A server adapter checks field names, action indexes, duplicates, cardinality and original value bounds, then constructs the unchanged canonical report. Existing materialization still verifies exact source quotes, removes invented numeric evidence and leaves unsupported owners/customers missing. The adapter does not alter persistence, auth, model choice, generation budgets or retry policy. Default provider mode is restored so Gateway can choose a compatible route.
 
-## Hosted acceptance
+Six transport tests cover mapping, provenance, malformed bindings, bounds, grammar size and an actual AI SDK mock-response conversion. These are local contract evidence, **not live Sonnet acceptance**. Full generation and rewriting must pass on the compact-schema candidate before release.
 
-- [PR #38](https://github.com/Causent-AI/causent-ai/pull/38), initial source `eced99b`: CI passed, including application, engine, RLS and bridge gates.
-- Initial candidate `dpl_5WNGA1zick92t4CAh7YngZ7VRawT` is Ready with production configuration and GA4 explicitly disabled. The CLI lost its polling connection; deployment inspection confirmed success. The live `app.causent.ai` alias was not moved.
-- Authentication uses the existing allowed `causent-ai-adamdavidowens-1984s-projects.vercel.app` address, verified against the candidate ID. No authentication settings changed.
-- Fresh-account sign-in reaches onboarding. Existing active report opens with both metrics, four actions, saved commitment and immutable state. All eight Claude/Codex handoff previews pass without copying or executing. Data, Reports, Actions, Impact and Graph load; mobile is 390px without document overflow. Core Metrics drawer, Ask navigation and user-entered cost calculation pass.
-- Graph keyboard selection, metric filtering and zoom pass. Pointer testing found a gap between the node and label; the follow-up adds one continuous hit area. Lint, types, graph tests and clean production build pass after the fix. A replacement candidate must verify pointer selection.
-- Automatic approval review blocked synthetic report generation because it creates persistent records and paid AI requests. Approval is pending for bounded acceptance in the two existing isolated test workspaces; promotion remains gated on completion. Those workspaces were temporarily restored using the existing operator archive RPC; no membership or rollout assignments changed.
-- Candidate `dpl_EjUyCX5vSrXR9x7kQcgWg9WQFATt` (`d6fa87e`) verifies the pointer fix. Both account OAuth flows pass; the existing account's three actions also pass all six handoff previews. Hosted CI run `35756274335` passes. Neither candidate recorded server errors; browser diagnostics show no application errors.
-- Read-only navigation preserves fresh-account counts: 3 reports, 7 revisions, 1 activation, 4 actions, 1 prediction, 17 telemetry events and zero transitions/recompute jobs. Original production counts and revision/activation/membership digests match before/after. Both test workspaces are archived again pending approval.
-- Real-workspace inspection found clustered dates overlapped node labels. Lane allocation now preserves chronological x coordinates while separating node hit areas, with regression coverage for date clusters and workspace separation. The final candidate must recheck this view before promotion.
+## Remaining release steps
 
-## Current acceptance gate
+1. Finish CI/build for the compact-schema commit and record its immutable candidate ID/source.
+2. Obtain a new bounded AI-request allowance; the six-request limit is exhausted. Restore only an isolated scope for normal generation/rewrite, confirm live mode, autosave and reload, then archive it again and compare invariants.
+3. Recheck exact source, candidate, production alias, unchanged database/workers, GA4-off setting and exposure. Merge #38 and explicitly promote only after acceptance passes.
+4. Verify the public alias and signed-in routes, all-action controls, error logs and worker health. Retain the baseline artifact for rollback; preserve schema and audit records.
 
-The owner approved six normal AI requests total, plus create/edit/activate tests in the two isolated workspaces. Five requests have run, costing $0.1129: three malformed responses, one successful rewrite that survived reload, and another malformed full report. Sonnet remains the model. No failed response was applied as a successful AI result.
-
-Both accounts pass report editing/reload, title synchronization, section rename, added notes, observed-data charts, two-metric selection, three-action activation and all six Claude/Codex handoff previews per account. Navigation preserves fresh-account report, revision, activation, action, prediction, telemetry and job counters. Mobile Data and Graph work at 390px without page overflow. Original production counts and revision/activation/membership digests remain unchanged.
-
-The native provider rejected the original nullable schema as too complex. JSON-tool mode removed that routing error and passed rewriting, but still returned a malformed full report. The correction now reduces nullable object branches using equivalent empty missing claims, removes unsupported provider-side bounds, and restores native structured output. Local validation enforces the original bounds; report persistence, provenance, budgets and retry policy are preserved. Three new regression cases cover grammar complexity, missing-claim equivalence and local bounds.
-
-Candidate `dpl_GPHaW5KhnmdfjCPdBpRWyPdzksQX` from `6a4041c` is Ready and CI `35782083936` passes, but its full-report generation failed acceptance. One approved AI request remains for the simplified-schema candidate. Both isolated scopes remain temporarily restored. Production stays on `dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`; archive the test scopes after acceptance and merge/promote only when the remaining release gate passes.
+[Engineering review](../reviews/2026-09-22/PRODUCTION_DESIGN_REVIEW.md) · [GA4 handoff](../handoffs/ga4-core-metrics.md) · [prior production infrastructure record](2026-09-22-production.md).

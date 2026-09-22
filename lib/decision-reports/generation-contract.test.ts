@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { JSONSchema7 } from "ai";
 
 import {
   INITIAL_PROMPT_SOURCE_ID,
-  MODEL_DECISION_REPORT_JSON_SCHEMA,
-  PROVIDER_DECISION_REPORT_JSON_SCHEMA,
   createSafeFallbackReport,
   materializeModelDecisionReport,
   recoverStringifiedModelDecisionReportDraft,
@@ -85,48 +82,6 @@ function draft(): ModelDecisionReportDraft {
 test("model draft validation rejects malformed structured output", () => {
   const result = validateModelDecisionReportDraft({ title: "Incomplete" });
   assert.equal(result.success, false);
-});
-
-test("native provider grammar stays bounded without changing the report schema", () => {
-  let unions = 0;
-  function inspect(schema: JSONSchema7) {
-    assert.equal(schema.maxLength, undefined);
-    assert.equal(schema.maxItems, undefined);
-    if (Array.isArray(schema.type)) {
-      unions += 1;
-      assert.deepEqual(schema.type, ["number", "null"]);
-    }
-    if (schema.type === "object") {
-      assert.equal(schema.additionalProperties, false);
-      assert.deepEqual(schema.required?.slice().sort(), Object.keys(schema.properties ?? {}).sort());
-    }
-    for (const child of Object.values(schema.properties ?? {})) {
-      if (typeof child === "object") inspect(child);
-    }
-    if (schema.items && typeof schema.items === "object" && !Array.isArray(schema.items)) inspect(schema.items);
-  }
-  inspect(PROVIDER_DECISION_REPORT_JSON_SCHEMA);
-  assert.equal(unions, 2);
-  assert.match(JSON.stringify(MODEL_DECISION_REPORT_JSON_SCHEMA), /"type":\["object","null"\]/);
-});
-
-test("empty missing claims preserve the nullable report's persisted meaning", () => {
-  const original = draft();
-  original.decision.background = null;
-  original.implementation.actions[0].owner = null;
-  original.implementation.governance = null;
-  const native = structuredClone(original);
-  native.decision.background = claim("", "missing");
-  native.implementation.actions[0].owner = claim("", "missing");
-  native.implementation.governance = {
-    dataClassification: "unspecified", allowedDataSources: [], approvedModelNotes: [],
-  };
-  assert.equal(validateModelDecisionReportDraft(native).success, true);
-  const corpus = createReportSourceCorpus(PROMPT);
-  assert.deepEqual(
-    materializeModelDecisionReport(native, corpus, { idFactory: () => "stable" }),
-    materializeModelDecisionReport(original, corpus, { idFactory: () => "stable" }),
-  );
 });
 
 test("local validation enforces bounds omitted from the provider grammar", () => {

@@ -223,33 +223,6 @@ export const MODEL_DECISION_REPORT_JSON_SCHEMA: JSONSchema7 = {
   ],
 };
 
-function providerSchema(schema: JSONSchema7): JSONSchema7 {
-  const result = { ...schema };
-  // Nullable objects multiply the provider's grammar states. Missing claims have
-  // an equivalent, already supported representation: kind=missing, empty text.
-  if (Array.isArray(result.type) && result.type.includes("object")) {
-    result.type = "object";
-  }
-  // These bounds are not supported by Anthropic's native structured output.
-  // Report validation and materialization still enforce the application contract.
-  delete result.minLength;
-  delete result.maxLength;
-  delete result.minimum;
-  delete result.maximum;
-  delete result.maxItems;
-  if (result.properties) {
-    result.properties = Object.fromEntries(Object.entries(result.properties).map(([key, value]) =>
-      [key, typeof value === "object" ? providerSchema(value) : value],
-    ));
-  }
-  if (result.items && typeof result.items === "object" && !Array.isArray(result.items)) {
-    result.items = providerSchema(result.items);
-  }
-  return result;
-}
-
-export const PROVIDER_DECISION_REPORT_JSON_SCHEMA = providerSchema(MODEL_DECISION_REPORT_JSON_SCHEMA);
-
 function withinSchemaBounds(value: unknown, schema: JSONSchema7): boolean {
   if (typeof value === "string") {
     const length = [...value].length;
