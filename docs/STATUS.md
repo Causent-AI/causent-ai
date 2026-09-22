@@ -16,12 +16,15 @@ generation, autosave and reload passed for $0.0231. Gateway recovered through Be
 two provider schema-size rejections; schema simplification remains a reliability follow-up.
 The Reports metric-label fix and navigation pass on candidate `239a245`. The final candidate
 `e6fe2c8` adds a Google account chooser after repeated login reused the old browser session;
-its chooser, security headers, hosted CI and both previews pass. Real new-account creation
-and isolated member provisioning passed in Chrome. Fresh-account report/activation acceptance
-awaits the owner completing Google sign-in in the connected preview. #36's parent
+its chooser, security headers, hosted CI and both previews pass. Fresh-account OAuth,
+live generation, autosave/reload, two CSV metrics, four-action activation and all eight
+Claude/Codex previews now pass on that candidate. One earlier AI response failed validation
+and preserved the brief as a safe fallback; a normal retry passed. Both synthetic workspaces
+are archived, with original data/audit digests unchanged. #37 is ready for final review and
+merge with GA4 disabled; post-merge deployment verification remains required. #36's parent
 conflict was resolved with an identical reviewed tree; fresh CI passed and #36 is merged
 as `87d3128`. Its automatic deployment is now on `app.causent.ai`; signed-in Impact
-loads successfully. #37 remains a draft targeting main. See the
+loads successfully. #37 targets main. See the
 [release record](releases/2026-09-22-production.md) for exact IDs, security findings and rollback.
 The dated entries below describe earlier checkpoints, not the current production state.
 

@@ -26,7 +26,7 @@ Gateway recovered through Bedrock after Claude Platform on AWS and direct Anthro
 rejected the compiled output grammar. Record schema simplification as a reliability
 follow-up; do not claim every provider route passed. No model or routing setting changed.
 The Reports metric-name fix is verified on candidate `239a245`, with saved content, all six handoffs and unchanged counters; production still serves #36. Fresh-account
-application acceptance remains unverified and unwaived. #36 merged as `87d3128`; do not merge #37 for the user.
+application acceptance now passes on the final candidate as detailed below. #36 merged as `87d3128`; do not merge #37 for the user.
 
 Use the [release manifest](../docs/releases/2026-09-22-production.md) for exact deployment
 IDs, security findings, rollback and cleanup. Preserve the current workers/additive
@@ -41,11 +41,22 @@ The connected browser retained the original Google session. Source `e6fe2c8` fix
 reuse by requesting `prompt=select_account`; local checks, hosted CI run `35696751128` and
 both previews pass. Candidate `dpl_B4zioUX25QJiujFjPvty4eD8aew1` has verified source metadata,
 passing headers and a visible Google account chooser. Its exact callback is the third
-temporary allowlist entry; production still serves #36. The owner has been handed the
-normal Google password step for the test identity. No new-account report or activation
-has been tested yet. Retain both isolated workspaces and their audit history; archive
-the fresh-account workspace after acceptance. Remove the three temporary callbacks only
-after acceptance and any rollback retest are complete.
+temporary allowlist entry; production still serves #36. The owner completed normal Google
+OAuth, and the connected candidate session has only the isolated workspace. Generation
+returned a safe fallback once, then a normal retry passed in 10.204 seconds (4,876 input /
+1,080 output tokens, one application attempt, released slot). Keep the schema-validation
+failure visible in the reliability backlog; no model/routing change was made.
+
+Fresh report `0c694a3e-1adf-4035-b8eb-d7eb2f3b5a55` passed title/commitment persistence,
+two CSV uploads (100 rows), four-action activation, a secondary-metric support action and
+all eight Claude/Codex previews. Data/Reports/Actions/Impact and the canonical metric label
+pass; no measured outcome or external export is claimed. Browser logs are clean. Navigation
+left three reports, seven revisions, one activation, four actions, one prediction, 16 funnel
+events and zero transitions/recompute jobs unchanged; activation digest matched.
+Both synthetic workspaces are archived with audit history intact. All pre-existing production
+counts and revision/activation/membership digests still match. Candidate acceptance is complete;
+the user merges #37 after final checks. Verify the automatic deployment and signed-in alias
+before removing the three temporary callbacks. No merge or promotion was performed here.
 
 Operational note: a failed archive export briefly created an empty Vercel project named
 `app-account-chooser`; it was removed completely. The final export excludes repository

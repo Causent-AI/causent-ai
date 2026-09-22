@@ -6,10 +6,11 @@
 - [x] Fix the candidate OAuth return with its exact allowed callback; verify existing-account navigation, six handoff previews, GA4 placeholder, logs and unchanged data.
 - [x] Verify new-report autosave/reopen, two uploaded metrics, secondary-metric action, activation and all six handoff previews; archive the isolated synthetic workspace and preserve original production data.
 - [x] Verify live Sonnet 5 generation after the owner added Gateway credits; draft autosave/reload passes, cost $0.0231.
-- [ ] Simplify the report output schema and test direct Anthropic / Claude Platform on AWS; both rejected its compiled grammar, while Gateway recovered successfully through Bedrock.
+- [ ] Improve structured-output reliability: simplify/test the schema across provider routes and investigate malformed output. Two providers rejected the compiled grammar; one fresh-account response failed validation safely, then a normal retry passed.
 - [x] Verify the activated Reports metric-label fix, navigation and all six handoff previews on candidate `239a245`.
 - [x] Verify new-account creation and isolated member provisioning; fix silent Google-account reuse and verify the chooser on candidate `e6fe2c8`, with hosted checks passing.
-- [ ] Finish fresh-account browser acceptance on the final candidate; then ready #37 for the user to merge and promote. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
+- [x] Finish fresh-account candidate acceptance: real OAuth, generation, saved edits/reload, two uploaded metrics, four-action activation, eight handoff previews, route continuity and unchanged navigation counters; archive the synthetic workspace.
+- [ ] User merges #37; verify its automatic deployment, alias and signed-in behavior, then remove the three temporary candidate callbacks. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
 - [ ] Resolve the existing hosted leaked-password protection warning; email/password auth is enabled.
 - [x] Remove the new `causent-release-20260922` rehearsal branch after retaining its evidence; leave the older preflight branch alone.
 

@@ -175,7 +175,7 @@
     "source": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
     "ga4Enabled": false,
     "promoted": false,
-    "authentication": "Google account chooser verified; authenticated acceptance pending on this candidate. Historical accepted deployments are identified below.",
+    "authentication": "Real fresh-account Google OAuth returned to this candidate; only the isolated member workspace was accessible. Existing-account acceptance passed on the prior runtime-equivalent candidate.",
     "existingAccountChecks": {
       "onboarding": true,
       "dataWorkshop": true,
@@ -205,7 +205,7 @@
       "revisions": true,
       "workspaces": true
     },
-    "freshAccountActivation": "pending browser acceptance; new account created in Chrome, connected browser awaits the owner at the Google password step",
+    "freshAccountActivation": "passed on e6fe2c8; two metrics, four actions, eight handoff previews",
     "syntheticActivation": {
       "workspaceId": "b1af84ee-ca9e-46fc-9943-99dc8ebb3f07",
       "reportId": "1f1fabb0-5bd2-4696-a403-ac4ee7da8667",
@@ -350,7 +350,8 @@
       "typecheck": true,
       "lint": true,
       "webpackBuildNode22": true,
-      "dashboardBuildContract": true
+      "dashboardBuildContract": true,
+      "normalOAuthReturnedToCandidate": true
     },
     "freshAccountSignup": {
       "accountCreated": true,
@@ -361,9 +362,70 @@
       "membershipCount": 1,
       "explicitRolloutAssignments": 0,
       "workspaceProvisionedEmpty": true,
-      "archived": false,
+      "archived": true,
       "preexistingProductionCountsAndDigestsUnchanged": true,
-      "browserAcceptancePassed": false
+      "browserAcceptancePassed": true
+    },
+    "freshAccountAcceptance": {
+      "verifiedDeploymentId": "dpl_B4zioUX25QJiujFjPvty4eD8aew1",
+      "source": "e6fe2c80641389f9ea683db73ad4524ad8e13e1d",
+      "workspaceId": "ef921cfb-87ed-4669-9047-c108ef38e5a6",
+      "reportId": "0c694a3e-1adf-4035-b8eb-d7eb2f3b5a55",
+      "oauthReturnedToCandidate": true,
+      "onlyIsolatedWorkspaceAccessible": true,
+      "liveGenerationReceipt": {
+        "created_at": "2026-09-22 07:15:58.722516+00",
+        "finished_at": "2026-09-22 07:16:09.026857+00",
+        "generation_mode": "live",
+        "request_id": "c2563150-ba97-4aa7-84fd-35111a237c5f",
+        "slot_released": true,
+        "status": "completed",
+        "telemetry": {
+          "attempts": 1,
+          "inputTokens": 4876,
+          "latencyMs": 10204,
+          "model": "anthropic/claude-sonnet-5",
+          "outputTokens": 1080,
+          "totalTokens": 5956
+        }
+      },
+      "previousValidationFailure": "bc691001-c583-49a6-83d2-f76e011d959a safely returned fallback; normal retry passed, reliability follow-up remains",
+      "autosaveReloadAndDirectReopen": true,
+      "editedTitlePersisted": true,
+      "commitmentAndMetricBindingsPersisted": true,
+      "metrics": 2,
+      "observations": 100,
+      "actions": 4,
+      "secondaryMetricSupportAction": true,
+      "claudeAndCodexPreviews": 8,
+      "exportedHandoff": false,
+      "dataReportsActionsImpact": true,
+      "canonicalMetricLabelCorrect": true,
+      "primaryVersusMonitoringLanguage": true,
+      "noMeasuredOutcomeClaimed": true,
+      "browserWarningOrErrorCount": 0,
+      "candidateLogSample": {
+        "records": 100,
+        "levels": [
+          "info"
+        ]
+      },
+      "navigationCountersBeforeAndAfter": {
+        "actions": 4,
+        "activation_digest": "1e3fe5bb49a968e1cf93cfbbc3d3095b",
+        "activations": 1,
+        "predictions": 1,
+        "recompute_jobs": 0,
+        "recompute_requested": null,
+        "reports": 3,
+        "revisions": 7,
+        "telemetry": 16,
+        "transitions": 0
+      },
+      "navigationCountersUnchanged": true,
+      "preexistingProductionCountsAndDigestsUnchanged": true,
+      "archived": true,
+      "earlierUserDraftAndFallbackPreserved": true
     }
   },
   "rehearsalBranchDeleted": true,
@@ -407,5 +469,7 @@
     ],
     "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback",
     "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-2oidideiw-adamdavidowens-1984s-projects.vercel.app/auth/callback"
-  }
+  },
+  "releaseVerdict": "READY_TO_PROMOTE; user merge and post-merge source/alias/signed-in verification remain",
+  "temporaryCallbackCleanup": "After post-merge production acceptance; preserve existing allowlist entries."
 }

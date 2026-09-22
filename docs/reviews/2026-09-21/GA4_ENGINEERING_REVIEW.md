@@ -2,6 +2,11 @@
 
 ## Overview
 
+Release update, September 22: infrastructure is applied, both existing- and fresh-account
+candidate acceptance pass, and GA4 remains disabled. See the [current release record](../../releases/2026-09-22-production.md)
+for merge readiness, the structured-output reliability follow-up and remaining deployment
+checks. The original submission assessment below records the September 21 checkpoint.
+
 The next implementation slice connects customer GA4 daily observations to Causent's existing metric and analysis contracts. Data Workshop now has an admin-only connection, preview/import and sync/disconnect flow. Credentials and provider writes stay behind dedicated server/database boundaries. The analysis models are unchanged; property-local dates and provenance now survive the pipeline.
 
 Submission: [draft PR #37](https://github.com/Causent-AI/causent-ai/pull/37), implementation `1bea0928e0be0c8e77e8c8c674a5880a596c63b0`. Hosted results are attached to the PR head.

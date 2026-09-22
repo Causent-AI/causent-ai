@@ -1,6 +1,6 @@
 # Production release · 2026-09-22
 
-Status: **existing-account activation, paid Sonnet 5 generation and new-account creation passed. Fresh-account browser acceptance remains open.**
+Status: **READY_TO_PROMOTE — candidate acceptance passed for existing and fresh accounts. The user can merge #37 after its final documentation checks pass; production alias verification remains required.**
 
 ## Scope and source
 
@@ -8,7 +8,7 @@ Authorized: required migrations, matching workers, candidate verification and pr
 
 Application candidate source: `e6fe2c80641389f9ea683db73ad4524ad8e13e1d` adds explicit Google account selection and includes the earlier Reports metric-label fix (`239a245`). Local verification passed: 678 app tests with 67 environment/optional skips, typecheck, zero-warning lint, Node 22 webpack build and the dashboard build contract. [Hosted CI on `e6fe2c8`](https://github.com/Causent-AI/causent-ai/actions/runs/35696751128) and both previews passed: 726 app tests, 19 optional live-model skips, 1,338 engine tests, 12 prototype tests, 15 load contracts, schema/worker gates and production build. Worker source remains `906dd7ab2b2f57e33e1db7367b256b735d1ebd11`. The unrelated untracked `ai-instances-desktop.png` is excluded.
 
-The user merged [#35](https://github.com/Causent-AI/causent-ai/pull/35) as `3b25913c0a2ce699157f734d08fc77673e2e6e30`. [#36](https://github.com/Causent-AI/causent-ai/pull/36) was retargeted to main; merge commit `961025a` resolves the squashed-parent conflicts with a tree identical to reviewed `01535f2`. [Fresh checks](https://github.com/Causent-AI/causent-ai/actions/runs/35680481325) passed and #36 merged as `87d3128d04bd0e93a618d40400ff9b4af84cf564`. [#37](https://github.com/Causent-AI/causent-ai/pull/37) remains a draft, now targeting main. Main merges trigger Vercel automatically; no manual production pull is needed.
+The user merged [#35](https://github.com/Causent-AI/causent-ai/pull/35) as `3b25913c0a2ce699157f734d08fc77673e2e6e30`. [#36](https://github.com/Causent-AI/causent-ai/pull/36) was retargeted to main; merge commit `961025a` resolves the squashed-parent conflicts with a tree identical to reviewed `01535f2`. [Fresh checks](https://github.com/Causent-AI/causent-ai/actions/runs/35680481325) passed and #36 merged as `87d3128d04bd0e93a618d40400ff9b4af84cf564`. [#37](https://github.com/Causent-AI/causent-ai/pull/37) targets main. Main merges trigger Vercel automatically; no manual production pull is needed.
 
 ## Released infrastructure
 
@@ -23,7 +23,7 @@ The user merged [#35](https://github.com/Causent-AI/causent-ai/pull/35) as `3b25
 | GA4 | Candidate build/runtime flag explicitly `0`; production has zero connections and credentials |
 | Report exposure | Existing `default-on-with-explicit-rollback` resolver; one enabled assignment, no assignment changes |
 
-Candidate: [immutable preview](https://causent-2oidideiw-adamdavidowens-1984s-projects.vercel.app). Earlier candidates `906dd7a` and `239a245` supplied the activation, corrected-label and paid-generation evidence below. The final candidate changes only the login account prompt; its browser chooser and security headers pass, while authenticated application acceptance remains pending. The live alias is still on #36.
+Candidate: [immutable preview](https://causent-2oidideiw-adamdavidowens-1984s-projects.vercel.app). Earlier candidates `906dd7a` and `239a245` supplied existing-account activation, corrected-label and paid-generation evidence. The final candidate adds only the login account prompt; its fresh-account generation, uploads, activation, eight handoffs and route continuity now pass. The live alias is still on #36.
 
 ## Database and security evidence
 
@@ -88,18 +88,33 @@ explicit rollout assignments. The new workspace is `ef921cfb-87ed-4669-9047-c108
 workflow. Pre-existing data counts and report/activation/membership digests are unchanged.
 The existing owner retains an administrative membership for test cleanup.
 
-The connected browser still held the original Google session. Repeated sign-in reused it
-without a choice, so source `e6fe2c8` adds `prompt=select_account` to the existing Supabase
-OAuth request. On the final candidate, Google now shows **Choose an account** and **Use
-another account**. The test address is at the normal Google password step, handed to the
-owner. No Google account-management settings, credentials, auth bypass, or model settings
-were changed. Only this candidate's exact callback was added to the existing allowlist;
-the production Site URL and other auth settings are unchanged.
+The connected browser initially reused the original Google session. Source `e6fe2c8` adds
+`prompt=select_account` to the existing Supabase OAuth request. The chooser works, and the
+new member completed normal OAuth back to the candidate with access only to the isolated
+workspace. No credentials, auth bypass or model settings were changed. The exact candidate
+callback is allowed; the production Site URL and other auth settings are unchanged.
 
-New-account creation and scoped provisioning have passed; fresh-account report creation,
-activation and handoff acceptance remain pending and are not waived. Automated tests cover
-the enabled/unassigned/disabled/unavailable rollout matrix and secondary-metric handoff
-assembly. Live Google Analytics property acceptance remains deferred while GA4 stays disabled.
+The first agent-run generation returned malformed structured output and safely preserved
+the brief as an editable fallback. A normal retry completed live with Sonnet 5 in 10.204
+seconds: 4,876 input / 1,080 output tokens, one application attempt, released request slot
+(`c2563150-ba97-4aa7-84fd-35111a237c5f`). This proves recovery, not elimination of the earlier
+schema-validation failure; improving structured-output reliability remains a follow-up.
+
+Report `0c694a3e-1adf-4035-b8eb-d7eb2f3b5a55` preserved the edited title, selected metrics,
+action bindings and commitment across reload/direct reopen. Two normal CSV uploads added
+100 synthetic observations. **Start** activated all four actions, including the support
+action assigned to the secondary metric. All eight Claude/Codex previews showed the correct
+action; nothing was exported. Data, Reports and Impact showed the same report and metrics,
+the correct canonical metric label, a planned target and no measured outcome. Browser
+warning/error logs were empty; the final 100 candidate log records were informational.
+
+Navigation and preview checks left three reports, seven revisions, one activation, four
+actions, one prediction, 16 funnel events and zero transition/recompute jobs unchanged.
+The activation digest also matched. The test workspace is archived, retaining both metrics,
+all 100 observations, the user's earlier draft and the fallback report. All pre-existing
+production counts and revision/activation/membership digests match the pre-test baseline.
+Automated tests additionally cover disabled/unavailable exposure and stale/foreign bindings.
+Real Google Analytics property acceptance remains deferred while GA4 stays disabled.
 
 ## Rollback and next steps
 
@@ -107,6 +122,8 @@ Keep the additive database schema, audit records and current worker set. The ret
 
 The new rehearsal branch was deleted after its aggregate [evidence](2026-09-22-evidence.json) was retained. The older preflight branch was left untouched.
 
-Next: complete fresh-account browser acceptance on `e6fe2c8` (or record an explicit deferral). Then finish #37, verify the final source, promote, prove alias identity and repeat signed-in checks. Founder/partner and representative-load validation remain separate gates.
+Next: the user merges #37 after final checks. Verify the resulting automatic deployment,
+exact source and production alias, then repeat signed-in checks. No manual production pull
+is needed. Founder/partner and representative-load validation remain separate gates.
 
 Remove all three temporary exact preview callbacks after release acceptance and any rollback retest are complete; preserve the pre-existing allowlist entries. Final PR merge and application promotion remain with the user/operator.
