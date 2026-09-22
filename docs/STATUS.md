@@ -9,8 +9,11 @@ update restored the live app's signed-in Data, Reports, Actions and Impact route
 
 The final #37 application candidate is Ready, with GA4 explicitly off, but has not been
 promoted. A narrow Supabase callback allowlist fix now keeps sign-in on the candidate.
-Existing-account Data/Reports/Actions/Impact checks, all six handoff previews, unchanged
-report/audit counters and candidate error logs pass. New-account/new-activation acceptance
+Existing-account navigation and a new report with two uploaded metrics, three actions,
+activation and all six handoff previews pass. The synthetic workspace is archived; original
+data counts/digests are unchanged. AI generation is blocked: the Gateway free plan excludes
+the configured Claude Sonnet 5 model. Paid Gateway credits and a successful retry are needed.
+The Reports metric-label fix and navigation pass on updated candidate `239a245`; fresh-account acceptance
 remains open pending an explicit scope decision. #36's parent
 conflict was resolved with an identical reviewed tree; fresh CI passed and #36 is merged
 as `87d3128`. Its automatic deployment is now on `app.causent.ai`; signed-in Impact

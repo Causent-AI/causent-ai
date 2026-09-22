@@ -4,7 +4,10 @@
 
 - [x] Rehearse and apply migrations 43–47; preserve report/audit/membership invariants, promote matching workers and verify live authenticated requests to all three.
 - [x] Fix the candidate OAuth return with its exact allowed callback; verify existing-account navigation, six handoff previews, GA4 placeholder, logs and unchanged data.
-- [ ] Complete or explicitly defer the fresh-account/new-activation gate; then finish #37 and promote the final app. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
+- [x] Verify new-report autosave/reopen, two uploaded metrics, secondary-metric action, activation and all six handoff previews; archive the isolated synthetic workspace and preserve original production data.
+- [ ] Add paid Gateway credits for the configured Claude Sonnet 5 model, then verify real AI generation; current free-plan requests return 403.
+- [x] Verify the activated Reports metric-label fix, navigation and all six handoff previews on candidate `239a245`.
+- [ ] Complete or explicitly defer fresh-account acceptance; then finish #37 and promote the final app. [Release evidence and rollback](docs/releases/2026-09-22-production.md).
 - [ ] Resolve the existing hosted leaked-password protection warning; email/password auth is enabled.
 - [x] Remove the new `causent-release-20260922` rehearsal branch after retaining its evidence; leave the older preflight branch alone.
 

@@ -1,5 +1,5 @@
 {
-  "runtimeSource": "906dd7ab2b2f57e33e1db7367b256b735d1ebd11",
+  "runtimeSource": "239a245b852f70f841101afce0532c07be5210b4",
   "productionProject": "royftsqyawtyfjolfabd",
   "migrationCountBefore": 42,
   "migrationCountAfter": 47,
@@ -171,8 +171,8 @@
     "existingAccountImpact": "passed"
   },
   "candidate": {
-    "deploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu",
-    "source": "906dd7ab2b2f57e33e1db7367b256b735d1ebd11",
+    "deploymentId": "dpl_BNr2Rqugsjmp5AkhveamFFVRH4r2",
+    "source": "239a245b852f70f841101afce0532c07be5210b4",
     "ga4Enabled": false,
     "promoted": false,
     "authentication": "passed: fresh OAuth returned to the immutable candidate onboarding",
@@ -187,7 +187,8 @@
       "ga4ConnectAbsent": true,
       "claudeAndCodexPreviews": 6,
       "exportedReportData": false,
-      "errorLogRecords": 0
+      "errorLogRecordsDuringReadOnlyChecks": 0,
+      "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
     },
     "navigationInvariantsPreserved": {
       "activation_digest": true,
@@ -204,7 +205,77 @@
       "revisions": true,
       "workspaces": true
     },
-    "freshAccountActivation": "not exercised; scope decision pending"
+    "freshAccountActivation": "not exercised; scope decision pending",
+    "syntheticActivation": {
+      "workspaceId": "b1af84ee-ca9e-46fc-9943-99dc8ebb3f07",
+      "reportId": "1f1fabb0-5bd2-4696-a403-ac4ee7da8667",
+      "existingAccount": true,
+      "freshAccount": false,
+      "archived": true,
+      "originalWorkspaceSelectionRestored": true,
+      "autosaveAndDirectReopen": true,
+      "paragraphAndTitleEdits": true,
+      "csvUploadThroughAuthenticatedUi": true,
+      "metrics": 2,
+      "observations": 100,
+      "actions": 3,
+      "secondaryMetricSupportAction": true,
+      "claudeAndCodexPreviews": 6,
+      "exportedHandoff": false,
+      "browserWarningsOrErrors": 0,
+      "navigationCountersBeforeAndAfter": {
+        "actions": 3,
+        "activation_digest": "dc143a3b8b32b1f9bf41d28bf7787815",
+        "activations": 1,
+        "predictions": 1,
+        "recompute_jobs": 0,
+        "recompute_requested": null,
+        "reports": 1,
+        "revisions": 8,
+        "telemetry": 5,
+        "transitions": 0
+      },
+      "navigationCountersUnchanged": true,
+      "preexistingProductionCountsAndDigestsUnchanged": true,
+      "durableResidue": "Archived synthetic workspace, organization/project, owner membership, report/revisions, activation, metrics/observations, actions, prediction and audit receipts retained.",
+      "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
+    },
+    "aiGeneration": {
+      "passed": false,
+      "safeFallbackPreservedBrief": true,
+      "model": "anthropic/claude-sonnet-5",
+      "providerStatus": 403,
+      "attempts": 2,
+      "tokens": 0,
+      "costUsd": 0,
+      "gatewayRequestId": "gen_01M33NQHB3XRT90AERFN09W9T9",
+      "cause": "Team Gateway plan excludes the configured model; free credit does not cover it.",
+      "userAction": "Add paid Gateway credits, then rerun generation.",
+      "modelChanged": false,
+      "verifiedDeploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu"
+    },
+    "priorAcceptedDeployment": {
+      "id": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu",
+      "source": "906dd7ab2b2f57e33e1db7367b256b735d1ebd11",
+      "acceptance": "Existing-account navigation and synthetic multi-metric activation; Gateway AI generation blocked."
+    },
+    "updatedCandidateChecks": {
+      "verifiedDeploymentId": "dpl_BNr2Rqugsjmp5AkhveamFFVRH4r2",
+      "authentication": true,
+      "correctActivatedMetricLabel": true,
+      "savedReportDirectOpen": true,
+      "dataWorkshop": true,
+      "ga4SetupPlaceholder": true,
+      "ga4ConnectAbsent": true,
+      "reports": true,
+      "actions": true,
+      "impact": true,
+      "claudeAndCodexPreviews": 6,
+      "browserWarningsOrErrors": 0,
+      "navigationCountersUnchanged": true,
+      "productionAliasUnchanged": true,
+      "aiGenerationRetried": false
+    }
   },
   "rehearsalBranchDeleted": true,
   "authRedirectFix": {
@@ -216,5 +287,26 @@
     ],
     "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**",
     "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback"
+  },
+  "reportMetricLabelFix": {
+    "reason": "Activated report still displayed original draft metric name.",
+    "updatedCandidateVerified": true,
+    "source": "239a245b852f70f841101afce0532c07be5210b4",
+    "localTestsPassed": 678,
+    "localTestsSkipped": 67,
+    "typecheck": true,
+    "lint": true,
+    "webpackBuildNode22": true,
+    "dashboardBuildContract": true
+  },
+  "updatedCandidateAuthRedirect": {
+    "project": "royftsqyawtyfjolfabd",
+    "added_callback": "https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "site_url_unchanged": true,
+    "changed_fields": [
+      "uri_allow_list"
+    ],
+    "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback,https://causent-f56u3hia4-adamdavidowens-1984s-projects.vercel.app/auth/callback"
   }
 }
