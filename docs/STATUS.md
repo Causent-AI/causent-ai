@@ -6,7 +6,10 @@
 GA01–GA04 are implemented behind `CAUSENT_GA4_ENABLED` (off by default): admin OAuth,
 property preview/import, daily sync, private encrypted credentials, core metric selection
 and existing analysis with property-local dates/provenance. Source/local SEC01 review
-patched vulnerable dependencies and added frontend protections.
+patched vulnerable dependencies and added frontend protections. Hosted CI passed with
+726 app tests (19 optional skips), 1,338 engine tests and both preview builds. Read-only
+hosted catalog/Storage checks passed; 33 advisor warnings are documented for deployment
+follow-through.
 
 See the [engineering review](reviews/2026-09-21/GA4_ENGINEERING_REVIEW.md),
 [security findings](reviews/2026-09-21/SECURITY_REVIEW.md),

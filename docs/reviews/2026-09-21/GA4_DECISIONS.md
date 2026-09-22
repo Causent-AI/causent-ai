@@ -27,6 +27,8 @@ The first review found the UTC assumption, so timezone handling was corrected th
 
 The dependency scan changed the package scope: Next/ESLint, Tiptap, Sharp, Undici, PostCSS and affected utilities were patched. Both packaged editors were rebuilt so the static proposals did not retain the vulnerable code. These are source fixes awaiting release, not a claim that production is already patched.
 
+The hosted check subsequently confirmed RLS, security-invoker views and private image-bucket settings, but returned 32 privileged-RPC warnings and disabled leaked-password protection. The decision was to document the actual deployed state and require targeted review/configuration follow-through, rather than blindly revoke application permissions or change production during a PR task.
+
 ## Decisions still requiring external evidence
 
 A consenting GA4 property must pass a date/value comparison and refresh/disconnect acceptance. Operators must verify hosted grants/API exposure, auth/Storage/CORS settings, environment separation, scheduled runtime support and key/token rotation. No release date, broad enablement or production migration is approved by this decision record.

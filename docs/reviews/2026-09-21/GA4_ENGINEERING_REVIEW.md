@@ -6,7 +6,7 @@ The next implementation slice connects customer GA4 daily observations to Causen
 
 Submission: [draft PR #37](https://github.com/Causent-AI/causent-ai/pull/37), implementation `1bea0928e0be0c8e77e8c8c674a5880a596c63b0`. Hosted results are attached to the PR head.
 
-Baseline: `01535f2`, parent [PR #36](https://github.com/Causent-AI/causent-ai/pull/36). This delivery is implemented and locally tested, with hosted checks attached to the submitted draft PR. It is not merged, enabled or deployed to production. Real Google consent/property acceptance remains pending operator setup.
+Baseline: `01535f2`, parent [PR #36](https://github.com/Causent-AI/causent-ai/pull/36). This delivery is implemented and locally tested, with [full hosted CI](https://github.com/Causent-AI/causent-ai/actions/runs/35674382314) and both previews passing on `d0c431c`. Subsequent evidence-only commits are tracked on the PR. It is not merged, enabled or deployed to production. Real Google consent/property acceptance remains pending operator setup.
 
 ## Executive summary
 
@@ -14,7 +14,7 @@ Baseline: `01535f2`, parent [PR #36](https://github.com/Causent-AI/causent-ai/pu
 - **GA02:** Encrypted private credentials, tenant-scoped metadata, immutable mappings/receipts and a dedicated RPC-only worker role implemented; real database/Data API denial checks pass.
 - **GA03:** Complete bounded imports, property-local backfill/overlap, leases, retries and disconnect invalidation implemented. Concurrent claims and atomic rollback pass.
 - **GA04:** Imported metrics feed existing Core Metrics, report bindings and measurement input. Revised, stale or restricted inputs withhold results; existing statistical models and prospective requirements remain.
-- **SEC01:** Source/local security review completed and verified dependency findings patched. Final npm audit reports zero vulnerabilities. Hosted infrastructure settings remain an explicit release gate.
+- **SEC01:** Source/local security review completed and verified dependency findings patched. Final npm audit reports zero vulnerabilities. Hosted catalog/Storage checks passed; advisors returned 33 warnings requiring the documented deployment follow-through. Remaining configuration remains a release gate.
 
 ## Next steps
 
@@ -30,7 +30,7 @@ The [decision record](GA4_DECISIONS.md) explains the alternatives, tradeoffs and
 
 Implementation followed a separate build and test phase from the [plan](GA4_PLAN.md). Provider requests are isolated behind a fetch-injectable TypeScript adapter; PostgreSQL enforces authorization and publication independently. Python consumes the resulting metric spine. A disposable Supabase project was reset and seeded, leaving the existing user review database intact. The local permission-hint crash required the existing CI workaround for Supabase's `supautils`; permission checks remained enabled.
 
-Local checks used Node 22.23.0 and Python 3.14; CI pins Python 3.12. Application tests passed (724, with 19 optional live-model skips), then the final provider additions passed 18 focused tests. The full engine suite passed 1,334 tests before four further connector regressions were added; all 14 connector tests pass. Typecheck, zero-warning lint, 12 prototype tests, production webpack build, schema lint and both editor rebuilds pass. Final commit CI is the authoritative full rerun.
+Local checks used Node 22.23.0 and Python 3.14; CI pins Python 3.12. Final hosted suites passed: 726 application tests with 19 optional live-model skips, 1,338 engine tests, and 12 prototype tests. Locally, all 14 connector database tests and 18 focused Node tests passed. Typecheck, zero-warning lint, 12 prototype tests, production webpack build, schema lint and both editor rebuilds pass. Final commit CI is the authoritative full rerun.
 
 C/D browser checks verified paragraph editing, toolbar availability and D title-to-folder synchronization. The live Data Workshop rendered against a synthetic authenticated workspace. Separate local HTTP probes passed origin/body/callback/header/cron checks. Browser disconnect feedback also passed. The HTTP checks caught and fixed a global-header override of the callback referrer policy. No real Google account was used. Provider payload fixtures prove parsing and quality behavior, not Google acceptance.
 
@@ -106,7 +106,7 @@ flowchart LR
 | GA02 tenant isolation and worker authority | PostgreSQL and PostgREST pass |
 | GA03 concurrency, replay, incomplete batch, late revisions | 14 connector integration tests pass |
 | GA04 core selection, provenance and immediate stale-result gate | Integration pass; real-data comparison pending |
-| SEC01 source/local audit and dependency remediation | Pass for recorded scope; hosted settings unverified |
+| SEC01 review and dependency remediation | Local pass; hosted catalog/Storage pass; 33 advisor warnings and remaining configuration gates documented |
 
 Reproduce with Node from `.node-version`: `npm ci`, `npm run typecheck`, `npm run lint -- --max-warnings=0`, `npm test`, `npm run test:ui-proposals`, `npm run build:webpack`, `npm audit`. For an isolated migrated/seeded Supabase database, run `python -m pytest -q` from `engine`, with `CAUSENT_TEST_DATABASE_URL`/`DATABASE_URL` pointing only to that test database. Run `supabase db lint --local --level error` and `supabase db advisors --local --type security --level info`. Use the project's existing CI permission-hint workaround where required.
 

@@ -1,6 +1,6 @@
 # SEC01 · Data infrastructure and frontend
 
-Scope: delta from `01535f2`, plus existing auth, report/source ingestion, private-image Storage and dependency boundaries. This is a source/local integration review for the GA4 draft PR. Hosted Supabase/Vercel configuration and real Google acceptance remain unchecked release gates.
+Scope: delta from `01535f2`, plus existing auth, report/source ingestion, private-image Storage and dependency boundaries. This is a source/local integration review for the GA4 draft PR. Hosted Supabase catalog, Storage bucket settings and security advisors were also checked read-only. Remaining hosted configuration and real Google acceptance are release gates.
 
 ## Findings and remediation
 
@@ -22,9 +22,15 @@ Primary advisories: [Next image processing](https://github.com/advisories/GHSA-2
 - Sources/frontend: existing URL tests cover DNS/IP pinning, private-address/redirect denial, byte bounds and timeouts. PDF/image tests cover type/size/parsing limits and scoped private delivery. Imported labels render through React text nodes. New provider requests use fixed Google hosts and disallow redirects. No new HTML injection path is introduced.
 - Storage/local configuration: `decision-report-assets` is private, limited to PNG/JPEG and 5 MiB. Final local schema lint passes. Security advisors at INFO level returned seven intentional RLS-without-policy notices on default-deny server tables, including the two private GA4 tables; zero warnings/errors. Private schema is not exposed by local PostgREST.
 
+## Hosted infrastructure findings
+
+The existing Causent AI project passed the catalog checks: every public table has RLS, every public view is security-invoker, and privileged functions have fixed search paths. Its image bucket is private with PNG/JPEG and 5 MiB limits. The only anonymous-executable definer is an existing trigger routine, which cannot be called directly. The latest deployed migration is `20260819053842`; this is an older schema, not acceptance of the pending GA4 migration.
+
+Hosted advisors returned **33 warnings and two informational notices**: 32 authenticated-executable SECURITY DEFINER RPCs, one disabled leaked-password protection setting, and the two expected default-deny server tables. These counts are not exploit counts. Review each deployed RPC against its authorization contract and the intended migration release; retain privileges needed by legitimate flows. Verify whether password authentication is enabled and enable leaked-password protection before permitting that login path. No production permissions or auth settings were changed. The local advisor result must not be substituted for this hosted result. [Redacted evidence and exact routine list](HOSTED_SECURITY_EVIDENCE.json).
+
 ## Release gates and residual limits
 
-Real Google property acceptance, hosted auth/Storage/CORS configuration, live API exposure/advisors, exact deployed headers and preview/production secret separation still require staging verification. This worktree has no linked hosted Supabase target. A passing local database is not evidence for those settings. Complete the [operator runbook](../../integrations/google-analytics.md) before enabling customer connections.
+Real Google property acceptance, hosted auth/CORS configuration, Storage delivery policies, live API schema exposure, final-migration advisors/RPC review, exact deployed headers and preview/production secret separation still require staging verification. The existing hosted metadata checks above do not establish those conditions. Complete the [operator runbook](../../integrations/google-analytics.md) before enabling customer connections.
 
 The app holds a scoped worker token plus a credential-encryption key: compromise of the application runtime can expose connected Google grants. Keep both server-only, use short operational token lifetimes with renewal, separate environments, and rehearse revocation/key rotation. A strict nonce-based script CSP remains a separate hardening step; the limited policy here does not claim to stop arbitrary inline scripts.
 
