@@ -84,6 +84,20 @@ test("model draft validation rejects malformed structured output", () => {
   assert.equal(result.success, false);
 });
 
+test("local validation enforces bounds omitted from the provider grammar", () => {
+  const generated = draft();
+  generated.title = "x".repeat(181);
+  assert.equal(validateModelDecisionReportDraft(generated).success, false);
+  generated.title = "Short title";
+  generated.decision.decision!.text = "x".repeat(501);
+  assert.equal(validateModelDecisionReportDraft(generated).success, false);
+  generated.decision.decision!.text = "Short claim";
+  generated.metric.baselinePct = 101;
+  assert.equal(validateModelDecisionReportDraft(generated).success, false);
+  generated.metric.baselinePct = null;
+  assert.equal(validateModelDecisionReportDraft(generated).success, true);
+});
+
 test("model generation accepts 25 draft actions and rejects a 26th", () => {
   const generated = draft();
   generated.implementation.actions = Array.from({ length: 25 }, (_, index) => ({

@@ -1063,3 +1063,38 @@ test("answering all fallback gaps transitions the report to ready", () => {
   assert.deepEqual(scanDecisionReportGaps(report), []);
   assert.equal(validateDecisionReport(report).success, true);
 });
+
+test("document layout survives rich-text edits without changing claim provenance or activation", () => {
+  const original = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const layout = { sectionTitles: { overview: "Context" }, sections: [{ id: "note-1", title: "Discussion", document: portableRichTextFromPlainText("A user note, not evidence.") }], charts: [{ id: "chart-1", metricId: "metric-1", type: "line" as const }] };
+  const first = applyReportEditCommand(original, { type: "edit_document_layout", layout });
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.deepEqual(first.report.decision, original.decision);
+  assert.deepEqual(first.report.activationDraft, original.activationDraft);
+  const claim = first.report.decision.background[0];
+  const second = applyReportEditCommand(first.report, { type: "replace_claim_document", claimId: claim.id, document: boldDocument(claim.text) });
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  const third = applyReportEditCommand(second.report, { type: "replace_claim_text", claimId: claim.id, text: "New text" });
+  assert.equal(third.ok, true);
+  if (!third.ok) return;
+  assert.deepEqual(third.report.documentLayout?.sectionTitles, layout.sectionTitles);
+  assert.deepEqual(third.report.documentLayout?.sections, layout.sections);
+  assert.deepEqual(third.report.documentLayout?.charts, layout.charts);
+});
+
+test("document layout rejects unsafe documents, duplicate identities and unbounded content", () => {
+  const original = cloneDecisionReport(GUMMY_ALPHA_GOLDEN_EXAMPLE.report);
+  const note = { id: "note-1", title: "Notes", document: portableRichTextFromPlainText("hello") };
+  for (const layout of [
+    { sectionTitles: { overview: "x".repeat(101) } },
+    { sections: [note, note] },
+    { sections: Array.from({ length: 9 }, (_, i) => ({ ...note, id: `note-${i}` })) },
+    { sections: [{ ...note, document: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Link", marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }] }] }] } }] },
+    { charts: [{ id: "x", metricId: "m", type: "pie" }] },
+  ]) {
+    const result = applyReportEditCommand(original, { type: "edit_document_layout", layout } as Parameters<typeof applyReportEditCommand>[1]);
+    assert.equal(result.ok, false);
+  }
+});

@@ -86,6 +86,7 @@ export type Action = {
   /** Origin and human-readable reference. Optional for legacy seed fixtures. */
   source?: "github" | "jira" | "manual";
   referenceLabel?: string;
+  sourceUrl?: string | null;
   /** Stable Decision Report item id for matching the durable action detail. */
   sourceItemId?: string;
   ownerLabel?: string;

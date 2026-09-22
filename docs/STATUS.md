@@ -1,5 +1,9 @@
 # Causent — Build Status & Resume Guide
 
+## 2026-09-22 — Proposal D production implementation
+
+[PR #38](https://github.com/Causent-AI/causent-ai/pull/38) contains the accepted Proposal D application design. Candidate `dpl_AiqPYUy1eFqYCvFpbvwACVMvfiYH` (`1ee763e`) passes both-account editing, charts, activation and all-action handoffs, plus live Sonnet generation and rewriting in one attempt each. All 743 application/database tests, full engine/RLS/bridge CI and both preview builds pass. Both synthetic scopes are archived and original data/audit digests match. Schema, workers, exposure and disabled GA4 remain unchanged. The [release manifest](releases/2026-09-22-proposal-d-production.md) records acceptance and rollback; PR #38 records the subsequent merge, exact production alias and post-promotion checks. See the [engineering review](reviews/2026-09-22/PRODUCTION_DESIGN_REVIEW.md). Older entries are historical.
+
 ## 2026-09-22 — Production infrastructure released; final app pending
 
 The user merged #35 (`3b25913`), which Vercel deployed automatically. The five pending

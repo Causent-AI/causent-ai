@@ -89,6 +89,15 @@ export type DecisionReportGeneration = {
   sourceSummaries: ReportSourceSummary[];
 };
 
+export class GenerationContractError extends Error {
+  readonly code: "metadata" | "bounds" | "shape" | "transport";
+  constructor(code: GenerationContractError["code"]) {
+    super(`Generated report validation failed: ${code}.`);
+    this.name = "GenerationContractError";
+    this.code = code;
+  }
+}
+
 type IdFactory = () => string;
 
 const claimDraftSchema: JSONSchema7 = {
@@ -223,6 +232,31 @@ export const MODEL_DECISION_REPORT_JSON_SCHEMA: JSONSchema7 = {
   ],
 };
 
+function withinSchemaBounds(value: unknown, schema: JSONSchema7): boolean {
+  if (typeof value === "string") {
+    const length = [...value].length;
+    return (schema.minLength === undefined || length >= schema.minLength) &&
+      (schema.maxLength === undefined || length <= schema.maxLength);
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) &&
+      (schema.minimum === undefined || value >= schema.minimum) &&
+      (schema.maximum === undefined || value <= schema.maximum);
+  }
+  if (Array.isArray(value)) {
+    const itemSchema = schema.items;
+    return (schema.maxItems === undefined || value.length <= schema.maxItems) &&
+      (!itemSchema || typeof itemSchema !== "object" || Array.isArray(itemSchema) ||
+        value.every((item) => withinSchemaBounds(item, itemSchema)));
+  }
+  if (isRecord(value) && schema.properties) {
+    return Object.entries(schema.properties).every(([key, child]) =>
+      typeof child !== "object" || withinSchemaBounds(value[key], child),
+    );
+  }
+  return true;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -249,7 +283,10 @@ export function validateModelDecisionReportDraft(
   value: unknown,
 ): { success: true; value: ModelDecisionReportDraft } | { success: false; error: Error } {
   if (!isRecord(value) || typeof value.projectName !== "string" || typeof value.title !== "string") {
-    return { success: false, error: new Error("Generated report metadata is malformed.") };
+    return { success: false, error: new GenerationContractError("metadata") };
+  }
+  if (!withinSchemaBounds(value, MODEL_DECISION_REPORT_JSON_SCHEMA)) {
+    return { success: false, error: new GenerationContractError("bounds") };
   }
 
   const decision = value.decision;
@@ -297,7 +334,7 @@ export function validateModelDecisionReportDraft(
     typeof metric.predictedEvidenceQuote !== "string" ||
     typeof metric.predictedSourceChunkId !== "string"
   ) {
-    return { success: false, error: new Error("Generated report does not match the generation contract.") };
+    return { success: false, error: new GenerationContractError("shape") };
   }
 
   return { success: true, value: value as ModelDecisionReportDraft };

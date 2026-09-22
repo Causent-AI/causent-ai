@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef } from "react";
 
+import { DocumentSectionTitle } from "./DocumentLayout";
 import { ClaimEditor } from "@/components/decision-report/ClaimEditor";
 import { PredictedImpactChart } from "@/components/decision-report/PredictedImpactChart";
 import type { ActionExecutionPatch } from "@/components/decision-report/ImplementationSection";
@@ -892,7 +893,7 @@ export function ActionPlanCanvas({
       label: "Action Plan Summary",
       document: getClaimPortableRichTextDocument(report, planSummary),
       invalid: planSummary.text.trim() === "",
-      after: { slotId: "core-metrics", content: metricSlot },
+
     },
     ...implementation.actions.flatMap((action, index) => {
       const summary = action.summary[0];
@@ -942,11 +943,10 @@ export function ActionPlanCanvas({
   ];
 
   return (
-    <section className="border-t border-[var(--border)] px-5 py-8 sm:px-9 sm:py-10">
+    <section id="report-implementation" className="document-section">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-blue)]">02</p>
-          <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-[var(--text)]">Action Plan</h2>
+          <DocumentSectionTitle section="implementation"/>
         </div>
         {!readOnly ? (
           <button
@@ -960,6 +960,24 @@ export function ActionPlanCanvas({
         ) : null}
       </div>
 
+      <div className="mt-5">
+        <ReportCanvasEditor
+          canvasId="action-plan-editor"
+          label="Action plan"
+          sections={sections}
+          readOnly={readOnly}
+          onChange={onDocumentsChange}
+          onTitleChange={(changes: ReportCanvasTitleChange[]) => {
+            for (const change of changes) {
+              onActionTitleChange(change.titleId, change.value);
+            }
+          }}
+        />
+      </div>
+
+      <section id="report-measurement" className="document-section">
+        <DocumentSectionTitle section="measurement"/>
+        {metricSlot}
       <PredictedImpactChart
         projection={projection}
         statusLabel={readOnly ? "Activated commitment" : "Draft commitment"}
@@ -982,20 +1000,7 @@ export function ActionPlanCanvas({
         }}
       />
 
-      <div className="mt-5">
-        <ReportCanvasEditor
-          canvasId="action-plan-editor"
-          label="Action plan"
-          sections={sections}
-          readOnly={readOnly}
-          onChange={onDocumentsChange}
-          onTitleChange={(changes: ReportCanvasTitleChange[]) => {
-            for (const change of changes) {
-              onActionTitleChange(change.titleId, change.value);
-            }
-          }}
-        />
-      </div>
+      </section>
 
       <ActionPlanReview
         report={report}

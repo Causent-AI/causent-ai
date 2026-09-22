@@ -1,10 +1,15 @@
 "use client";
 
+import { useMetricInspection } from "./WorkspaceMetrics";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { Action, Decision, Metric } from "@/lib/types";
-import { formatLongDate, formatMetricValue, formatShortDate } from "@/lib/format";
+import {
+  formatLongDate,
+  formatMetricValue,
+  formatShortDate,
+} from "@/lib/format";
 import type { SeriesFlag } from "@/components/charts/LineTimeSeries";
 import { VolumeChangeChart } from "@/components/charts/VolumeChangeChart";
 import { Sparkline } from "@/components/charts/Sparkline";
@@ -36,10 +41,16 @@ function formatRate(value: number | null): string {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
-function rateTone(value: number | null, higherIsBetter: boolean, desiredDirection?: string): string {
-  if (desiredDirection === "unknown" || desiredDirection === "neutral") return "text-[var(--neutral)]";
-  if (value === null || Math.abs(value) < 0.0001) return "text-[var(--text-subtle)]";
-  return (value > 0) === higherIsBetter
+function rateTone(
+  value: number | null,
+  higherIsBetter: boolean,
+  desiredDirection?: string,
+): string {
+  if (desiredDirection === "unknown" || desiredDirection === "neutral")
+    return "text-[var(--neutral)]";
+  if (value === null || Math.abs(value) < 0.0001)
+    return "text-[var(--text-subtle)]";
+  return value > 0 === higherIsBetter
     ? "text-[var(--pos)]"
     : "text-[var(--neg)]";
 }
@@ -62,35 +73,49 @@ export function CoreMetricsDrawer({
   decisions: Decision[];
   projectMetricLabel: string | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const [expanded, setOpen] = useState(false);
+  const inspection = useMetricInspection();
   const [range, setRange] = useState<SeriesRange>("60d");
   const [cadence, setCadence] = useState<SeriesCadence>("daily");
   const [selectedMetricId, setSelectedMetricId] = useState("");
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const reportMetricView = pathname === "/actions"
-    ? selectReportMetricView(searchParams.get("selected"), decisions, metrics, actions)
-    : null;
+  const inspectedMetric =
+    pathname === "/data-workshop" ? inspection.metric : null;
+  const open = Boolean(inspectedMetric) || expanded;
+  const reportMetricView =
+    pathname === "/actions"
+      ? selectReportMetricView(
+          searchParams.get("selected"),
+          decisions,
+          metrics,
+          actions,
+        )
+      : null;
   // loadDashboardData() keeps the current report metric first. A selected
   // report decision gives us the same target explicitly on Actions.
-  const canonicalReportMetric = reportMetricView?.metric
-    ?? (projectMetricLabel ? metrics[0] ?? null : null);
+  const canonicalReportMetric =
+    reportMetricView?.metric ??
+    (projectMetricLabel ? (metrics[0] ?? null) : null);
   const drawerView = selectCoreMetricDrawerView({
     metrics,
     reportMetricId: canonicalReportMetric?.id ?? null,
     selectedMetricId,
   });
   const selectedChoice = drawerView.selectedChoice;
-  const selectedMetric = selectedChoice?.metric;
+  const selectedMetric = inspectedMetric ?? selectedChoice?.metric;
   const visibleActions = reportMetricView?.actions ?? actions;
-  const selectedMetricNeedsData = !selectedMetric || selectedMetric.series.length === 0;
+  const selectedMetricNeedsData =
+    !selectedMetric || selectedMetric.series.length === 0;
   const metricCountLabel = drawerView.countLabel;
 
-  const chartMetrics = selectedMetric ? [selectedMetric].map((metric) => ({
-    metric,
-    view: prepareSeriesView(metric.series, range, cadence),
-    flagWindow: filterSeriesRange(metric.series, range),
-  })) : [];
+  const chartMetrics = selectedMetric
+    ? [selectedMetric].map((metric) => ({
+        metric,
+        view: prepareSeriesView(metric.series, range, cadence),
+        flagWindow: filterSeriesRange(metric.series, range),
+      }))
+    : [];
   const summaryMetrics = drawerView.summaryChoices.map(({ metric, role }) => ({
     metric,
     role,
@@ -98,21 +123,30 @@ export function CoreMetricsDrawer({
   }));
   const visibleSeries = selectedMetric?.series ?? [];
 
-  const flagsForMetric = (color: string, series: Metric["series"]): SeriesFlag[] => {
+  const flagsForMetric = (
+    color: string,
+    series: Metric["series"],
+  ): SeriesFlag[] => {
     const windowStart = series[0]?.date ?? "";
     const windowEnd = series.at(-1)?.date ?? "";
     return thin(
       visibleActions
-        .filter((action) =>
-          action.shippedAt !== null &&
-          action.shippedAt >= windowStart &&
-          action.shippedAt <= windowEnd,
+        .filter(
+          (action) =>
+            action.shippedAt !== null &&
+            action.shippedAt >= windowStart &&
+            action.shippedAt <= windowEnd,
         )
-        .sort((left, right) => (left.shippedAt ?? "").localeCompare(right.shippedAt ?? "")),
+        .sort((left, right) =>
+          (left.shippedAt ?? "").localeCompare(right.shippedAt ?? ""),
+        ),
       MAX_FLAGS,
     ).map((action) => ({
       date: action.shippedAt!,
-      label: action.displayCode ?? action.referenceLabel ?? (action.pr > 0 ? `#${action.pr}` : "Action"),
+      label:
+        action.displayCode ??
+        action.referenceLabel ??
+        (action.pr > 0 ? `#${action.pr}` : "Action"),
       color,
       href: `/actions?selected=${encodeURIComponent(action.id)}#${encodeURIComponent(action.id)}`,
       title: action.title,
@@ -121,23 +155,32 @@ export function CoreMetricsDrawer({
 
   function rangeOptionLabel(option: SeriesRange): string {
     const optionSeries = filterSeriesRange(visibleSeries, option);
-    if (optionSeries.length === 0) return option === "all" ? "All data" : `Last ${option.slice(0, -1)} days`;
+    if (optionSeries.length === 0)
+      return option === "all" ? "All data" : `Last ${option.slice(0, -1)} days`;
     const first = optionSeries[0].date;
     const last = optionSeries.at(-1)!.date;
-    const start = first.slice(0, 4) === last.slice(0, 4) ? formatShortDate(first) : formatLongDate(first);
+    const start =
+      first.slice(0, 4) === last.slice(0, 4)
+        ? formatShortDate(first)
+        : formatLongDate(first);
     const dates = `${start} – ${formatLongDate(last)}`;
     return option === "all" ? `All data · ${dates}` : dates;
   }
 
   return (
-    <section className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)]">
+    <section className="core-metrics-drawer shrink-0 border-t border-[var(--border)] bg-[var(--surface)]">
       {/* drawer header (wraps on narrow viewports so the controls never overlap) */}
       <div className="flex min-h-11 flex-wrap items-center justify-between gap-y-1 px-5 py-1">
         <button
           type="button"
           aria-controls="core-metrics-content"
           aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            if (inspectedMetric) {
+              inspection.inspect(null);
+              setOpen(false);
+            } else setOpen((v) => !v);
+          }}
           className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-[var(--text)]"
         >
           <ChevronIcon
@@ -149,9 +192,9 @@ export function CoreMetricsDrawer({
             style={{ background: "var(--brand-teal)" }}
             aria-hidden="true"
           />
-          Core Metrics
+          {inspectedMetric?.name ?? "Core Metrics"}
           <span className="text-[var(--text-subtle)]">
-            {metricCountLabel}
+            {inspectedMetric ? "Metric details" : metricCountLabel}
           </span>
         </button>
 
@@ -163,29 +206,41 @@ export function CoreMetricsDrawer({
               <select
                 aria-label="Chart date range"
                 value={range}
-                onChange={(event) => setRange(event.target.value as SeriesRange)}
+                onChange={(event) =>
+                  setRange(event.target.value as SeriesRange)
+                }
                 disabled={selectedMetricNeedsData}
                 className="max-w-[230px] appearance-none bg-transparent pr-4 outline-none disabled:opacity-50"
               >
                 {RANGE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{rangeOptionLabel(option)}</option>
+                  <option key={option} value={option}>
+                    {rangeOptionLabel(option)}
+                  </option>
                 ))}
               </select>
-              <ChevronIcon size={13} className="pointer-events-none absolute right-1.5 text-[var(--text-subtle)]" />
+              <ChevronIcon
+                size={13}
+                className="pointer-events-none absolute right-1.5 text-[var(--text-subtle)]"
+              />
             </label>
             <label className="relative flex items-center rounded-md border border-[var(--border)] px-2 py-1 text-[var(--text-muted)] focus-within:border-[var(--brand-blue)]">
               <span className="sr-only">Chart cadence</span>
               <select
                 aria-label="Chart cadence"
                 value={cadence}
-                onChange={(event) => setCadence(event.target.value as SeriesCadence)}
+                onChange={(event) =>
+                  setCadence(event.target.value as SeriesCadence)
+                }
                 disabled={selectedMetricNeedsData}
                 className="appearance-none bg-transparent pr-5 outline-none disabled:opacity-50"
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
               </select>
-              <ChevronIcon size={13} className="pointer-events-none absolute right-1.5 text-[var(--text-subtle)]" />
+              <ChevronIcon
+                size={13}
+                className="pointer-events-none absolute right-1.5 text-[var(--text-subtle)]"
+              />
             </label>
           </div>
         ) : null}
@@ -202,8 +257,12 @@ export function CoreMetricsDrawer({
             </Link>
           </div>
 
-          {drawerView.choices.length > 0 ? (
-            <div className="scroll-slim mt-3 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="View metric">
+          {!inspectedMetric && drawerView.choices.length > 0 ? (
+            <div
+              className="scroll-slim mt-3 flex gap-2 overflow-x-auto pb-1"
+              role="group"
+              aria-label="View metric"
+            >
               {drawerView.choices.map(({ metric, role }) => {
                 const selected = selectedMetric?.id === metric.id;
                 return (
@@ -219,7 +278,11 @@ export function CoreMetricsDrawer({
                     }`}
                   >
                     <span className="flex items-center gap-2 text-[12px] font-semibold">
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: metric.color }} aria-hidden="true" />
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: metric.color }}
+                        aria-hidden="true"
+                      />
                       <span className="truncate">{metric.name}</span>
                     </span>
                     <span className="mt-0.5 block text-[10px] font-medium text-[var(--text-subtle)]">
@@ -236,7 +299,10 @@ export function CoreMetricsDrawer({
               <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
                 <div>
                   <p className="text-[12px] font-semibold text-amber-950">
-                    {selectedMetric?.name ?? reportMetricView?.metricLabel ?? projectMetricLabel ?? "No core metric confirmed"}
+                    {selectedMetric?.name ??
+                      reportMetricView?.metricLabel ??
+                      projectMetricLabel ??
+                      "No core metric confirmed"}
                   </p>
                   <p className="mt-0.5 text-[11px] text-amber-900/75">
                     This metric has no connected series to chart yet.
@@ -262,7 +328,11 @@ export function CoreMetricsDrawer({
                           color={m.color}
                           format={m.format}
                           percentScale={m.percentScale}
-                          flags={selectedChoice?.role === "report" ? flagsForMetric(m.color, flagWindow) : []}
+                          flags={
+                            selectedChoice?.role === "report"
+                              ? flagsForMetric(m.color, flagWindow)
+                              : []
+                          }
                         />
                       </div>
                     );
@@ -296,28 +366,54 @@ export function CoreMetricsDrawer({
                             selected ? "pb-3" : "py-1.5"
                           } ${index === 1 ? "border-t border-[var(--border)] pt-3" : ""}`}
                         >
-                          <div className="flex min-w-0 items-center gap-2" title={role === "report" ? "Report target" : "Context metric"}>
+                          <div
+                            className="flex min-w-0 items-center gap-2"
+                            title={
+                              role === "report"
+                                ? "Report target"
+                                : "Context metric"
+                            }
+                          >
                             <span
                               className="h-2 w-2 shrink-0 rounded-full"
                               style={{ background: m.color }}
                               aria-hidden="true"
                             />
-                            <span className={`truncate text-[var(--text)] ${selected ? "text-[15px] font-semibold" : "text-[12px]"}`}>
+                            <span
+                              className={`truncate text-[var(--text)] ${selected ? "text-[15px] font-semibold" : "text-[12px]"}`}
+                            >
                               {m.name}
                             </span>
                             {view.levels.length > 0 ? (
                               <span className="hidden xl:block">
-                                <Sparkline series={view.levels} color={m.color} width={48} height={22} />
+                                <Sparkline
+                                  series={view.levels}
+                                  color={m.color}
+                                  width={48}
+                                  height={22}
+                                />
                               </span>
                             ) : null}
                           </div>
-                          <span className={`text-right font-semibold tabular-nums text-[var(--text)] ${selected ? "text-[15px]" : "text-[12px]"}`}>
-                            {current === undefined ? "—" : formatMetricValue(current, m.format, m.percentScale)}
+                          <span
+                            className={`text-right font-semibold tabular-nums text-[var(--text)] ${selected ? "text-[15px]" : "text-[12px]"}`}
+                          >
+                            {current === undefined
+                              ? "—"
+                              : formatMetricValue(
+                                  current,
+                                  m.format,
+                                  m.percentScale,
+                                )}
                           </span>
-                          <span className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(wow, m.higherIsBetter, m.beneficialDirection)}`}>
+                          <span
+                            className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(wow, m.higherIsBetter, m.beneficialDirection)}`}
+                          >
                             {formatRate(wow)}
                           </span>
-                          <span className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(mom, m.higherIsBetter, m.beneficialDirection)}`}>
+                          <span
+                            className={`text-right font-semibold tabular-nums ${selected ? "text-[12px]" : "text-[11px]"} ${rateTone(mom, m.higherIsBetter, m.beneficialDirection)}`}
+                          >
                             {formatRate(mom)}
                           </span>
                         </div>

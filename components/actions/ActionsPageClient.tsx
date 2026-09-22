@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Action, Decision, Metric, ProjectObjective } from "@/lib/types";
+import Link from "next/link";
+import { StartIterationControl } from "@/components/reports/DecisionReportsIndex";
 import { Panel } from "@/components/ui/Panel";
 import { ActionList } from "@/components/actions/ActionList";
 import { ActionDetail } from "@/components/actions/ActionDetail";
@@ -110,8 +112,9 @@ export function ActionsPageClient({
 
   if (view.mode === "decision_report") {
     return (
-      <div className="mx-auto flex h-full max-w-[1360px] flex-col p-5">
-        <Panel className="min-h-0 flex-1 overflow-hidden">
+      <div className="workspace-page actions-page">
+        <header className="workspace-heading"><h1>{decisionReport?.title ?? "Project"}: Implementation Plan</h1>{decisionReportId && <div className="flex gap-3"><Link className="button" href={`/reports?report=${decisionReportId}`}>Report</Link><StartIterationControl reportId={decisionReportId}/></div>}</header>
+        <Panel className="action-workbench">
           {selectedDecision ? (
             <DecisionDetail
               decision={selectedDecision}

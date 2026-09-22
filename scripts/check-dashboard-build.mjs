@@ -3,6 +3,8 @@
 import { readFile } from "node:fs/promises";
 
 const dashboardRoutes = [
+  { appPath: "/(dashboard)/graph/page", publicPath: "/graph" },
+  { appPath: "/(onboarding)/onboarding/page", publicPath: "/onboarding" },
   { appPath: "/(dashboard)/actions/page", publicPath: "/actions" },
   { appPath: "/(dashboard)/data-workshop/page", publicPath: "/data-workshop" },
   { appPath: "/(dashboard)/impact/page", publicPath: "/impact" },

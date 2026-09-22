@@ -98,9 +98,19 @@ export type PortableRichTextValidationResult =
   | { success: true; data: PortableRichTextDocument }
   | { success: false; errors: string[] };
 
+export type ReportSectionKey = "overview" | "decision" | "implementation" | "measurement";
+export type ReportNoteSection = { id: string; title: string; document: PortableRichTextDocument };
+
 export type DecisionReportPresentationV1 = {
   version: 1;
   claimDocuments: Record<string, PortableRichTextDocument>;
+};
+
+export type ReportDocumentLayout = {
+  version: 1;
+  sectionTitles?: Partial<Record<ReportSectionKey, string>>;
+  sections?: ReportNoteSection[];
+  charts?: Array<{ id: string; metricId: string; type: "line" | "bar" }>;
 };
 
 function flattenPortableRichTextNode(node: PortableRichTextNode): string {
@@ -217,6 +227,8 @@ export type DecisionReportV1 = {
   title: string;
   /** Optional rich presentation; Claim.text remains the authoritative semantic value. */
   presentation?: DecisionReportPresentationV1;
+  /** Additive top-level metadata stays readable by the prior production validator. */
+  documentLayout?: ReportDocumentLayout;
   /** Partial pre-activation intent. Canonical rows are created only by activation. */
   activationDraft?: DecisionReportActivationDraft;
   /** Required for v2. Bounded provenance lives in the same RLS-protected snapshot. */
@@ -1098,6 +1110,54 @@ function validateSourceSummaries(
   return true;
 }
 
+function validateReportDocumentLayout(value: unknown, errors: string[]): boolean {
+  if (!isRecord(value)) { errors.push("documentLayout must be a versioned object"); return false; }
+  let valid = validateExactObjectKeys(value, ["version", "sectionTitles", "sections", "charts"], "documentLayout", errors);
+  if (value.version !== 1) { errors.push("documentLayout.version must be 1"); valid = false; }
+  const safeTitle = (title: unknown) => typeof title === "string" && title.trim().length > 0 && title.length <= 100 && !/[\u0000-\u001f\u007f]/.test(title);
+  const safeId = (id: unknown) => typeof id === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(id);
+  if (value.sectionTitles !== undefined) {
+    if (!isRecord(value.sectionTitles) || Object.entries(value.sectionTitles).some(([key, title]) => !["overview", "decision", "implementation", "measurement"].includes(key) || !safeTitle(title))) {
+      errors.push("documentLayout.sectionTitles must contain bounded titles for known sections"); valid = false;
+    }
+  }
+  if (value.sections !== undefined) {
+    if (!Array.isArray(value.sections) || value.sections.length > 8) {
+      errors.push("documentLayout.sections must contain at most 8 notes"); valid = false;
+    } else {
+      const ids = new Set<string>();
+      for (const section of value.sections) {
+        if (!isRecord(section) || !safeId(section.id) || !safeTitle(section.title)) {
+          errors.push("documentLayout.sections must have safe unique IDs and bounded titles"); valid = false; continue;
+        }
+        if (ids.has(String(section.id))) { errors.push("documentLayout.sections IDs must be unique"); valid = false; }
+        ids.add(String(section.id));
+        if (!validateExactObjectKeys(section, ["id", "title", "document"], "documentLayout.sections", errors) || !validatePortableRichTextDocumentAt(section.document, "documentLayout.sections.document", errors)) valid = false;
+      }
+    }
+  }
+  if (value.charts !== undefined) {
+    if (!Array.isArray(value.charts) || value.charts.length > 4) {
+      errors.push("documentLayout.charts must contain at most 4 charts"); valid = false;
+    } else {
+      const ids = new Set<string>();
+      for (const chart of value.charts) {
+        if (!isRecord(chart) || !safeId(chart.id) || !safeId(chart.metricId) || !["line", "bar"].includes(String(chart.type))) {
+          errors.push("documentLayout.charts must reference a metric and supported chart type"); valid = false; continue;
+        }
+        if (ids.has(String(chart.id))) { errors.push("documentLayout.charts IDs must be unique"); valid = false; }
+        ids.add(String(chart.id));
+        if (!validateExactObjectKeys(chart, ["id", "metricId", "type"], "documentLayout.charts", errors)) valid = false;
+      }
+    }
+  }
+
+  try {
+    if (new TextEncoder().encode(JSON.stringify(value)).byteLength > MAX_DECISION_REPORT_PRESENTATION_BYTES) { errors.push("documentLayout exceeds the document size limit"); valid = false; }
+  } catch { errors.push("documentLayout must be serializable JSON"); valid = false; }
+  return valid;
+}
+
 function validateDecisionReportPresentation(
   value: unknown,
   claims: unknown[],
@@ -1184,6 +1244,8 @@ function validateDecisionReportPresentation(
 export function validateDecisionReport(value: unknown): ValidationResult {
   const errors: string[] = [];
   if (!isRecord(value)) return { success: false, errors: ["report must be an object"] };
+
+  if (value.documentLayout !== undefined) validateReportDocumentLayout(value.documentLayout, errors);
 
   if (value.schemaVersion !== 1 && value.schemaVersion !== 2) {
     errors.push("schemaVersion must be 1 or 2");

@@ -26,14 +26,14 @@ function lifecycleLabel(report: DashboardDecisionReport): string {
 const DELETE_INITIAL_STATE: DeleteReportActionState = { status: "idle" };
 const START_INITIAL_STATE: StartIterationActionState = { status: "idle" };
 
-function StartIterationControl({ reportId }: { reportId: string }) {
+export function StartIterationControl({ reportId }: { reportId: string }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(startDecisionReportIterationAction, START_INITIAL_STATE);
   useEffect(() => {
     if (state.status === "created") router.push(`/onboarding?report=${state.reportId}`);
   }, [router, state]);
   return (
-    <details className="relative">
+    <details className="iteration-menu relative">
       <summary className="cursor-pointer list-none rounded-lg bg-[var(--brand-blue)] px-3 py-2 text-[12px] font-semibold text-white marker:hidden">Create next version</summary>
       <form action={action} className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-[var(--border)] bg-white p-4 shadow-xl">
         <input type="hidden" name="parentReportId" value={reportId} />
@@ -47,7 +47,7 @@ function StartIterationControl({ reportId }: { reportId: string }) {
   );
 }
 
-function DeleteReportControl({
+export function DeleteReportControl({
   reportId,
   active,
   current,
@@ -112,7 +112,7 @@ export function DecisionReportsIndex({ reports }: { reports: DashboardDecisionRe
     <div className="mx-auto grid h-full max-w-[1360px] grid-cols-1 gap-4 p-5 lg:grid-cols-[340px_1fr]">
       <Panel className="flex min-h-0 flex-col">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold text-[var(--text)]">Decision Reports</h2>
+          <h2 className="text-[15px] font-semibold text-[var(--text)]">Report library</h2>
           <Link href="/onboarding" className="rounded-lg bg-[var(--brand-blue)] px-2.5 py-2 text-[12px] font-semibold text-white">
             New Report
           </Link>
@@ -178,8 +178,8 @@ export function DecisionReportsIndex({ reports }: { reports: DashboardDecisionRe
                 <p className="mt-1 text-[12px] text-[var(--text-muted)]">Core metric: {selected.status === "active" ? selected.activeMetricName ?? "Metric unavailable" : selected.metricProjection.metricName}</p>
               </div>
               <div className="flex flex-wrap items-start gap-2">
-                <Link href={`/onboarding?report=${selected.id}`} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--brand-blue)]">
-                  Open full report
+                <Link href={`/reports?report=${selected.id}`} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--brand-blue)]">
+                  Open report
                 </Link>
                 {selected.isCurrent && selected.status === "active" ? <StartIterationControl reportId={selected.id} /> : null}
                 <DeleteReportControl

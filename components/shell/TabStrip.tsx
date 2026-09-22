@@ -2,49 +2,79 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Scope } from "@/lib/types";
-import { DataIcon, DecisionIcon, FolderIcon, ImpactIcon, ReportIcon } from "@/components/ui/icons";
-
 const TABS = [
-  { href: "/data-workshop", label: "Data", icon: DataIcon },
-  { href: "/reports", label: "Reports", icon: ReportIcon },
-  { href: "/actions", label: "Actions", icon: DecisionIcon },
-  { href: "/impact", label: "Impact", icon: ImpactIcon },
+  {
+    href: "/data-workshop",
+    label: "Data",
+    shape: (
+      <>
+        <ellipse cx="12" cy="5" rx="7" ry="3" />
+        <path d="M5 5v7c0 4 14 4 14 0V5M5 12v7c0 4 14 4 14 0v-7" />
+      </>
+    ),
+  },
+  {
+    href: "/reports",
+    label: "Reports",
+    shape: <path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6" />,
+  },
+  {
+    href: "/actions",
+    label: "Actions",
+    shape: <path d="m4 6 2 2 4-4M13 6h7M4 13h5M13 13h7M4 20h5M13 20h7" />,
+  },
+  {
+    href: "/impact",
+    label: "Impact",
+    shape: <path d="M4 3v17h17M7 15l5-6 4 3 5-7" />,
+  },
+  {
+    href: "/graph",
+    label: "Graph",
+    shape: (
+      <>
+        <circle cx="5" cy="12" r="3" />
+        <circle cx="18" cy="5" r="3" />
+        <circle cx="18" cy="19" r="3" />
+        <path d="m8 10 7-4M8 14l7 4" />
+      </>
+    ),
+  },
 ] as const;
 
-export function TabStrip({ scope }: { scope: Scope }) {
+export function TabStrip() {
   const pathname = usePathname();
-
   return (
-    <div className="grid min-h-14 grid-cols-1 items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2 xl:grid-cols-[minmax(220px,1fr)_auto_minmax(220px,1fr)] xl:px-5">
-      <div className="flex min-w-0 items-center gap-2 text-[13px]">
-        <FolderIcon className="text-[var(--text-subtle)]" />
-        <span className="truncate font-medium text-[var(--brand-blue)]">{scope.project}</span>
-        <span className="text-[var(--text-subtle)]">/</span>
-        <span className="truncate font-semibold text-[var(--text)]">{scope.workspace}</span>
-      </div>
-
-      <nav className="scroll-slim flex min-w-0 items-center gap-1 overflow-x-auto sm:justify-center xl:overflow-visible" aria-label="Project sections">
-        {TABS.map((tab) => {
-          const active = pathname === tab.href;
-          const Icon = tab.icon;
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={`flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[13px] transition-colors ${
-                active
-                  ? "bg-slate-900 font-semibold text-white shadow-sm"
-                  : "font-medium text-[var(--text-muted)] hover:bg-slate-100 hover:text-[var(--text)]"
-              }`}
+    <nav className="project-tabs" aria-label="Project sections">
+      {TABS.map(({ href, label, shape }) => {
+        const active =
+          pathname === href ||
+          (href === "/reports" && pathname.startsWith("/onboarding"));
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-label={label}
+            aria-current={active ? "page" : undefined}
+            className="project-tab"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.65"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <Icon size={16} />
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="hidden xl:block" aria-hidden="true" />
-    </div>
+              {shape}
+            </svg>
+            <span>{label}</span>
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

@@ -13,6 +13,9 @@ import {
   type SaveDecisionReportActionResult,
 } from "@/app/(onboarding)/onboarding/decision-report-persistence-actions";
 import { startDecisionReportAction } from "@/app/(onboarding)/onboarding/decision-report-activation-actions";
+import { DocumentLayoutProvider, DocumentOutline, DocumentNotes, DocumentCharts, DocumentChartPicker } from "./DocumentLayout";
+import { ReportRewrite } from "./ReportRewrite";
+import { ReportTitleSync } from "@/components/shell/WorkspaceTitle";
 import { ActionPlanCanvas } from "@/components/decision-report/ActionPlanCanvas";
 import { DecisionNarrativeCanvas } from "@/components/decision-report/DecisionNarrativeCanvas";
 import {
@@ -84,8 +87,6 @@ function focusEditableAtEnd(target: HTMLElement) {
 export function DecisionReportEditor({
   initialReport,
   projection,
-  workspaceName,
-  projectName,
   generationMeta,
   initialPersistence,
   initialAsset,
@@ -1054,7 +1055,8 @@ export function DecisionReportEditor({
   const editorReadOnly = reportIsActive || isChangingAsset || isStartingAction;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 pb-16">
+    <DocumentLayoutProvider layout={report.documentLayout ?? {}} readOnly={editorReadOnly} update={(layout) => dispatchEdit({ type: "edit_document_layout", layout }, "layout")}><div className="report-workbench"><DocumentOutline/><div className="report-document flex flex-col gap-4">
+      <ReportTitleSync title={titleDraft}/>
       {generationMeta?.warning ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-900" role="status">
           {generationMeta.warning}
@@ -1064,14 +1066,6 @@ export function DecisionReportEditor({
         <header className="px-5 py-7 sm:px-9 sm:py-9">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium text-[var(--text-muted)]">
-                <span>{workspaceName}</span>
-                <span aria-hidden>·</span>
-                <span>{projectName}</span>
-                <span className={`rounded-full px-2.5 py-1 font-semibold ${reportIsActive ? "bg-teal-50 text-teal-800" : "bg-slate-100 text-slate-700"}`}>
-                  {reportIsActive ? "Active" : "Draft"}
-                </span>
-              </div>
               <AutoGrowingTextarea
                 id="report-title"
                 rows={1}
@@ -1107,11 +1101,10 @@ export function DecisionReportEditor({
             aria-label="Decision report editor"
           >
             {!reportIsActive ? (
-              <div className="sticky top-0 z-20 min-w-0 max-w-full overflow-hidden border-b border-[var(--border)] bg-white/95 px-2 py-1.5 shadow-sm shadow-slate-200/30 backdrop-blur md:hidden">
-                <DocumentEditorToolbar
-                  readOnly={editorReadOnly}
-                  variant="mobile"
-                />
+              <div className="document-toolbar sticky top-0 z-20 min-w-0 max-w-full border-b border-[var(--border)] bg-white/95 px-2 py-1.5 shadow-sm shadow-slate-200/30 backdrop-blur">
+                <DocumentEditorToolbar readOnly={editorReadOnly} variant="mobile"/>
+                <DocumentChartPicker/>
+                <ReportRewrite report={report} disabled={editorReadOnly} onApply={updateClaim}/>
               </div>
             ) : null}
 
@@ -1131,6 +1124,7 @@ export function DecisionReportEditor({
               onAssetUpload={uploadAsset}
               onAssetRemove={removeAsset}
             />
+            <DocumentCharts/>
             <ActionPlanCanvas
               report={actionPlanReport}
               projection={projection}
@@ -1174,6 +1168,7 @@ export function DecisionReportEditor({
               onResolutionDateChange={updatePredictionResolutionDate}
               onStartAction={startReportAction}
             />
+            <DocumentNotes/>
           </div>
         </DocumentEditorProvider>
       </article>
@@ -1275,6 +1270,6 @@ export function DecisionReportEditor({
             {lifecycle.actionLabel}
           </button> : null}
       </div>
-    </div>
+    </div></div></DocumentLayoutProvider>
   );
 }

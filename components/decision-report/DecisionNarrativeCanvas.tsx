@@ -1,5 +1,6 @@
 "use client";
 
+import { DocumentSectionTitle } from "./DocumentLayout";
 import { SuppliedMockup } from "@/components/decision-report/SuppliedMockup";
 import {
   ReportCanvasEditor,
@@ -101,11 +102,15 @@ export function DecisionNarrativeCanvas({
   }
 
   return (
-    <section className="border-t border-[var(--border)] px-5 py-8 first:border-t-0 sm:px-9 sm:py-10">
+    <>
+    <section id="report-overview" className="document-section">
+      <DocumentSectionTitle section="overview"/>
+      <ReportCanvasEditor canvasId="report-overview-editor" label="Overview" sections={sections.slice(0, 2)} readOnly={readOnly} onChange={updateCanvas}/>
+    </section>
+    <section id="report-decision" className="document-section">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-blue)]">01</p>
-          <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] text-[var(--text)]">Decision</h2>
+          <DocumentSectionTitle section="decision"/>
         </div>
         {!readOnly && evidence.length > 0 && evidence.length < 3 ? (
           <button
@@ -121,7 +126,7 @@ export function DecisionNarrativeCanvas({
       <ReportCanvasEditor
         canvasId="decision-narrative-editor"
         label="Decision narrative"
-        sections={sections}
+        sections={sections.slice(2)}
         readOnly={readOnly}
         onChange={updateCanvas}
       />
@@ -141,7 +146,7 @@ export function DecisionNarrativeCanvas({
         </div>
       ) : null}
 
-      <div className="mt-6">
+      <details className="report-attachment" open={Boolean(asset || assetError)}><summary>Image</summary>
         <SuppliedMockup
           asset={asset}
           readOnly={readOnly}
@@ -151,7 +156,7 @@ export function DecisionNarrativeCanvas({
           onUpload={onAssetUpload}
           onRemove={onAssetRemove}
         />
-      </div>
-    </section>
+      </details>
+    </section></>
   );
 }
