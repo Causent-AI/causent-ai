@@ -79,6 +79,25 @@ test("provider output still obeys canonical value bounds", () => {
   assert.equal(decodeReportWire({ ...wire(), claims: [] }).success, true);
 });
 
+test("paragraph rewrites with empty unrelated labels use explicit missing defaults", () => {
+  const raw = {
+    ...wire(), projectName: "", title: " ", metricName: "", metricDefinition: "",
+    claims: [entry("decision", "Some customers leave before completing setup.")],
+  };
+  const decoded = decodeReportWire(raw);
+  assert.equal(decoded.success, true);
+  if (!decoded.success) return;
+  assert.equal(decoded.value.projectName, "New project");
+  assert.equal(decoded.value.title, "Decision Report draft");
+  assert.equal(decoded.value.metric.name, "Core metric needs confirmation");
+  assert.equal(decoded.value.metric.definition, "Define how this metric is calculated.");
+  assert.equal(decoded.value.metric.baselinePct, null);
+  assert.equal(decoded.value.decision.decision?.text, raw.claims[0].text);
+  assert.deepEqual(decoded.value.implementation.actions, []);
+  assert.equal(decodeReportWire({ ...raw, projectName: null }).success, false);
+  assert.equal(decodeReportWire({ ...raw, title: "x".repeat(181) }).success, false);
+});
+
 test("provider grammar has only one repeated claim object", () => {
   const schemaText = JSON.stringify(REPORT_WIRE_SCHEMA);
   assert.equal((schemaText.match(/"type":"object"/g) ?? []).length, 2);

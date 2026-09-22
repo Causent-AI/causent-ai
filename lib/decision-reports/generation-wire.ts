@@ -1,6 +1,7 @@
 import type { JSONSchema7 } from "ai";
 import {
   MODEL_CLAIM_KINDS,
+  GenerationContractError,
   validateModelDecisionReportDraft,
   type ModelClaimDraft,
 } from "./generation-contract.ts";
@@ -57,8 +58,12 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function label(value: unknown, missing: string): unknown {
+  return typeof value === "string" && !value.trim() ? missing : value;
+}
+
 export function decodeReportWire(value: unknown): ReturnType<typeof validateModelDecisionReportDraft> {
-  const invalid = () => ({ success: false as const, error: new Error("Generated report transport is malformed.") });
+  const invalid = () => ({ success: false as const, error: new GenerationContractError("transport") });
   if (!record(value) || !Array.isArray(value.claims) || value.claims.length > 100) return invalid();
   if (Object.keys(value).some((key) => !REPORT_WIRE_SCHEMA.required!.includes(key))) return invalid();
   const sections = new Map<Field, ModelClaimDraft[]>();
@@ -94,8 +99,8 @@ export function decodeReportWire(value: unknown): ReturnType<typeof validateMode
   const first = (field: Field) => sections.get(field)?.[0] ?? null;
   const list = (field: Field) => sections.get(field) ?? [];
   const draft = {
-    projectName: value.projectName,
-    title: value.title,
+    projectName: label(value.projectName, "New project"),
+    title: label(value.title, "Decision Report draft"),
     decision: { decision: first("decision"), background: first("background"), problem: first("problem") },
     supportingEvidence: { factors: list("factor"), metricMechanism: null },
     implementation: {
@@ -112,7 +117,8 @@ export function decodeReportWire(value: unknown): ReturnType<typeof validateMode
       },
     },
     metric: {
-      name: value.metricName, definition: value.metricDefinition,
+      name: label(value.metricName, "Core metric needs confirmation"),
+      definition: label(value.metricDefinition, "Define how this metric is calculated."),
       baselinePct: value.baselinePct, baselineEvidenceQuote: value.baselineEvidenceQuote,
       baselineSourceChunkId: value.baselineSourceChunkId,
       predictedPct: value.predictedPct, predictedEvidenceQuote: value.predictedEvidenceQuote,

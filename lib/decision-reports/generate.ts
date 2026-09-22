@@ -5,6 +5,7 @@ import { NoObjectGeneratedError, Output, generateText, jsonSchema } from "ai";
 import {
   DECISION_REPORT_PROMPT_MAX_CHARS,
   DECISION_REPORT_PROMPT_MIN_CHARS,
+  GenerationContractError,
   createSafeFallbackReport,
   materializeModelDecisionReport,
   recoverStringifiedModelDecisionReportDraft,
@@ -65,6 +66,7 @@ function generationErrorDetails(error: unknown) {
           : null,
       outputCharacters: error.text?.length ?? 0,
       outputShape: generatedOutputShape(error.text),
+      validationCode: generationValidationCode(error),
       usage: error.usage,
     };
   }
@@ -72,6 +74,15 @@ function generationErrorDetails(error: unknown) {
   return {
     name: error instanceof Error ? error.name : "Unknown generation error",
   };
+}
+
+function generationValidationCode(error: unknown): string | null {
+  let current = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    if (current instanceof GenerationContractError) return current.code;
+    current = current.cause;
+  }
+  return null;
 }
 
 function generatedOutputShape(text: string | undefined) {
@@ -176,6 +187,7 @@ async function generateDraftWithGateway(
         description: "A compact three-section Decision Report draft with explicit provenance.",
       }),
       temperature: 0.2,
+      reasoning: "low",
       maxOutputTokens: GENERATION_OUTPUT_TOKENS,
       maxRetries: 0,
       abortSignal: signal,

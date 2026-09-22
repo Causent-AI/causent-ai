@@ -16,7 +16,7 @@ Status: **held for live AI acceptance**. [PR #38](https://github.com/Causent-AI/
 | Workers | Source `906dd7a`; drift `dpl_CdKNvUQVm2RiGhH6tdQXyxhS8KBm`, recompute `dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4`, resolve `dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt` |
 | Exposure | Existing authenticated default-on with explicit rollback; no membership or assignment changes |
 
-The owner authorized implementation, PR updates, candidates and production rollout after verification. Synthetic acceptance was limited to two isolated workspaces and six normal AI requests. All six have run; no further AI requests are authorized. Both test workspaces are archived. Unrelated prototype evidence and `plugins/` remain untouched.
+The owner authorized implementation, PR updates, candidates and production rollout after verification. Synthetic acceptance was limited to two isolated workspaces and six normal AI requests. After those six requests, the owner explicitly instructed continued testing and fixes. The fresh-account test workspace is temporarily restored; the owner test workspace remains archived. Unrelated prototype evidence and `plugins/` remain untouched.
 
 ## Product changes
 
@@ -32,7 +32,7 @@ Calendar summaries require complete windows. GA4/BigQuery setup, custom saved ha
 
 ## Acceptance evidence
 
-- **Local:** 742 application/database tests pass, with 19 optional paid-model tests skipped; no database skips. The prior full design run passed 1,338 engine/RLS/bridge and 27 prototype/load cases. Types and changed-file lint pass. Hosted CI on `ab606bd` passed all app/engine/RLS/bridge gates and both Vercel builds: [run 35784300322](https://github.com/Causent-AI/causent-ai/actions/runs/35784300322). The compact-response follow-up needs its own hosted checks.
+- **Local:** 743 application/database tests pass, with 19 optional paid-model tests skipped; no database skips. The prior full design run passed 1,338 engine/RLS/bridge and 27 prototype/load cases. Types and changed-file lint pass. Hosted CI on `ab606bd` passed all app/engine/RLS/bridge gates and both Vercel builds: [run 35784300322](https://github.com/Causent-AI/causent-ai/actions/runs/35784300322). The compact-response commit `8f82f3b` also passed full hosted CI [35786332224](https://github.com/Causent-AI/causent-ai/actions/runs/35786332224) and both preview builds.
 - **Both accounts:** normal Google sign-in, create/edit/autosave/reload/direct reopen, synchronized title, section rename, added note, observed chart, two selected metrics, three actions, activation and every Claude/Codex preview pass. Each account has one registered primary action, one supporting primary-metric action and one secondary monitoring action. No external handoff was executed.
 - **UI:** all five routes, source/upload dialogs, graph pointer/keyboard selection, metric filter and Fit pass. Data, Reports, onboarding and Graph were inspected at 390px without document overflow. Mobile viewport override was reset.
 - **Navigation invariants:** owner remained at 3 reports / 20 revisions / 2 activations / 6 actions / 2 predictions / 16 telemetry events. Fresh account remained at 4 / 12 / 2 / 7 / 2 / 22 during its navigation-only comparison. Both had zero recompute jobs and transitions; activation digests matched. Later explicit generation requests added only synthetic drafts/receipts.
@@ -44,12 +44,12 @@ Six user-triggered requests cost **$0.1129 total**. Requests 1–3 returned malf
 
 The final correction uses a **1,404-byte flat transport schema** instead of the original 6,666-byte nested provider schema. It describes a single repeated claim shape. A server adapter checks field names, action indexes, duplicates, cardinality and original value bounds, then constructs the unchanged canonical report. Existing materialization still verifies exact source quotes, removes invented numeric evidence and leaves unsupported owners/customers missing. The adapter does not alter persistence, auth, model choice, generation budgets or retry policy. Default provider mode is restored so Gateway can choose a compatible route.
 
-Six transport tests cover mapping, provenance, malformed bindings, bounds, grammar size and an actual AI SDK mock-response conversion. These are local contract evidence, **not live Sonnet acceptance**. Full generation and rewriting must pass on the compact-schema candidate before release.
+Six transport tests cover mapping, provenance, malformed bindings, bounds, grammar size and an actual AI SDK mock-response conversion. These are local contract evidence, **not live Sonnet acceptance**. Live generation passed on compact-schema candidate `dpl_3yf4fDS7gFaFnj2iH4r1E9TieYMD` (`8f82f3b`), created three actions and survived title edit/reload. Its first attempt spent all 2,200 output tokens on reasoning; the built-in retry returned a valid report. The resulting three-minute reservation briefly blocked the rewrite, as intended. The rewrite then returned the compact structure but failed local validation. The follow-up gives empty labels the existing explicit missing-state defaults and sets AI SDK reasoning to low so the fixed output allowance leaves room for report text. Budgets and model remain unchanged. A regression case covers rewrites with empty labels; error diagnostics now include a fixed validation category without source text. Both live paths still need verification on that follow-up.
 
 ## Remaining release steps
 
-1. Finish CI/build for the compact-schema commit and record its immutable candidate ID/source.
-2. Obtain a new bounded AI-request allowance; the six-request limit is exhausted. Restore only an isolated scope for normal generation/rewrite, confirm live mode, autosave and reload, then archive it again and compare invariants.
+1. Finish CI/build for the rewrite-label/effort correction and record its immutable candidate ID/source.
+2. Complete the authorized continued generation/rewrite checks, confirm live mode, autosave and reload, then archive the isolated scope again and compare invariants.
 3. Recheck exact source, candidate, production alias, unchanged database/workers, GA4-off setting and exposure. Merge #38 and explicitly promote only after acceptance passes.
 4. Verify the public alias and signed-in routes, all-action controls, error logs and worker health. Retain the baseline artifact for rollback; preserve schema and audit records.
 

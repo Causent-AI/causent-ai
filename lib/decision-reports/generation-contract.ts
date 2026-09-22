@@ -89,6 +89,15 @@ export type DecisionReportGeneration = {
   sourceSummaries: ReportSourceSummary[];
 };
 
+export class GenerationContractError extends Error {
+  readonly code: "metadata" | "bounds" | "shape" | "transport";
+  constructor(code: GenerationContractError["code"]) {
+    super(`Generated report validation failed: ${code}.`);
+    this.name = "GenerationContractError";
+    this.code = code;
+  }
+}
+
 type IdFactory = () => string;
 
 const claimDraftSchema: JSONSchema7 = {
@@ -274,10 +283,10 @@ export function validateModelDecisionReportDraft(
   value: unknown,
 ): { success: true; value: ModelDecisionReportDraft } | { success: false; error: Error } {
   if (!isRecord(value) || typeof value.projectName !== "string" || typeof value.title !== "string") {
-    return { success: false, error: new Error("Generated report metadata is malformed.") };
+    return { success: false, error: new GenerationContractError("metadata") };
   }
   if (!withinSchemaBounds(value, MODEL_DECISION_REPORT_JSON_SCHEMA)) {
-    return { success: false, error: new Error("Generated report exceeds the generation bounds.") };
+    return { success: false, error: new GenerationContractError("bounds") };
   }
 
   const decision = value.decision;
@@ -325,7 +334,7 @@ export function validateModelDecisionReportDraft(
     typeof metric.predictedEvidenceQuote !== "string" ||
     typeof metric.predictedSourceChunkId !== "string"
   ) {
-    return { success: false, error: new Error("Generated report does not match the generation contract.") };
+    return { success: false, error: new GenerationContractError("shape") };
   }
 
   return { success: true, value: value as ModelDecisionReportDraft };

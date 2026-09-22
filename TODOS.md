@@ -5,7 +5,7 @@
 - [x] Implement the authenticated application design; preserve backend contracts, default models and disabled GA4.
 - [x] Correct design fidelity against Proposal D and pass local checks for the revised layout. Earlier candidate checks cover both accounts and unchanged data; repeat affected acceptance on the replacement.
 - [x] Verify hosted design editing, charts, two-metric/three-action activation and every handoff with both accounts.
-- [ ] Verify live generation and rewriting on the compact-response candidate. Six approved requests are exhausted; additional AI calls require a new allowance. Both synthetic scopes are archived and original data digests match.
+- [ ] Finish the authorized live tests: compact-format generation passes, but rewriting needs the empty-label/low-effort correction. Re-archive the fresh test scope and verify original data digests.
 - [ ] Merge #38, promote the verified candidate, verify `app.causent.ai`, archive test workspaces and close the [release record](docs/releases/2026-09-22-proposal-d-production.md).
 
 ## 2026-09-22 production release
