@@ -1,22 +1,22 @@
 # Proposal D production rollout
 
-Status: **held for live AI acceptance**. [PR #38](https://github.com/Causent-AI/causent-ai/pull/38) implements the approved design. Production still runs PR #37. Google Analytics stays disabled.
+Verdict: **READY_TO_PROMOTE**. [PR #38](https://github.com/Causent-AI/causent-ai/pull/38) implements the approved design and records the subsequent merge/promotion result. This document records acceptance of the immutable candidate below; Google Analytics stays disabled.
 
 ## Release identity
 
 | State | Verified value |
 | --- | --- |
 | Branch | `codex/proposal-d-production`, based on main `9dcc20b5c74ae0633f88fe077aacec6c93ed2638` |
-| Production / rollback | `app.causent.ai` → `dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`, source `9dcc20b` |
+| Pre-release production / rollback | `app.causent.ai` → `dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`, source `9dcc20b` |
 | Rollback URL | `https://causent-izflytjml-adamdavidowens-1984s-projects.vercel.app` |
-| Last tested candidate | `dpl_3Lb92ScWUqwVBX86TjuPJVbtt1Xf`, source `ab606bd9ed19c53f3a4fe128d09915fc364a6093` — live generation failed |
-| Candidate URL | `https://causent-dsz9tpqnm-adamdavidowens-1984s-projects.vercel.app` |
+| Accepted candidate | `dpl_AiqPYUy1eFqYCvFpbvwACVMvfiYH`, source `1ee763e41ebd444544c790956c05d7165479a76d` |
+| Candidate URL | `https://causent-5xn23m6sr-adamdavidowens-1984s-projects.vercel.app` |
 | Review alias | `causent-ai-adamdavidowens-1984s-projects.vercel.app`; verify the exact deployment before acceptance |
 | Supabase | `royftsqyawtyfjolfabd`, 47 migrations; no schema changes |
 | Workers | Source `906dd7a`; drift `dpl_CdKNvUQVm2RiGhH6tdQXyxhS8KBm`, recompute `dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4`, resolve `dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt` |
 | Exposure | Existing authenticated default-on with explicit rollback; no membership or assignment changes |
 
-The owner authorized implementation, PR updates, candidates and production rollout after verification. Synthetic acceptance was limited to two isolated workspaces and six normal AI requests. After those six requests, the owner explicitly instructed continued testing and fixes. The fresh-account test workspace is temporarily restored; the owner test workspace remains archived. Unrelated prototype evidence and `plugins/` remain untouched.
+The owner authorized implementation, PR updates, candidates and production rollout after verification. Continued synthetic testing was explicitly authorized after the initial six requests. Both isolated test workspaces are archived; audit history is retained. Original data, memberships, rollout assignments, schema and workers are unchanged. Unrelated prototype evidence and `plugins/` remain untouched.
 
 ## Product changes
 
@@ -32,25 +32,28 @@ Calendar summaries require complete windows. GA4/BigQuery setup, custom saved ha
 
 ## Acceptance evidence
 
-- **Local:** 743 application/database tests pass, with 19 optional paid-model tests skipped; no database skips. The prior full design run passed 1,338 engine/RLS/bridge and 27 prototype/load cases. Types and changed-file lint pass. Hosted CI on `ab606bd` passed all app/engine/RLS/bridge gates and both Vercel builds: [run 35784300322](https://github.com/Causent-AI/causent-ai/actions/runs/35784300322). The compact-response commit `8f82f3b` also passed full hosted CI [35786332224](https://github.com/Causent-AI/causent-ai/actions/runs/35786332224) and both preview builds.
-- **Both accounts:** normal Google sign-in, create/edit/autosave/reload/direct reopen, synchronized title, section rename, added note, observed chart, two selected metrics, three actions, activation and every Claude/Codex preview pass. Each account has one registered primary action, one supporting primary-metric action and one secondary monitoring action. No external handoff was executed.
-- **UI:** all five routes, source/upload dialogs, graph pointer/keyboard selection, metric filter and Fit pass. Data, Reports, onboarding and Graph were inspected at 390px without document overflow. Mobile viewport override was reset.
-- **Navigation invariants:** owner remained at 3 reports / 20 revisions / 2 activations / 6 actions / 2 predictions / 16 telemetry events. Fresh account remained at 4 / 12 / 2 / 7 / 2 / 22 during its navigation-only comparison. Both had zero recompute jobs and transitions; activation digests matched. Later explicit generation requests added only synthetic drafts/receipts.
-- **Original data:** counts and revision/activation/membership digests match before/after the entire run, excluding only the two authorized test scopes: 8 reports, 23 revisions, 6 activations, 17 predictions, 11 metrics, 1,504 observations, 244 evidence rows, 4 memberships and 1 active workspace. Both synthetic scopes are confirmed archived through the existing archive RPC; their audit records remain intact.
+- **Source gates:** 743 application/database tests pass; 19 optional paid-model tests are skipped, with no database skips. The full design run passed 1,338 engine/RLS/bridge and 27 prototype/load cases. Types, lint, schema checks, dashboard gate and production build pass. Final implementation CI and both Vercel previews pass: [run 35788196916](https://github.com/Causent-AI/causent-ai/actions/runs/35788196916). The closing commit changes documentation only.
+- **Both accounts:** normal Google sign-in; create/edit/autosave/reload/direct reopen; synchronized title; section rename; added note; observed chart; two selected metrics; three actions; activation; every Claude/Codex preview. Each account exercises a registered primary action, a supporting primary-metric action and a secondary monitoring action. No external handoff was executed.
+- **Final live AI:** new-report generation completed in one attempt, 9.053s, and rewriting in one attempt, 4.471s. Both receipts report `live`; generated text, title, selected metrics and the kept rewrite survive reload. Final-build activation and all six generated-action handoff previews also pass. Candidate logs contain no errors or warnings after these checks.
+- **UI:** all five routes, source/upload dialogs, graph pointer/keyboard selection, metric filter and Fit pass. Data, Reports, onboarding and Graph fit 390px without document overflow. Mobile viewport override was reset.
+- **Navigation:** owner counters remain unchanged across its read-only pass. On the final build, fresh-account navigation remains at 7 reports / 19 revisions / 3 activations / 10 actions / 3 predictions / 38 telemetry events, with zero jobs/transitions and an unchanged activation digest. Explicit report generation and editing are excluded from navigation comparisons.
+- **Original data:** counts and revision/activation/membership digests match the pre-test baseline, excluding only the authorized scopes: 8 reports, 23 revisions, 6 activations, 17 predictions, 11 metrics, 1,504 observations, 244 evidence rows, 4 memberships and 1 active workspace. Both synthetic scopes are confirmed archived through the existing archive RPC.
 
-## AI release blocker and correction
+## AI reliability decisions
 
-Six user-triggered requests cost **$0.1129 total**. Requests 1–3 returned malformed structured output. Request 4 successfully rewrote a paragraph on `6a4041c`; Keep and reload passed. Request 5 still failed full-report validation. Request 6 on `ab606bd` failed before generation: Claude Platform on AWS and Anthropic rejected the compiled grammar; Bedrock rejected forced native output and Vertex returned 400. Its existing automatic retry also failed; both gateway attempts cost $0. No failed response was represented as a successful AI result, and every brief was preserved.
+The original nested response schema exceeded provider grammar limits. A **1,404-byte flat transport schema** replaces the 6,666-byte provider schema. A server adapter validates claim field names, action indexes, duplicates, cardinality and original value bounds before constructing the unchanged canonical report. Existing materialization still checks source quotes, removes unsupported numeric evidence and leaves unknown facts missing.
 
-The final correction uses a **1,404-byte flat transport schema** instead of the original 6,666-byte nested provider schema. It describes a single repeated claim shape. A server adapter checks field names, action indexes, duplicates, cardinality and original value bounds, then constructs the unchanged canonical report. Existing materialization still verifies exact source quotes, removes invented numeric evidence and leaves unsupported owners/customers missing. The adapter does not alter persistence, auth, model choice, generation budgets or retry policy. Default provider mode is restored so Gateway can choose a compatible route.
+Empty metadata strings receive explicit missing-state labels; wrong types and missing required fields still fail validation. Low reasoning effort preserves room for report text within the unchanged 2,200-token output limit. Sonnet 5, retry policy, budgets, authorization and persistence remain unchanged. Seven transport tests cover mapping, provenance, malformed bindings, bounds, empty labels, grammar size and actual AI SDK mock-response conversion. The live results above separately verify provider acceptance.
 
-Six transport tests cover mapping, provenance, malformed bindings, bounds, grammar size and an actual AI SDK mock-response conversion. These are local contract evidence, **not live Sonnet acceptance**. Live generation passed on compact-schema candidate `dpl_3yf4fDS7gFaFnj2iH4r1E9TieYMD` (`8f82f3b`), created three actions and survived title edit/reload. Its first attempt spent all 2,200 output tokens on reasoning; the built-in retry returned a valid report. The resulting three-minute reservation briefly blocked the rewrite, as intended. The rewrite then returned the compact structure but failed local validation. The follow-up gives empty labels the existing explicit missing-state defaults and sets AI SDK reasoning to low so the fixed output allowance leaves room for report text. Budgets and model remain unchanged. A regression case covers rewrites with empty labels; error diagnostics now include a fixed validation category without source text. Both live paths still need verification on that follow-up.
+Ten admitted checks across the correction sequence cost **$0.1920** including automatic retries. The final generation cost $0.0161 and rewrite $0.0068. One additional fresh-account attempt was blocked by the existing daily reservation budget before a provider call; limits were not raised. Earlier invalid results preserved the brief and did not silently replace edited text.
 
-## Remaining release steps
+## Release and rollback
 
-1. Finish CI/build for the rewrite-label/effort correction and record its immutable candidate ID/source.
-2. Complete the authorized continued generation/rewrite checks, confirm live mode, autosave and reload, then archive the isolated scope again and compare invariants.
-3. Recheck exact source, candidate, production alias, unchanged database/workers, GA4-off setting and exposure. Merge #38 and explicitly promote only after acceptance passes.
-4. Verify the public alias and signed-in routes, all-action controls, error logs and worker health. Retain the baseline artifact for rollback; preserve schema and audit records.
+1. Merge only with all required checks green. Promote the accepted immutable candidate explicitly, retaining its source identity even though the closing commit contains documentation updates.
+2. Confirm `app.causent.ai` resolves to that candidate. Repeat signed-in route checks, confirm all-action controls, inspect logs and worker health. Record deployment evidence in [PR #38](https://github.com/Causent-AI/causent-ai/pull/38).
+3. Keep existing authenticated default-on exposure with explicit rollback. GA4 remains off; custom connectors, saved harnesses and portfolio attribution remain separate work.
+4. If needed, restore the prior application with `vercel promote https://causent-izflytjml-adamdavidowens-1984s-projects.vercel.app --yes --scope adamdavidowens-1984s-projects`, then verify the public alias. Preserve schema and append-only audit records.
+
+Automated acceptance does not establish unassisted partner validation or a measured causal outcome before the registered observation window completes.
 
 [Engineering review](../reviews/2026-09-22/PRODUCTION_DESIGN_REVIEW.md) · [GA4 handoff](../handoffs/ga4-core-metrics.md) · [prior production infrastructure record](2026-09-22-production.md).

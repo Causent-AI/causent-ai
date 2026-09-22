@@ -2,7 +2,7 @@
 
 ## Overview
 
-This release ports Proposal D into the authenticated Next.js application. A fidelity correction restores the approved page layouts after the initial port proved incomplete. It uses saved reports, real imported observations and authorized workspace data. Existing activation, measurement, provenance and AI budget controls remain in force. Google Analytics stays disabled. Design acceptance passes with both accounts. Release is held on live AI generation: the six approved requests are exhausted, and a compact-response correction needs provider acceptance. Production remains PR #37; both synthetic workspaces are archived. Release evidence is recorded in the [release manifest](../../releases/2026-09-22-proposal-d-production.md).
+This release ports Proposal D into the authenticated Next.js application. A fidelity correction restores the approved page layouts after the initial port proved incomplete. It uses saved reports, real imported observations and authorized workspace data. Existing activation, measurement, provenance and AI budget controls remain in force. Google Analytics stays disabled. Design acceptance passes with both accounts. Full-report generation and rewriting now pass on the same corrected candidate, each in one attempt. Both synthetic workspaces are archived and original data/audit digests match. The candidate is ready to promote; PR #38 records the subsequent merge and production verification. Release evidence is recorded in the [release manifest](../../releases/2026-09-22-proposal-d-production.md).
 
 ## Executive Summary
 
@@ -14,7 +14,7 @@ This release ports Proposal D into the authenticated Next.js application. A fide
 
 ## Next Steps
 
-1. Finish the compact-response candidate checks, then verify live generation/rewrite within a newly approved request allowance. Merge/promote only after acceptance passes and verify the exact production alias.
+1. Merge with green checks, promote the accepted candidate and verify the public alias. Candidate acceptance is complete; record the final deployment in PR #38.
 2. Keep GA4 at **Setup required** until the owner provides a Google account/property and completes the [provider acceptance](../../integrations/google-analytics.md#setup-pending).
 3. Treat custom harness persistence, local execution, additional connections, cross-project metric identity and portfolio attribution as separate backend work. The current interface does not simulate these capabilities.
 
@@ -24,7 +24,7 @@ This release ports Proposal D into the authenticated Next.js application. A fide
 
 The approved prototype defines spacing, hierarchy, color and controls. Real records replace sample content. Reports keep meaningful immutable-version controls; measurement views keep attribution caveats. Healthy background status moves into details, while queued/failed updates remain visible. Connections do not claim success without a configured service. Manual harness guides retain the Build, Review and UX review card layout without fabricating saved configurations or provider prices.
 
-Latest local application/database checks: 742 pass; 19 optional paid-model tests are skipped. The full design run passed 1,338 engine/RLS/bridge and 27 prototype/load tests, types, lint and build. Both-account editing, observed charts, two-metric/three-action activation and all twelve handoff previews pass. Mobile routes fit 390px, navigation counters remain unchanged and original data digests match. Live AI acceptance remains the release gate.
+Latest local application/database checks: 743 pass; 19 optional paid-model tests are skipped. The full design run passed 1,338 engine/RLS/bridge and 27 prototype/load tests, types, lint and build. Both-account editing, observed charts, two-metric/three-action activation and all twelve handoff previews pass. Mobile routes fit 390px, navigation counters remain unchanged and original data digests match. Final live generation and rewriting pass, with no candidate runtime errors or warnings.
 
 ### Build and verification method
 
@@ -32,7 +32,7 @@ The application uses React 19.2.4, Next.js 16.3.5 and Tiptap 3.31.3. Server comp
 
 A stale local server was restarted before visual checks. Local tests initially skipped database cases because network access was unavailable; the decisive run used the verified, isolated 47-migration database. Only optional paid model-polish tests remain skipped. Deployment checks are separate from local checks and founder acceptance.
 
-The original nested response schema exceeded Sonnet's compiled-grammar limit. Prompt strengthening did not solve it; JSON-tool mode passed one rewrite but still returned an invalid full report. Removing nullable branches was insufficient. The final correction uses one repeated claim shape in a flat provider payload, then validates and converts it into the original report contract. Local AI SDK conversion, malformed-binding, provenance and bounds tests pass. The six approved normal requests cost $0.1129; the last request and its existing automatic retry were rejected before inference at $0. No live result for the compact format is claimed.
+The original nested response schema exceeded Sonnet's compiled-grammar limit. A flat provider payload now carries one repeated claim shape; the server validates it into the original canonical report. Empty labels receive explicit missing-state defaults, and low reasoning effort leaves room for text within the unchanged token cap. Local contract/provenance checks and actual hosted provider calls both pass. Final generation took 9.053s and rewriting 4.471s, each in one attempt. The ten admitted checks cost $0.1920 including retries. A further request was blocked by the existing daily budget before inference; no limit was raised. Failed outputs preserved user text.
 
 ### D01 — Shared shell
 

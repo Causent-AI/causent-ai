@@ -5,7 +5,7 @@
 - [x] Implement the authenticated application design; preserve backend contracts, default models and disabled GA4.
 - [x] Correct design fidelity against Proposal D and pass local checks for the revised layout. Earlier candidate checks cover both accounts and unchanged data; repeat affected acceptance on the replacement.
 - [x] Verify hosted design editing, charts, two-metric/three-action activation and every handoff with both accounts.
-- [ ] Finish the authorized live tests: compact-format generation passes, but rewriting needs the empty-label/low-effort correction. Re-archive the fresh test scope and verify original data digests.
+- [x] Pass live generation/rewrite on the corrected candidate, archive both synthetic scopes and verify original data/audit digests.
 - [ ] Merge #38, promote the verified candidate, verify `app.causent.ai`, archive test workspaces and close the [release record](docs/releases/2026-09-22-proposal-d-production.md).
 
 ## 2026-09-22 production release
@@ -14,7 +14,7 @@
 - [x] Fix the candidate OAuth return with its exact allowed callback; verify existing-account navigation, six handoff previews, GA4 placeholder, logs and unchanged data.
 - [x] Verify new-report autosave/reopen, two uploaded metrics, secondary-metric action, activation and all six handoff previews; archive the isolated synthetic workspace and preserve original production data.
 - [x] Verify live Sonnet 5 generation after the owner added Gateway credits; draft autosave/reload passes, cost $0.0231.
-- [ ] Improve structured-output reliability: simplify/test the schema across provider routes and investigate malformed output. Two providers rejected the compiled grammar; one fresh-account response failed validation safely, then a normal retry passed.
+- [x] Improve structured-output reliability in #38: compact validated transport, explicit missing labels and low reasoning effort; final live generation/rewrite pass in one attempt. Provider failures still preserve the brief.
 - [x] Verify the activated Reports metric-label fix, navigation and all six handoff previews on candidate `239a245`.
 - [x] Verify new-account creation and isolated member provisioning; fix silent Google-account reuse and verify the chooser on candidate `e6fe2c8`, with hosted checks passing.
 - [x] Finish fresh-account candidate acceptance: real OAuth, generation, saved edits/reload, two uploaded metrics, four-action activation, eight handoff previews, route continuity and unchanged navigation counters; archive the synthetic workspace.
