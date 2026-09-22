@@ -10,6 +10,7 @@ import {
   type ResolutionTuple,
 } from "@/lib/priors";
 import { getServerSupabase } from "@/lib/supabase-server";
+import { collectKeyset } from "./keyset";
 
 /**
  * Priors for a reference class. The class is (metric) narrowed by mechanism
@@ -22,19 +23,19 @@ export async function getPriorsForReferenceClass(params: {
   mechanismCategory?: string | null;
 }): Promise<ReferenceClassPriors> {
   const sb = await getServerSupabase();
-  const res = await sb
-    .from("predictions")
-    .select("resolved_verdict, resolution_tuple")
-    .eq("scope_id", params.scopeId)
-    .eq("metric_id", params.metricId)
-    .not("resolved_at", "is", null);
-  if (res.error) throw res.error;
+  type PriorRow = Parameters<typeof fromStoredTuple>[0] & { prediction_id: string };
+  const { rows } = await collectKeyset<PriorRow>((after, size) => {
+    let query = sb.from("predictions")
+      .select("prediction_id, resolved_verdict, resolution_tuple")
+      .eq("scope_id", params.scopeId).eq("metric_id", params.metricId)
+      .not("resolved_at", "is", null).order("prediction_id").limit(size);
+    if (after) query = query.gt("prediction_id", after);
+    return query;
+  }, (row) => row.prediction_id);
 
-  let tuples = (res.data as Parameters<typeof fromStoredTuple>[0][])
+  let tuples = rows
     .map(fromStoredTuple)
     .filter((t): t is ResolutionTuple => t !== null);
-  if (params.mechanismCategory) {
-    tuples = tuples.filter((t) => t.mechanismCategory === params.mechanismCategory);
-  }
+  tuples = tuples.filter((t) => t.mechanismCategory === (params.mechanismCategory ?? null));
   return computePriors(tuples);
 }

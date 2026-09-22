@@ -7,7 +7,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { computePriors, type ResolutionTuple } from "../priors.ts";
+import { computePriors, fromStoredTuple, type ResolutionTuple } from "../priors.ts";
 
 function tuple(over: Partial<ResolutionTuple>): ResolutionTuple {
   return {
@@ -22,6 +22,28 @@ function tuple(over: Partial<ResolutionTuple>): ResolutionTuple {
 }
 
 describe("computePriors", () => {
+  it("all inconclusive policy weights withhold aggregate predictions but retain coverage", () => {
+    const result = computePriors([tuple({ verdict: "INCONCLUSIVE", beliefScore: 0.5, measuredPct: 7 })]);
+    assert.equal(result.baseRate.weightedMeanPct, null);
+    assert.equal(result.calibration.weightedMeanErrorPct, null);
+    assert.equal(result.baseRate.minPct, 7);
+    assert.deepEqual(result.evaluation, { measuredCount: 1, confidentCount: 0, coveragePct: 0, meanAbsoluteErrorPct: null });
+  });
+
+  it("forecast errors are descriptive and do not count unmeasured cases as accurate", () => {
+    const result = computePriors([tuple({ predictedPct: 10, measuredPct: 6 }), tuple({ measuredPct: null, beliefScore: null })]);
+    assert.equal(result.evaluation.coveragePct, 50);
+    assert.equal(result.evaluation.meanAbsoluteErrorPct, 4);
+  });
+
+  it("malformed and observational historical tuples cannot inform causal history", () => {
+    const valid = { resolved_verdict: "CONFIRMED", resolution_tuple: { predicted_direction: "POSITIVE", predicted_magnitude_pct: 10, measured_pct: 3, belief_score: 1 } };
+    assert.notEqual(fromStoredTuple(valid), null);
+    for (const patch of [{ measured_pct: NaN }, { belief_score: 2 }, { predicted_direction: "unknown" }, { interpretation: "observational" }]) {
+      assert.equal(fromStoredTuple({ ...valid, resolution_tuple: { ...valid.resolution_tuple, ...patch } }), null);
+    }
+    assert.equal(computePriors([tuple({ measuredPct: Infinity })]).hasPrecedent, false);
+  });
   it("empty class → hasPrecedent false, no fabricated figures", () => {
     const p = computePriors([]);
     assert.equal(p.hasPrecedent, false);

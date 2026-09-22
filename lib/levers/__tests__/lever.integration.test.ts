@@ -16,7 +16,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { after, before, beforeEach, test } from "node:test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -352,6 +352,11 @@ test("a delivery received before its lever is durable and succeeds on exact retr
 test("a signed GitHub delivery cannot attribute a token from another repository", async (t) => {
   if (!available || !sb) return t.skip("local Supabase stack not reachable");
   const client = sb;
+  const deliveryId = `delivery-wrong-repository-${randomUUID()}`;
+  t.after(async () => {
+    const cleanup = await client.from("connector_webhook_inbox").delete().eq("provider", "github").eq("provider_event_id", deliveryId);
+    assert.equal(cleanup.error, null, cleanup.error?.message);
+  });
   const drafted = await draftLeverFromDecision(client, WS, draftInput());
   assert.equal(drafted.ok, true);
 
@@ -371,13 +376,13 @@ test("a signed GitHub delivery cannot attribute a token from another repository"
   const outcome = await processIssueWebhook(client, {
     rawBody,
     signature,
-    deliveryId: "delivery-wrong-repository",
+    deliveryId,
     secret: SECRET,
   });
   assert.equal(outcome.result, "queued_retry");
   assert.equal(await isAttributed(client), false);
   assert.equal((await client.from("transition_events").select("event_id", { count: "exact", head: true })
-    .eq("source", "github").eq("provider_event_id", "delivery-wrong-repository")).count, 0);
+    .eq("source", "github").eq("provider_event_id", deliveryId)).count, 0);
 });
 
 // ============================================================================

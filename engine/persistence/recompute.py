@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, replace
+from time import perf_counter
 from datetime import timedelta
 from uuid import UUID
 
@@ -30,6 +32,7 @@ class RecomputeResult:
     generation: int
     status: str
     detail: str
+    timings_ms: dict[str, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -297,9 +300,29 @@ def process_next_recompute_job(
     scope_id: UUID | str | None = None,
     metric_id: UUID | str | None = None,
 ) -> RecomputeResult | None:
+    """Process atomically and expose bounded phase timings without source data."""
+    timings: dict[str, float] = {}
+    started = perf_counter()
+    result = _process_next_recompute_job(conn, scope_id=scope_id, metric_id=metric_id, timings=timings)
+    if result is None:
+        return None
+    timings["total"] = round((perf_counter() - started) * 1000, 3)
+    # Includes Python return/receipt overhead after commit: an upper bound, not
+    # a claim that pg_locks was sampled continuously.
+    timings["post_claim"] = round(max(0, timings["total"] - timings["claim"]), 3)
+    timings["lock_held_upper"] = timings["total"]
+    logger = logging.getLogger("causent.recompute")
+    log = logger.warning if timings["lock_held_upper"] >= 1000 else logger.info
+    log(json.dumps({"event": "recompute_timing", "status": result.status, "timings_ms": timings}))
+    return replace(result, timings_ms=timings)
+
+
+def _process_next_recompute_job(conn: Connection, *, scope_id, metric_id, timings: dict[str, float]) -> RecomputeResult | None:
     """Lock and process one eligible generation on ``conn``."""
+    phase = perf_counter()
     conn.execute("reset role")
     job = _claim_job(conn, scope_id=scope_id, metric_id=metric_id)
+    timings["claim"] = round((perf_counter() - phase) * 1000, 3)
     if job is None:
         conn.rollback()
         return None
@@ -308,16 +331,20 @@ def process_next_recompute_job(
     # newer enqueue generation acquires the row and is then overwritten.
     conn.execute("savepoint causal_recompute_work")
     try:
+        phase = perf_counter()
         target = _resolve_current_target(conn, job)
+        timings["target"] = round((perf_counter() - phase) * 1000, 3)
         if target is None:
             _finish(conn, job, input_hash=None, error_code="SUPERSEDED_POINTER")
             return RecomputeResult(
                 job.activation_id, job.generation, "SUPERSEDED", "current pointer moved"
             )
         _set_actor(conn, target.actor_id)
+        phase = perf_counter()
         measurement = load_measurement_input(
             conn, job.scope_id, job.metric_id, job.activation_id, target.action_ids
         )
+        timings["input"] = round((perf_counter() - phase) * 1000, 3)
         input_hash = measurement.input_hash
         if input_hash == job.last_input_hash:
             _finish(
@@ -334,6 +361,7 @@ def process_next_recompute_job(
                 "input hash already processed",
             )
 
+        phase = perf_counter()
         persist_metric_readouts(
             conn,
             job.scope_id,
@@ -342,6 +370,7 @@ def process_next_recompute_job(
             activation_id=job.activation_id,
             commit=False,
         )
+        timings["analysis_and_write"] = round((perf_counter() - phase) * 1000, 3)
         _finish(
             conn,
             job,

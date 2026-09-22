@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Causent — document workspace proposal</title>
+  <style>
+    :root { --ink:#242927; --muted:#717975; --line:#e1e5e1; --paper:#fff; --canvas:#f4f5f2; --soft:#eff2ee; --green:#315e4c; --green-soft:#e7efe9; --amber:#936c20; --sans:Inter,"Segoe UI",Arial,sans-serif; --serif:Georgia,"Times New Roman",serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--canvas); font-family:var(--sans); font-size:14px; line-height:1.5; }
+    button,input,textarea,select { font:inherit; }
+    button { color:inherit; cursor:pointer; }
+    button:disabled { cursor:default; opacity:.45; }
+    button,a,input,textarea,select,[contenteditable] { -webkit-tap-highlight-color:transparent; }
+    :focus-visible { outline:2px solid var(--green); outline-offset:3px; }
+    [hidden] { display:none !important; }
+    a { color:var(--green); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+    .icon { width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0; }
+    .proposal-bar { min-height:34px;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 25px;background:#e7ebe5;color:#525e53;font-size:11px;letter-spacing:.025em; }
+    .proposal-bar strong { font-weight:650; }
+    .proposal-bar .dot { width:5px;height:5px;border-radius:50%;display:inline-block;background:#7b927a;margin:0 7px 2px; }
+    .proposal-bar a { color:inherit; }
+    .topbar { min-height:72px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 27px;background:#fff;border-bottom:1px solid var(--line);gap:18px; }
+    .brand { display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.055em; }
+    .brand-mark { position:relative;width:25px;height:25px;border:2px solid var(--green);border-radius:50%; }
+    .brand-mark::after { content:"";position:absolute;width:9px;height:9px;top:6px;left:6px;background:var(--green);border-radius:50%; }
+    .project { margin-left:10px;padding-left:17px;border-left:1px solid var(--line);font-size:12px;letter-spacing:0;font-weight:450;color:var(--muted); }
+    .tabs { display:flex;gap:6px; }
+    .tab { display:flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:8px 14px;background:transparent;border:0;border-radius:7px;font-size:12px;font-weight:550;color:var(--muted); }
+    .tab:hover { background:var(--soft); }
+    .tab[aria-selected="true"] { color:var(--ink);background:var(--soft); }
+    .header-end { display:flex;align-items:center;justify-content:flex-end;gap:14px; }
+    .avatar { width:29px;height:29px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;font-size:10px;color:#6e756e; }
+    .btn { min-height:38px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);border-radius:6px;padding:7px 12px;background:#fff;font-size:12px;font-weight:550;white-space:nowrap; }
+    .btn:hover { background:var(--soft); }
+    .btn.primary { background:var(--green);color:#fff;border-color:var(--green); }
+    .btn.primary:hover { background:#254c3c; }
+    .btn.quiet { border-color:transparent;background:transparent; }
+    .btn.quiet:hover,.btn[aria-pressed="true"] { background:var(--soft); }
+    .btn.icon-only { width:38px;padding:0; }
+    .pill { display:inline-flex;align-items:center;gap:5px;border-radius:4px;background:var(--soft);color:#617065;padding:3px 7px;font-size:10px;font-weight:550;white-space:nowrap; }
+    .pill.amber { color:#88671f;background:#f8f1df; }
+    .pill.green { color:#365e46;background:var(--green-soft); }
+    .workbar { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 28px 13px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.5); }
+    .crumb { font-size:12px;color:var(--muted);display:flex;gap:9px;align-items:center; }
+    .crumb strong { color:var(--ink);font-weight:550; }
+    .work-actions { display:flex;align-items:center;gap:8px; }
+    .status { color:var(--muted);font-size:11px; }
+    .compare { margin:18px 28px 0;padding:17px 20px;border-left:2px solid #89997c;background:#eef0e9; }
+    .compare-top { display:flex;justify-content:space-between;gap:20px;align-items:flex-start; }
+    .compare h2 { margin:0 0 12px;font-size:12px;font-weight:650; }
+    .compare-grid { display:grid;grid-template-columns:1fr 1fr;gap:30px; }
+    .compare small { display:block;text-transform:uppercase;font-size:9px;letter-spacing:.1em;color:#788071;margin-bottom:5px; }
+    .compare p { margin:0;color:#53604f;font-size:12px;line-height:1.65; }
+    .compare .note { margin-top:10px;font-size:10px;color:#76816c; }
+    .workspace { display:grid;grid-template-columns:178px minmax(0,1fr);gap:28px;max-width:1460px;margin:0 auto;padding:26px 28px 64px;align-items:start; }
+    .workspace.no-outline { grid-template-columns:minmax(0,1fr); }
+    .workspace.ai-open { grid-template-columns:160px minmax(0,1fr) 298px;gap:22px; }
+    .workspace.ai-open.no-outline { grid-template-columns:minmax(0,1fr) 298px; }
+    .outline { position:sticky;top:26px;padding:16px 4px; }
+    .eyebrow { color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-size:9px;font-weight:650; }
+    .outline-title { display:flex;align-items:center;justify-content:space-between;margin-bottom:16px; }
+    .outline a { display:block;padding:7px 10px;margin:2px 0;color:var(--muted);font-size:12px;border-left:1px solid transparent; }
+    .outline a:first-of-type { color:var(--green);border-color:#88a58f; }
+    .outline a:hover { background:#ebeee8;text-decoration:none; }
+    .outline .sub { padding-left:20px; }
+    .outline-bottom { margin-top:34px;padding-top:17px;border-top:1px solid var(--line); }
+    .outline-bottom p { font-size:10px;color:var(--muted);line-height:1.7; }
+    .canvas { min-width:0; }
+    .document { max-width:850px;margin:0 auto;background:var(--paper);border:1px solid #dfe3dc;box-shadow:0 3px 14px #26342804; }
+    .doc-tools { display:flex;align-items:center;gap:3px;padding:8px 15px;border-bottom:1px solid var(--line);flex-wrap:wrap; }
+    .doc-tools .btn { min-height:31px;height:31px;font-size:11px; }
+    .doc-tools .icon-only { width:31px; }
+    .tool-divider { width:1px;height:18px;background:var(--line);margin:0 7px; }
+    .tools-end { margin-left:auto;display:flex;gap:3px; }
+    .paper { padding:46px 62px 43px; }
+    .paper-meta { display:flex;align-items:center;gap:9px;color:#7f877f;font-size:10px;letter-spacing:.035em;margin-bottom:19px; }
+    .document h1 { margin:0 0 14px;font-family:var(--serif);font-weight:400;font-size:36px;letter-spacing:-.04em;line-height:1.18;max-width:580px; }
+    .document .dek { color:#59645c;font-size:15px;line-height:1.85;margin-bottom:26px; }
+    .document p { font-family:"Aptos","Calibri","Segoe UI",Arial,sans-serif;font-size:15px;line-height:1.9; }
+    .document h2 { margin:29px 0 10px;font-size:17px;font-weight:550;letter-spacing:-.025em; }
+    .document .editable { margin:9px -5px;padding:2px 5px;border-radius:2px; }
+    .document .editable:hover { background:#f7f8f4; }
+    .document .editable:focus { background:#f7f8f4;outline:1px solid #d8e2d4;outline-offset:2px; }
+    .document .editable:empty::before { content:attr(data-placeholder);color:#9a9f99; }
+    .doc-foot { margin-top:33px;padding-top:17px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:18px;align-items:center;font-size:10px;color:#889085; }
+    .cite { color:var(--green);font-size:10px;vertical-align:super;padding-left:2px; }
+    .inline-note { color:#7a8379;font-size:10px !important;font-family:var(--sans) !important;line-height:1.65 !important; }
+    .chart-object { margin:23px 0;border:1px solid var(--line);border-radius:4px;overflow:hidden; }
+    .object-head { display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 17px 0; }
+    .object-title { font-size:12px;font-weight:600; }
+    .object-meta { font-size:10px;color:var(--muted);margin-top:3px; }
+    .chart { display:block;width:100%;height:auto; }
+    .chart text { font-family:var(--sans);font-size:10px;fill:#8b9288; }
+    .chart .gridline { stroke:#e8ece5;stroke-width:1; }
+    .chart .observed { fill:none;stroke:#416d55;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round; }
+    .chart .forecast { fill:none;stroke:#8799b6;stroke-width:2;stroke-dasharray:5 5; }
+    .chart .exposure { stroke:#b7c0b0;stroke-dasharray:3 5; }
+    .chart .wash { fill:#eef2e9; }
+    .chart-caption { display:flex;gap:12px;justify-content:space-between;padding:10px 17px;background:#fafbf8;border-top:1px solid #eef0eb;color:#80887b;font-size:9px; }
+    .legend { display:flex;align-items:center;gap:6px; }
+    .legend::before { content:"";width:15px;height:2px;background:#416d55; }
+    .legend.planned::before { background:#8799b6; }
+    .action-object { border-block:1px solid var(--line);margin:17px 0 12px; }
+    .action-object-row { display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;padding:13px 0;border-bottom:1px solid var(--line);font-size:12px; }
+    .action-object-row:last-child { border:0; }
+    .action-no { font-size:10px;color:#99a092; }
+    .action-owner { color:#879080;font-size:10px; }
+    .ai-inline { display:inline-flex;align-items:center;gap:6px;margin-top:8px;background:transparent;border:0;color:#57705d;padding:4px 0;font-size:11px; }
+    .ai-inline .icon { width:14px;height:14px; }
+    .assistant { position:sticky;top:24px;border-left:1px solid #dfe5dc;padding:6px 0 18px 21px;min-width:0; }
+    .assistant-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:9px; }
+    .assistant-head h2 { margin:0;font-size:13px;display:flex;align-items:center;gap:7px; }
+    .assistant .context { color:var(--muted);font-size:10px;margin:1px 0 21px; }
+    .assistant label { display:block;font-size:11px;color:#636d60;margin-bottom:7px; }
+    .assistant textarea { width:100%;resize:vertical;min-height:93px;border:1px solid #d3dccf;background:#fbfcf9;border-radius:5px;padding:11px;font-size:12px;line-height:1.6; }
+    .assistant .prompt-actions { display:flex;justify-content:flex-end;margin-top:9px; }
+    .assistant .hint { font-size:10px;color:#899181;line-height:1.65; }
+    .suggestion { margin-top:22px;border-top:1px solid var(--line);padding-top:18px; }
+    .suggestion h3 { font-size:10px;color:var(--green);margin:0 0 10px;font-weight:550; }
+    .suggestion p { font-size:13px;line-height:1.8;color:#4d594b; }
+    .suggestion .actions { display:flex;gap:7px;margin-top:16px; }
+    .suggestion .source-note { font-size:10px;color:#8b9284; }
+    .design-caption { max-width:850px;margin:14px auto 0;display:flex;align-items:flex-start;gap:8px;color:#818878;font-size:10px;line-height:1.7; }
+    .design-caption .icon { width:14px;height:14px;margin-top:2px; }
+    .sheet { max-width:1150px;margin:0 auto;background:#fff;padding:34px 38px 38px;border:1px solid var(--line); }
+    .sheet-header { display:flex;align-items:flex-start;justify-content:space-between;gap:22px;padding-bottom:24px;border-bottom:1px solid var(--line); }
+    .sheet h1 { margin:4px 0 7px;font-family:var(--serif);font-size:33px;font-weight:400;letter-spacing:-.04em; }
+    .sheet-intro { font-size:12px;color:var(--muted);margin:0; }
+    .sheet .section-heading { display:flex;align-items:center;justify-content:space-between;margin:26px 0 12px; }
+    .sheet h2 { font-size:13px;font-weight:600;margin:0; }
+    .table-wrap { overflow:auto; }
+    table { width:100%;border-collapse:collapse;text-align:left;font-size:12px; }
+    th { font-weight:500;font-size:10px;color:#8a9286;padding:12px 8px;border-bottom:1px solid var(--line);white-space:nowrap; }
+    td { padding:17px 8px;border-bottom:1px solid #ecf0e8; }
+    th:first-child,td:first-child { padding-left:0; }
+    th:last-child,td:last-child { padding-right:0;text-align:right; }
+    .metric-name { display:block;font-weight:550; }
+    .metric-sub { display:block;font-size:10px;color:#8a9384;margin-top:3px; }
+    .trend { width:70px;height:23px; }
+    .plain-link { border:0;background:transparent;padding:4px 0;color:var(--green);text-align:left;font-size:12px; }
+    .data-split { display:grid;grid-template-columns:1.3fr 1fr;gap:35px;align-items:start;margin-top:28px; }
+    .data-note { border-left:1px solid var(--line);padding-left:25px; }
+    .data-note p { font-size:12px;line-height:1.8;color:#798170; }
+    .data-note h3 { font-size:12px;font-weight:600;margin:5px 0; }
+    .metric-figure { font-size:31px;letter-spacing:-.06em;font-weight:450;line-height:1.3;margin:14px 0 0; }
+    .metric-figure small { font-size:13px;letter-spacing:0;color:#87917f; }
+    .steps { display:flex;gap:17px;padding-top:22px;color:#92998c;font-size:11px; }
+    .steps .active { color:var(--green); }
+    .task-list { margin-top:10px; }
+    .task-row { display:grid;grid-template-columns:24px minmax(0,1fr) 96px 90px;align-items:center;gap:15px;border-bottom:1px solid var(--line);padding:22px 0; }
+    .task-title { font-size:14px;font-weight:500; }
+    .task-sub { color:#92998b;font-size:11px;margin-top:5px; }
+    .task-check { width:17px;height:17px;border:1px solid #c8d0c0;border-radius:4px;display:grid;place-items:center;font-size:11px;color:#fff; }
+    .task-check.done { background:#719278;border-color:#719278; }
+    .task-person { color:#838d7a;font-size:11px; }
+    .task-end { text-align:right; }
+    .task-footer { margin-top:24px;display:flex;align-items:center;justify-content:space-between;gap:15px;font-size:11px;color:#929a8a; }
+    .outcome-head { display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;padding:25px 0 8px; }
+    .outcome-value { font-size:48px;line-height:1.25;font-weight:350;letter-spacing:-.06em; }
+    .outcome-value small { font-size:19px;letter-spacing:0;color:#8b937f; }
+    .outcome-note { margin-top:5px;color:#8c937f;font-size:11px; }
+    .outcome-status { text-align:right; }
+    .outcome-status p { color:#878f7d;font-size:11px;margin:7px 0; }
+    .impact-controls { display:flex;gap:16px;margin-top:22px;align-items:center; }
+    .segmented { display:inline-flex;border:1px solid var(--line);padding:3px;border-radius:6px; }
+    .segmented button { background:transparent;border:0;padding:5px 12px;font-size:11px;border-radius:3px;color:#78816f; }
+    .segmented button[aria-pressed="true"] { background:#ebefe6;color:#3e5b41; }
+    .impact-chart { margin-top:13px; }
+    .impact-foot { display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;padding-top:19px;border-top:1px solid var(--line); }
+    .impact-foot span { display:block;font-size:10px;color:#939b87; }
+    .impact-foot strong { display:block;font-weight:500;margin-top:4px;font-size:12px; }
+    .details { margin-top:23px;border-top:1px solid var(--line);padding-top:17px; }
+    .details summary { cursor:pointer;color:#78886e;font-size:11px; }
+    .details p { max-width:670px;font-size:12px;color:#7f8875;line-height:1.85; }
+    .history { margin:18px 0;padding:15px 18px;background:#f3f6ef;border-left:2px solid #a3b59b;font-size:12px; }
+    .history p { margin:5px 0; }
+    .toast { position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:200;background:#293b2e;color:#fff;padding:10px 17px;border-radius:6px;max-width:calc(100vw - 36px);box-shadow:0 4px 20px #0001;font-size:12px; }
+    @media(min-width:1450px) { .paper { padding:53px 72px; } }
+    @media(max-width:1180px) { .project { display:none; } .workspace { grid-template-columns:145px minmax(0,1fr);gap:20px; } .workspace.ai-open { grid-template-columns:minmax(0,1fr) 285px; } .workspace.ai-open .outline { display:none; } .paper { padding:35px 40px; } .doc-tools { padding-inline:10px; } }
+    @media(max-width:850px) { .topbar { grid-template-columns:1fr auto;gap:0;padding:17px 20px 0; } .tabs { grid-column:1/-1;grid-row:2;justify-content:center;margin-top:10px;padding-bottom:10px; } .tab { min-width:96px; } .workspace { display:block;padding:22px 20px 60px; } .outline { display:none; } #outline-toggle { display:none; } .header-end { grid-column:2;grid-row:1; } .workbar { padding-inline:20px; } .compare { margin-inline:20px; } .assistant { position:fixed;right:0;top:0;bottom:0;width:min(350px,calc(100vw - 22px));background:#fafbf8;z-index:100;padding:24px;border-left:1px solid #ccd7c4;overflow-y:auto;box-shadow:-10px 0 50px #283b2620; } .sheet { padding:27px; } .data-split { grid-template-columns:1fr;gap:20px; } .data-note { border-left:0;border-top:1px solid var(--line);padding:18px 0 0; } }
+    @media(max-width:540px) { .proposal-bar { padding:7px 16px;font-size:9px;gap:5px; } .proposal-bar a { display:none; } .topbar { padding-inline:16px; } .tab { min-width:0;padding:8px 11px;gap:6px;font-size:11px;min-height:44px; } .tab .icon { width:15px;height:15px; } .brand { font-size:17px; } .header-end { gap:7px; } .header-end .btn { min-height:34px; } .avatar { display:none; } .workbar { padding:11px 16px;gap:8px; } .crumb { font-size:11px; } .crumb .optional { display:none; } .status { display:none; } .work-actions { gap:3px; } .btn { min-height:40px;padding:7px 10px;font-size:11px; } .workspace { padding:16px 10px 42px; } .document { border-color:#e6e9e0; } .doc-tools { padding:7px 9px;gap:0; } .doc-tools .btn { min-height:36px;height:36px; } .tool-divider { margin:0 4px; } .tools-end .icon { display:none; } .paper { padding:29px 23px 30px; } .document h1 { font-size:30px; } .document p { font-size:15px;line-height:1.9; } .document .dek { font-size:14px; } .document h2 { font-size:16px; } .chart-caption { flex-wrap:wrap;font-size:9px; } .paper-meta { font-size:9px;gap:6px; } .sheet { padding:25px 18px; } .sheet h1 { font-size:29px; } .sheet-header { gap:10px; } .sheet-header .btn { padding:7px 9px; } .sheet-header .btn .icon { display:none; } .sheet-intro { font-size:11px; } .task-row { grid-template-columns:19px minmax(0,1fr) 61px;gap:9px;padding:19px 0; } .task-person { display:none; } .task-title { font-size:12px; } .task-sub { font-size:10px; } .task-end .btn { padding-inline:9px; } .table-wrap table { min-width:400px; } .outcome-value { font-size:39px; } .outcome-value small { font-size:16px; } .outcome-head { gap:9px; } .outcome-status p { max-width:100px;font-size:10px; } .impact-foot { gap:10px; } .impact-foot strong { font-size:11px; } .impact-controls { gap:10px;flex-wrap:wrap; } .compare { margin:14px 12px 0;padding:15px; } .compare-grid { grid-template-columns:1fr;gap:14px; } .compare p { font-size:11px; } .doc-foot { align-items:flex-start;font-size:9px; } .design-caption { padding-inline:7px;font-size:9px; } .action-object-row { grid-template-columns:18px minmax(0,1fr) auto;font-size:11px; } }
+    @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+  </style>
+</head>
+<body>
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v7c0 4 14 4 14 0V5M5 12v7c0 4 14 4 14 0v-7"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/></symbol>
+  <symbol id="i-actions" viewBox="0 0 24 24"><path d="m4 6 2 2 4-4M13 6h7M4 13h5M13 13h7M4 20h5M13 20h7"/></symbol>
+  <symbol id="i-impact" viewBox="0 0 24 24"><path d="M4 3v17h17M7 15l5-6 4 3 5-7"/></symbol>
+  <symbol id="i-ai" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5zM20 2v4M18 4h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-outline" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M12 8h6M12 12h6M12 16h4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r=".8"/><circle cx="12" cy="12" r=".8"/><circle cx="19" cy="12" r=".8"/></symbol>
+</svg>
+
+<div class="proposal-bar"><span><strong>Design proposal</strong><span class="dot"></span>All content is illustrative · No services connected</span><a href="../UX_SOURCE_AUDIT.md">Source audit ↗</a></div>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Causent<span class="project">Acme / Product</span></div>
+  <nav class="tabs" role="tablist" aria-label="Proposed workspace views">
+    <button class="tab" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1" data-tab="data"><svg class="icon"><use href="#i-data"/></svg>Data</button>
+    <button class="tab" id="tab-reports" role="tab" aria-controls="view-reports" aria-selected="true" data-tab="reports"><svg class="icon"><use href="#i-report"/></svg>Reports</button>
+    <button class="tab" id="tab-actions" role="tab" aria-controls="view-actions" aria-selected="false" tabindex="-1" data-tab="actions"><svg class="icon"><use href="#i-actions"/></svg>Actions</button>
+    <button class="tab" id="tab-impact" role="tab" aria-controls="view-impact" aria-selected="false" tabindex="-1" data-tab="impact"><svg class="icon"><use href="#i-impact"/></svg>Impact</button>
+  </nav>
+  <div class="header-end"><button class="btn quiet" id="compare-toggle" aria-expanded="false" aria-controls="comparison">Compare</button><span class="avatar" aria-label="Illustrative profile">JD</span></div>
+</header>
+
+<div class="workbar">
+  <div class="crumb"><button class="btn quiet icon-only" id="outline-toggle" aria-label="Toggle document outline" aria-pressed="true" aria-controls="outline"><svg class="icon"><use href="#i-outline"/></svg></button><span class="optional" id="crumb-parent">Reports</span><span class="optional">/</span><strong id="crumb-current">Simpler setup</strong></div>
+  <div class="work-actions"><span class="status" id="local-state">Local draft</span><button class="btn quiet" id="history-toggle" aria-expanded="false" aria-controls="history-panel">History</button><button class="btn primary" id="ask-button" aria-expanded="false" aria-controls="assistant"><svg class="icon"><use href="#i-ai"/></svg>Ask</button></div>
+</div>
+
+<section class="compare" id="comparison" aria-labelledby="comparison-title" hidden>
+  <div class="compare-top"><div><h2 id="comparison-title">What changes</h2></div><span class="pill">Source → proposal</span></div>
+  <div class="compare-grid"><div><small>Current pattern</small><p id="current-pattern"></p></div><div><small>Proposed experience</small><p id="proposed-pattern"></p></div></div>
+  <p class="note">Source-based observations from the audit. This comparison contains no current-interface screenshots.</p>
+</section>
+
+<main class="workspace" id="workspace">
+  <aside class="outline" id="outline" aria-label="Document outline">
+    <div class="outline-title"><span class="eyebrow">In this report</span><span class="pill">Draft</span></div>
+    <a href="#report-summary">Summary</a><a href="#report-decision">Decision</a><a href="#report-chart" class="sub">Activation rate</a><a href="#report-plan">Plan</a><a href="#report-measurement">Measurement</a>
+    <div class="outline-bottom"><span class="eyebrow">Workspace</span><a href="#view-reports" data-jump="reports">Simpler setup</a><a href="#view-data" data-jump="data">Metric library</a><p>One document.<br>Supporting work stays close.</p></div>
+  </aside>
+
+  <div class="canvas">
+    <div class="history" id="history-panel" hidden><strong>Illustrative history</strong><p>Draft · September 7 · Current local edits</p><p>Version 1 · September 2 · Registered example</p><p class="inline-note">A future Revise action creates a draft. It does not alter the registered version. This prototype creates no real revision.</p></div>
+
+    <section id="view-reports" role="tabpanel" aria-labelledby="tab-reports">
+      <article class="document">
+        <div class="doc-tools" role="toolbar" aria-label="Illustrative document tools">
+          <button class="btn quiet" id="paragraph-button" title="Focus the selected paragraph">Paragraph</button><span class="tool-divider"></span>
+          <button class="btn quiet icon-only format" data-command="bold" title="Bold" aria-label="Bold"><strong>B</strong></button><button class="btn quiet icon-only format" data-command="italic" title="Italic" aria-label="Italic"><em>I</em></button><button class="btn quiet icon-only format" data-command="underline" title="Underline" aria-label="Underline"><u>U</u></button>
+          <div class="tools-end"><button class="btn quiet" id="insert-chart"><svg class="icon"><use href="#i-impact"/></svg>Chart</button><button class="btn quiet" id="rewrite-button"><svg class="icon"><use href="#i-ai"/></svg>Rewrite</button></div>
+        </div>
+        <div class="paper">
+          <div class="paper-meta"><span>PRODUCT / SEPTEMBER 2026</span><span>·</span><span>Illustrative proposal</span></div>
+          <h1>Make the first five minutes simpler.</h1>
+          <p class="dek editable" id="report-summary" data-edit="summary" contenteditable="true" role="textbox" aria-label="Editable summary" aria-multiline="true">Help new teams reach their first useful result before asking them to configure their workspace.</p>
+          <p class="editable" id="report-context" data-edit="context" contenteditable="true" role="textbox" aria-label="Editable context" aria-multiline="true">Today, our example setup flow asks people to make several decisions before they see the product work. We propose a shorter path: one goal, a useful starting point, and a clear next step.</p>
+          <h2 id="report-decision">Decision</h2>
+          <p class="editable" id="report-decision-text" data-edit="decision" contenteditable="true" role="textbox" aria-label="Editable decision" aria-multiline="true">Move optional configuration out of onboarding. Show a starter workspace first, then let teams refine it as they work. This is a proposed product direction, ready for discussion and revision.</p>
+          <figure class="chart-object" id="report-chart" aria-labelledby="report-chart-title">
+            <div class="object-head"><div><div class="object-title" id="report-chart-title">Activation rate</div><div class="object-meta">Daily · % of eligible new workspaces</div></div><button class="btn quiet icon-only" id="chart-details" aria-label="Explain this illustrative chart"><svg class="icon"><use href="#i-more"/></svg></button></div>
+            <svg class="chart" viewBox="0 0 580 215" role="img" aria-labelledby="chart-report-svg-title chart-report-svg-desc"><title id="chart-report-svg-title">Illustrative activation rate and target</title><desc id="chart-report-svg-desc">Synthetic daily activation fluctuates around 32 percent. A dashed illustrative target reaches 38 percent. This is not a measured effect.</desc><path class="gridline" d="M47 39H553M47 89H553M47 139H553M47 179H553"/><text x="14" y="43">40%</text><text x="14" y="93">35%</text><text x="14" y="143">30%</text><path class="wash" d="M365 39H553V179H365z"/><path class="exposure" d="M365 28V179"/><path class="observed" d="M48 130 72 118 96 124 120 109 144 116 168 125 192 108 216 118 240 105 264 120 288 106 312 114 340 111 365 119"/><path class="forecast" d="M365 119 394 108 423 96 452 84 481 74 510 65 548 59"/><circle cx="365" cy="119" r="3.6" fill="#416d55"/><text x="48" y="200">Aug 10</text><text x="197" y="200">Aug 24</text><text x="353" y="200">Sep 7</text><text x="505" y="200">Sep 21</text><text x="387" y="24">Proposed target</text></svg>
+            <figcaption class="chart-caption"><span class="legend">Illustrative data</span><span class="legend planned">Target</span><span>Synthetic sample · 2026 · Not evidence</span></figcaption>
+          </figure>
+          <div id="added-chart" hidden></div>
+          <h2 id="report-plan">Plan</h2>
+          <p class="editable" id="report-plan-text" data-edit="plan" contenteditable="true" role="textbox" aria-label="Editable plan" aria-multiline="true">Start with the smallest useful version. Remove nonessential fields, offer one example, and use the first session to learn which step still needs explanation.</p>
+          <div class="action-object" aria-label="Illustrative action objects"><div class="action-object-row"><span class="action-no">01</span><span>Trim the setup flow</span><span class="action-owner">Design</span></div><div class="action-object-row"><span class="action-no">02</span><span>Introduce a starter workspace</span><span class="action-owner">Product</span></div></div>
+          <button class="ai-inline" id="draft-actions"><svg class="icon"><use href="#i-ai"/></svg>Draft actions</button>
+          <h2 id="report-measurement">Measurement</h2>
+          <p class="editable" id="report-measurement-text" data-edit="measurement" contenteditable="true" role="textbox" aria-label="Editable measurement plan" aria-multiline="true">Review activation for eligible new workspaces. Agree on the rollout date, observation window, and decision threshold before exposure. The target above is an example, not a result.</p>
+          <div class="doc-foot"><span>Draft · Not registered</span><span>Illustrative content · Editable in this browser</span></div>
+        </div>
+      </article>
+      <p class="design-caption"><svg class="icon"><use href="#i-info"/></svg><span>UX01–04: edit any paragraph. Select text for formatting or choose Rewrite. Charts and actions are the few structured objects inside the document. Changes last only until reload.</span></p>
+    </section>
+
+    <section id="view-data" role="tabpanel" aria-labelledby="tab-data" hidden>
+      <div class="sheet">
+        <div class="sheet-header"><div><span class="eyebrow">Illustrative workspace</span><h1>A place for your data.</h1><p class="sheet-intro">Three metrics. One definition for each.</p></div><button class="btn primary" id="import-button"><svg class="icon"><use href="#i-plus"/></svg>Import</button></div>
+        <div class="section-heading"><h2>Metrics</h2><span class="pill">3 connected · Example</span></div>
+        <div class="table-wrap"><table aria-label="Illustrative metric library"><thead><tr><th>Metric</th><th>Latest</th><th>Trend</th><th>Source</th><th>Use</th></tr></thead><tbody><tr><td><button class="plain-link metric-choice" data-metric="Activation rate">Activation rate</button><span class="metric-sub">% of eligible new workspaces</span></td><td>32.4%</td><td><svg class="trend" viewBox="0 0 70 23" aria-hidden="true"><path d="M1 18 10 12 18 17 27 8 38 14 48 7 59 11 69 5" fill="none" stroke="#5d8464" stroke-width="1.5"/></svg></td><td><span class="pill">CSV</span></td><td><span class="pill green">Report</span></td></tr><tr><td><button class="plain-link metric-choice" data-metric="Active workspaces">Active workspaces</button><span class="metric-sub">Daily count</span></td><td>248</td><td><svg class="trend" viewBox="0 0 70 23" aria-hidden="true"><path d="M1 17 10 18 20 14 30 15 40 10 50 11 60 5 69 4" fill="none" stroke="#5d8464" stroke-width="1.5"/></svg></td><td><span class="pill">CSV</span></td><td>—</td></tr><tr><td><button class="plain-link metric-choice" data-metric="Setup time">Setup time</button><span class="metric-sub">Median minutes per workspace</span></td><td>7.2 min</td><td><svg class="trend" viewBox="0 0 70 23" aria-hidden="true"><path d="M1 4 10 8 20 7 30 13 40 10 50 15 60 13 69 19" fill="none" stroke="#8598aa" stroke-width="1.5"/></svg></td><td><span class="pill">CSV</span></td><td>—</td></tr></tbody></table></div>
+        <div class="data-split"><div><span class="eyebrow" id="selected-metric">Activation rate</span><div class="metric-figure" id="metric-value">32.4<small>%</small></div><p class="inline-note" id="metric-definition">Activated within seven days / eligible new workspaces.</p><svg class="chart" viewBox="0 0 410 140" role="img" aria-label="Illustrative metric trend"><path class="gridline" d="M5 28H404M5 65H404M5 104H404"/><path class="observed" d="M5 92 30 84 58 92 85 66 113 74 142 88 170 71 199 77 227 55 255 68 284 60 312 70 340 48 370 58 403 45"/><text x="5" y="131">Aug 10</text><text x="350" y="131">Sep 7</text></svg><p class="inline-note">Synthetic sample values · 2026 · Not connected to a source.</p></div><div class="data-note"><h3>Understand this metric</h3><p>Ask for a chart, a definition, or a quick description. Suggested mappings and definitions stay editable before import.</p><button class="btn quiet" id="data-ask"><svg class="icon"><use href="#i-ai"/></svg>Explain</button><div id="data-kept" hidden></div></div></div>
+        <details class="details"><summary>Definition</summary><p>For a real import, review the unit, scale, aggregation, population, and beneficial direction. AI can propose a mapping from supplied data; it cannot establish unknown facts. A saved definition remains linked to its observations.</p></details>
+      </div>
+      <p class="design-caption"><svg class="icon"><use href="#i-info"/></svg><span>UX06–07: one metric library replaces repeated tables. Import and definition review open only when needed. All displayed numbers are synthetic.</span></p>
+    </section>
+
+    <section id="view-actions" role="tabpanel" aria-labelledby="tab-actions" hidden>
+      <div class="sheet">
+        <div class="sheet-header"><div><span class="eyebrow">Simpler setup · Illustrative</span><h1>Make the next move.</h1><p class="sheet-intro">Two actions remain. Keep the work in view.</p></div><button class="btn primary" id="actions-draft"><svg class="icon"><use href="#i-ai"/></svg>Draft</button></div>
+        <div class="steps"><span class="active">Open · 2</span><span>Complete · 1</span></div>
+        <div class="task-list"><div class="task-row"><span class="task-check" aria-label="Open"></span><div><div class="task-title">Trim the setup flow</div><div class="task-sub">Design · Activation rate</div></div><span class="task-person">Jordan</span><div class="task-end"><button class="btn quiet task-details" data-task="Trim the setup flow">Open</button></div></div><div class="task-row"><span class="task-check" aria-label="Open"></span><div><div class="task-title">Introduce a starter workspace</div><div class="task-sub">Product · Activation rate</div></div><span class="task-person">Sam</span><div class="task-end"><button class="btn quiet task-details" data-task="Introduce a starter workspace">Open</button></div></div><div class="task-row"><span class="task-check done" aria-label="Complete">✓</span><div><div class="task-title">Map the first session</div><div class="task-sub">Research · Completed Sep 5</div></div><span class="task-person">Casey</span><div class="task-end"><span class="pill">Complete</span></div></div></div>
+        <div class="task-footer"><button class="plain-link" data-switch="reports">Open report →</button><span>Work complete ≠ customer exposure</span></div>
+        <div id="actions-kept" hidden></div>
+        <details class="details"><summary>Details</summary><p>This proposed view keeps owner, state, and the next action visible. Instructions, references, governance, and completion evidence open beside the work. Copying instructions or recording completion would remain explicit actions in the product.</p></details>
+      </div>
+      <p class="design-caption"><svg class="icon"><use href="#i-info"/></svg><span>UX08: an execution list replaces repeated report summaries. Open reveals an illustrative instruction draft. The prototype cannot run tasks or change completion records.</span></p>
+    </section>
+
+    <section id="view-impact" role="tabpanel" aria-labelledby="tab-impact" hidden>
+      <div class="sheet">
+        <div class="sheet-header"><div><span class="eyebrow">Simpler setup · Illustrative</span><h1>What changed?</h1><p class="sheet-intro">Activation rate · Eligible new workspaces</p></div><button class="btn primary" id="impact-explain"><svg class="icon"><use href="#i-ai"/></svg>Explain</button></div>
+        <div class="outcome-head"><div><span class="eyebrow" id="impact-measure-label">Observed change · Synthetic example</span><div class="outcome-value" id="impact-value">+2.1 <small>pp</small></div><div class="outcome-note" id="impact-interval">95% interval: −0.8 to +5.0 pp</div></div><div class="outcome-status"><span class="pill amber" id="impact-status">Inconclusive</span><p id="impact-status-note">The interval includes no change.</p></div></div>
+        <div class="impact-controls"><div class="segmented" aria-label="Illustrative chart view"><button id="outcome-button" aria-pressed="true">Outcome</button><button id="plan-button" aria-pressed="false">Plan</button></div><span class="inline-note" id="impact-period">Jul 20 – Nov 6, 2026</span></div>
+        <svg class="chart impact-chart" viewBox="0 0 800 290" role="img" aria-labelledby="impact-svg-title impact-svg-desc"><title id="impact-svg-title">Illustrative activation timeline</title><desc id="impact-svg-desc">Synthetic activation values before and after an example rollout. The highlighted period is observational, not proof of attribution.</desc><path class="wash" d="M395 28H770V248H395z"/><path class="gridline" d="M45 49H770M45 108H770M45 168H770M45 227H770"/><text x="9" y="53">40%</text><text x="9" y="112">35%</text><text x="9" y="172">30%</text><text x="9" y="231">25%</text><path class="exposure" d="M395 22V248"/><text x="410" y="23">Example exposure · Sep 7</text><path class="observed" d="M47 182 70 176 94 190 116 171 141 157 163 169 187 181 210 151 232 163 258 175 282 156 306 172 330 150 354 167 378 159 399 170 422 159 446 143 470 160 494 132 518 147 542 155 566 133 590 146 614 126 638 137 662 145 686 125 710 139 734 130 768 141"/><path class="forecast" id="impact-plan-line" d="M395 165 470 124 545 99 620 83 695 76 768 72" hidden/><text x="45" y="276">Jul 20</text><text x="209" y="276">Aug 14</text><text x="379" y="276">Sep 7</text><text x="557" y="276">Oct 7</text><text x="727" y="276">Nov 6</text></svg>
+        <div class="impact-foot"><div><span>Baseline</span><strong>45 daily points</strong></div><div><span>Follow-up</span><strong>60 daily points</strong></div><div><span>Method</span><strong>Observational</strong></div></div>
+        <div id="impact-kept" hidden></div>
+        <details class="details"><summary>Details</summary><p>All figures here are invented to demonstrate layout. In the product, this view would use a server-owned estimate and registered window. A measured level change does not identify the contribution of an individual action or AI. Units, uncertainty, exposure evidence, and disqualifying limitations remain attached to the result.</p></details>
+      </div>
+      <p class="design-caption"><svg class="icon"><use href="#i-info"/></svg><span>UX09–10: one chart, one verdict, one visible limitation. Methods and supporting details remain available. No displayed number is evidence about Causent or a customer.</span></p>
+    </section>
+  </div>
+
+  <aside class="assistant" id="assistant" aria-label="Illustrative AI proposal drawer" hidden>
+    <div class="assistant-head"><h2><svg class="icon"><use href="#i-ai"/></svg>Ask Causent</h2><button class="btn quiet icon-only" id="assistant-close" aria-label="Close AI proposal"><svg class="icon"><use href="#i-close"/></svg></button></div>
+    <p class="context" id="assistant-context">Report · Selected paragraph</p>
+    <label for="ai-prompt">Your request</label><textarea id="ai-prompt">Make this paragraph shorter and clearer.</textarea>
+    <div class="prompt-actions"><button class="btn primary" id="preview-button">Preview</button></div>
+    <p class="hint">Local interaction demo. Preview displays a prepared example; it does not contact AI or read connected data.</p>
+    <div class="suggestion" id="suggestion" hidden><h3>Illustrative suggestion</h3><p id="suggestion-text"></p><p class="source-note" id="suggestion-source">Based on the illustrative brief. Review before keeping.</p><div class="actions"><button class="btn primary" id="keep-button">Keep</button><button class="btn quiet" id="discard-button">Discard</button></div></div>
+  </aside>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+  'use strict';
+  const byId = (id) => document.getElementById(id);
+  const workspace = byId('workspace');
+  const state = { tab:'reports', outline:true, target:byId('report-summary'), mode:'rewrite', opener:null, selection:null, toastTimer:null };
+  const comparisons = {
+    reports:['A report summary links out to a second, full editor. Bordered section canvases, repeated commitment controls, and an empty chart-upload tile compete with the text.','Open the document directly. Keep ordinary paragraphs editable, place charts and actions in the flow, and bring revision or AI tools alongside the page.'],
+    data:['Measurement setup and a complete import form precede two overlapping metric tables. Definitions are supplied through a long form.','Lead with one metric library. Ask for a mapping or chart when needed, then review the source, meaning, and unit before saving.'],
+    actions:['The page repeats decision and commitment context before action rows with multiple labels, tags, handoff controls, and detailed metadata.','Lead with the work, owner, and state. Open instructions and evidence beside a selected action; keep shared context in the report.'],
+    impact:['Summary tiles, a Prediction panel, a timeline, action outcome rows, and methodological caveats compete for attention.','Lead with the primary chart and a concise result state. Keep the main limitation visible, and place supporting methods and diagnostics in Details.']
+  };
+  const names = { reports:['Reports','Simpler setup'], data:['Data','Metric library'], actions:['Actions','Simpler setup'], impact:['Impact','Simpler setup'] };
+  function toast(message) { clearTimeout(state.toastTimer); byId('toast').textContent=message; byId('toast').hidden=false; state.toastTimer=setTimeout(() => { byId('toast').hidden=true; },3600); }
+  function updateComparison() { byId('current-pattern').textContent=comparisons[state.tab][0]; byId('proposed-pattern').textContent=comparisons[state.tab][1]; }
+  function layout() { const show=state.tab==='reports' && state.outline; byId('outline').hidden=!show; workspace.classList.toggle('no-outline',!show); byId('outline-toggle').hidden=state.tab!=='reports'; }
+  function closeAI(restoreFocus=true) { byId('assistant').hidden=true; workspace.classList.remove('ai-open'); byId('ask-button').setAttribute('aria-expanded','false'); if(restoreFocus && state.opener && state.opener.isConnected) state.opener.focus(); }
+  function switchTab(tab) { if(!names[tab]) return; closeAI(false); state.tab=tab; document.querySelectorAll('[role="tabpanel"]').forEach((panel) => { panel.hidden=panel.id!=='view-'+tab; }); document.querySelectorAll('[data-tab]').forEach((button) => { const active=button.dataset.tab===tab; button.setAttribute('aria-selected',String(active)); button.tabIndex=active?0:-1; }); byId('crumb-parent').textContent=names[tab][0]; byId('crumb-current').textContent=names[tab][1]; byId('history-toggle').hidden=tab!=='reports'; byId('history-panel').hidden=true; byId('history-toggle').setAttribute('aria-expanded','false'); byId('local-state').textContent=tab==='reports'?'Local draft':'Illustrative'; layout(); updateComparison(); }
+  document.querySelectorAll('[data-tab]').forEach((button) => { button.addEventListener('click',()=>switchTab(button.dataset.tab)); button.addEventListener('keydown',(event) => { const buttons=[...document.querySelectorAll('[data-tab]')]; let next=buttons.indexOf(button); if(event.key==='ArrowRight') next=(next+1)%buttons.length; else if(event.key==='ArrowLeft') next=(next+buttons.length-1)%buttons.length; else if(event.key==='Home') next=0; else if(event.key==='End') next=buttons.length-1; else return; event.preventDefault(); switchTab(buttons[next].dataset.tab); buttons[next].focus(); }); });
+  document.querySelectorAll('[data-switch],[data-jump]').forEach((button) => button.addEventListener('click',(event)=>{event.preventDefault();switchTab(button.dataset.switch||button.dataset.jump);byId('tab-'+state.tab).focus();}));
+  byId('compare-toggle').addEventListener('click',()=>{ const show=byId('comparison').hidden; byId('comparison').hidden=!show; byId('compare-toggle').setAttribute('aria-expanded',String(show)); updateComparison(); });
+  byId('outline-toggle').addEventListener('click',()=>{state.outline=!state.outline;byId('outline-toggle').setAttribute('aria-pressed',String(state.outline));layout();});
+  byId('history-toggle').addEventListener('click',()=>{const show=byId('history-panel').hidden;byId('history-panel').hidden=!show;byId('history-toggle').setAttribute('aria-expanded',String(show));});
+  document.querySelectorAll('[contenteditable]').forEach((element)=>{element.addEventListener('focus',()=>{state.target=element;});element.addEventListener('input',()=>{byId('local-state').textContent='Edited locally';});element.addEventListener('paste',(event)=>{event.preventDefault();const text=event.clipboardData?.getData('text/plain')||'';document.execCommand('insertText',false,text);});});
+  document.addEventListener('selectionchange',()=>{const selection=window.getSelection();if(selection&&selection.rangeCount&&state.target.contains(selection.anchorNode))state.selection=selection.getRangeAt(0).cloneRange();});
+  document.querySelectorAll('.format').forEach((button)=>{button.addEventListener('mousedown',(event)=>event.preventDefault());button.addEventListener('click',()=>{state.target.focus();if(state.selection){const selection=window.getSelection();selection.removeAllRanges();selection.addRange(state.selection);}document.execCommand(button.dataset.command,false);byId('local-state').textContent='Edited locally';});});
+  byId('paragraph-button').addEventListener('click',()=>state.target.focus());
+  const examples = {
+    rewrite:'Show new teams a useful workspace first. Ask for configuration only when it helps them take the next step.',
+    chart:'Create a weekly activation chart from the same illustrative sample, with the denominator and period attached. This preview would become an editable chart object in the product.',
+    data:'Activation rate describes the share of eligible new workspaces that reach the agreed first-use milestone within seven days. Confirm the eligibility and activation definitions before comparing periods.',
+    import:'Proposed mapping: date → daily UTC date; activated_workspaces / eligible_workspaces → activation rate. Confirm the file actually contains these fields, then review the denominator and scale before importing.',
+    actions:'Draft a smaller setup flow. Keep one goal question, show a starter workspace, and move optional settings after first use. Review the proposed behavior and test the complete first-session flow before release.',
+    impact:'The illustrative change is +2.1 percentage points, with a 95% interval from −0.8 to +5.0 points. This example remains inconclusive and does not identify the contribution of any individual action or AI.'
+  };
+  function openAI(mode,opener,prompt) { state.mode=mode; state.opener=opener||document.activeElement; byId('assistant').hidden=false; workspace.classList.add('ai-open'); byId('ask-button').setAttribute('aria-expanded','true'); byId('assistant-context').textContent= mode==='rewrite'?'Report · '+(state.target.dataset.edit||'paragraph'): mode==='chart'?'Report · Chart object':mode==='import'?'Data · Import proposal':names[state.tab][0]+' · Illustrative context'; byId('ai-prompt').value=prompt||({rewrite:'Make this paragraph shorter and clearer.',chart:'Chart activation by week. Keep the source and denominator visible.',data:'Explain what this metric means.',import:'Suggest a mapping for an activation-rate CSV.',actions:'Draft instructions for this action.',impact:'Explain the outcome in two sentences.'}[mode]); byId('suggestion').hidden=true; byId('ai-prompt').focus(); }
+  byId('ask-button').addEventListener('click',(event)=>openAI(state.tab==='reports'?'rewrite':state.tab,event.currentTarget));
+  byId('rewrite-button').addEventListener('click',(event)=>openAI('rewrite',event.currentTarget));
+  byId('insert-chart').addEventListener('click',(event)=>openAI('chart',event.currentTarget));
+  byId('chart-details').addEventListener('click',(event)=>openAI('chart',event.currentTarget,'Show the source, period, and meaning of this illustrative chart.'));
+  byId('data-ask').addEventListener('click',(event)=>openAI('data',event.currentTarget));
+  byId('import-button').addEventListener('click',(event)=>openAI('import',event.currentTarget));
+  byId('actions-draft').addEventListener('click',(event)=>openAI('actions',event.currentTarget));
+  byId('draft-actions').addEventListener('click',(event)=>openAI('actions',event.currentTarget,'Draft the first action from this illustrative plan.'));
+  byId('impact-explain').addEventListener('click',(event)=>openAI('impact',event.currentTarget));
+  document.querySelectorAll('.task-details').forEach((button)=>button.addEventListener('click',()=>openAI('actions',button,'Draft instructions: '+button.dataset.task+'.')));
+  byId('assistant-close').addEventListener('click',()=>closeAI());
+  document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&!byId('assistant').hidden)closeAI();});
+  byId('preview-button').addEventListener('click',()=>{if(!byId('ai-prompt').value.trim()){toast('Add a request to preview the prepared example.');return;}byId('suggestion-text').textContent=examples[state.mode];byId('suggestion-source').textContent=state.mode==='impact'?'Uses the synthetic figures shown in this proposal.':state.mode==='import'?'Example fields only. No file is read and no import will run.':'Prepared example based on the illustrative brief. No model was called.';byId('suggestion').hidden=false;});
+  function addLocalNote(targetId,text) { const target=byId(targetId);target.replaceChildren();const note=document.createElement('p');note.className='history';note.textContent='Local draft · '+text;target.append(note);target.hidden=false; }
+  byId('keep-button').addEventListener('click',()=>{
+    if(state.mode==='rewrite'){state.target.textContent=examples.rewrite;state.selection=null;byId('local-state').textContent='Kept locally';}
+    else if(state.mode==='chart'){const target=byId('added-chart');target.replaceChildren();const source=byId('report-chart').cloneNode(true);source.removeAttribute('id');source.querySelectorAll('[id]').forEach((node)=>node.removeAttribute('id'));source.removeAttribute('aria-labelledby');source.setAttribute('aria-label','Additional illustrative weekly chart proposal');const svg=source.querySelector('svg.chart');svg.removeAttribute('aria-labelledby');svg.setAttribute('aria-label','Synthetic chart reused to demonstrate inserting a chart object');source.querySelector('.object-title').textContent='Weekly activation · Proposal';source.querySelector('.object-meta').textContent='Demonstration object · Same synthetic sample';source.querySelector('button').remove();target.append(source);target.hidden=false;toast('Illustrative chart inserted. Its data is unchanged.');}
+    else if(state.mode==='import'){toast('Mapping kept locally. No file was read or imported.');addLocalNote('data-kept',examples.import);}
+    else if(state.mode==='actions'){if(state.tab==='reports'){const p=document.createElement('p');p.className='inline-note';p.textContent='Illustrative action draft · '+examples.actions;byId('report-plan-text').after(p);}else addLocalNote('actions-kept',examples.actions);}
+    else addLocalNote(state.mode+'-kept',examples[state.mode]);
+    if(state.mode!=='chart'&&state.mode!=='import')toast('Suggestion kept in this local proposal only.');closeAI();
+  });
+  byId('discard-button').addEventListener('click',()=>{closeAI();toast('Suggestion discarded. Existing content is unchanged.');});
+  const metricInfo={ 'Activation rate':['32.4','%','Activated within seven days / eligible new workspaces.'],'Active workspaces':['248','','Workspaces with an example qualifying event that day.'],'Setup time':['7.2',' min','Median minutes to first completion in this illustrative sample.'] };
+  document.querySelectorAll('.metric-choice').forEach((button)=>button.addEventListener('click',()=>{const values=metricInfo[button.dataset.metric];byId('selected-metric').textContent=button.dataset.metric;byId('metric-value').textContent=values[0];const unit=document.createElement('small');unit.textContent=values[1];byId('metric-value').append(unit);byId('metric-definition').textContent=values[2];toast('Selected illustrative metric. The sparkline is a layout sample.');}));
+  function impactView(plan) { byId('plan-button').setAttribute('aria-pressed',String(plan));byId('outcome-button').setAttribute('aria-pressed',String(!plan));byId('impact-plan-line').toggleAttribute('hidden',!plan);byId('impact-measure-label').textContent=plan?'Proposed target · Synthetic example':'Observed change · Synthetic example';byId('impact-value').textContent=plan?'+6.0 ':'+2.1 ';const unit=document.createElement('small');unit.textContent='pp';byId('impact-value').append(unit);byId('impact-interval').textContent=plan?'Illustrative target: 32% → 38%':'95% interval: −0.8 to +5.0 pp';byId('impact-status').textContent=plan?'Draft target':'Inconclusive';byId('impact-status-note').textContent=plan?'A target is not a measured result.':'The interval includes no change.'; }
+  byId('plan-button').addEventListener('click',()=>impactView(true));byId('outcome-button').addEventListener('click',()=>impactView(false));
+  updateComparison();layout();
+})();
+</script>
+</body>
+</html>
