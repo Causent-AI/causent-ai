@@ -8,7 +8,10 @@ Matching drift, recompute and resolve workers from `906dd7a` are promoted. The d
 update restored the live app's signed-in Data, Reports, Actions and Impact routes.
 
 The final #37 application candidate is Ready, with GA4 explicitly off, but has not been
-promoted. Its authentication and fresh-account/action acceptance remain open. #36's parent
+promoted. A narrow Supabase callback allowlist fix now keeps sign-in on the candidate.
+Existing-account Data/Reports/Actions/Impact checks, all six handoff previews, unchanged
+report/audit counters and candidate error logs pass. New-account/new-activation acceptance
+remains open pending an explicit scope decision. #36's parent
 conflict was resolved with an identical reviewed tree; fresh CI passed and #36 is merged
 as `87d3128`. Its automatic deployment is now on `app.causent.ai`; signed-in Impact
 loads successfully. #37 remains a draft targeting main. See the

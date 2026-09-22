@@ -175,7 +175,46 @@
     "source": "906dd7ab2b2f57e33e1db7367b256b735d1ebd11",
     "ga4Enabled": false,
     "promoted": false,
-    "authentication": "blocked at Vercel login in Codex"
+    "authentication": "passed: fresh OAuth returned to the immutable candidate onboarding",
+    "existingAccountChecks": {
+      "onboarding": true,
+      "dataWorkshop": true,
+      "reports": true,
+      "savedReportDirectOpen": true,
+      "actions": true,
+      "impact": true,
+      "ga4SetupPlaceholder": true,
+      "ga4ConnectAbsent": true,
+      "claudeAndCodexPreviews": 6,
+      "exportedReportData": false,
+      "errorLogRecords": 0
+    },
+    "navigationInvariantsPreserved": {
+      "activation_digest": true,
+      "activations": true,
+      "evidence": true,
+      "membership_digest": true,
+      "memberships": true,
+      "metrics": true,
+      "migrations": true,
+      "observations": true,
+      "predictions": true,
+      "reports": true,
+      "revision_digest": true,
+      "revisions": true,
+      "workspaces": true
+    },
+    "freshAccountActivation": "not exercised; scope decision pending"
   },
-  "rehearsalBranchDeleted": true
+  "rehearsalBranchDeleted": true,
+  "authRedirectFix": {
+    "project": "royftsqyawtyfjolfabd",
+    "added_callback": "https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback",
+    "site_url_unchanged": true,
+    "changed_fields": [
+      "uri_allow_list"
+    ],
+    "allowlist_before": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**",
+    "allowlist_after": "https://app.causent.ai/auth/callback,http://localhost:3000/**,https://causent-ai-*.vercel.app/**,https://causent-9cocvycib-adamdavidowens-1984s-projects.vercel.app/auth/callback"
+  }
 }

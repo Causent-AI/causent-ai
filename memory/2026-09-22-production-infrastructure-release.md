@@ -6,12 +6,14 @@ existing signed-in app. Production now has 47 migrations and matching drift, rec
 and resolve deployments from runtime source `906dd7a`. Migration-boundary report/audit/
 membership digests are unchanged. No seed, membership or Google setup mutation occurred.
 
-The final #37 app candidate is Ready but unpromoted. Codex's preview still shows Vercel
-login after the user's sign-in response; clarification is pending. Fresh-account and
-changed-action acceptance remain open. #36's squashed-parent conflict was resolved with
-an identical reviewed tree; fresh CI passed and #36 merged as `87d3128`. Its parent
-history was carried into #37 without runtime changes. Do not merge
-#37 or claim the final app is released until its remaining gates pass.
+The final #37 app candidate is Ready but unpromoted. The user completed Vercel and
+Causent login; the actual remaining sign-in defect was an outdated Supabase redirect
+allowlist pattern. Only the exact candidate callback was added, preserving every other
+setting. Fresh OAuth now returns to the candidate; existing-account navigation, all six
+handoff previews, GA4 placeholder, clean error logs and unchanged counters pass.
+Fresh-account/new-activation acceptance is still unverified and an explicit scope
+exception is pending. #36 merged as `87d3128` after fresh CI; #37 runtime code remains
+identical to reviewed `906dd7a`. Do not merge #37 for the user.
 
 Use the [release manifest](../docs/releases/2026-09-22-production.md) for exact deployment
 IDs, security findings, rollback and cleanup. Preserve the current workers/additive

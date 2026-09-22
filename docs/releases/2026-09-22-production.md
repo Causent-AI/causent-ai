@@ -1,6 +1,6 @@
 # Production release · 2026-09-22
 
-Status: **BLOCKED — infrastructure released; final application promotion awaits authenticated acceptance**.
+Status: **existing-account candidate checks passed; fresh-account activation gate remains open**.
 
 ## Scope and source
 
@@ -43,7 +43,11 @@ Live drift and recompute deployments received successful authenticated scheduled
 
 The #35 automatic deployment initially failed because the old database lacked `workspaces.archived_at`. Applying the rehearsed schema restored the existing signed-in Data, Reports, Actions and Impact routes. All three existing action rows expose both Claude and Codex controls. No report was edited or activated during this read-only check. After #36 merged, its automatic deployment was verified on the custom alias and the existing signed-in Impact route. Its runtime application files match #35. This is existing-account continuity, not fresh-user or secondary-metric activation acceptance.
 
-The final candidate passes deployed security-header checks (frame/object/base restrictions, nosniff, referrer and device permissions). Its protected preview still shows Vercel login in Codex after the user's sign-in response. Candidate authentication, fresh-account and changed-flow acceptance remain incomplete. Do not promote the candidate or merge #37 while these gates remain open. Google account/property acceptance is deferred while the connector stays disabled.
+The final candidate passes deployed security-header checks (frame/object/base restrictions, nosniff, referrer and device permissions). After the user signed in, the remaining blocker was reproduced as an OAuth redirect configuration mismatch: the existing allowed preview pattern began `causent-ai-`, while this candidate begins `causent-`. Supabase fell back to the live site. Added only this immutable candidate's exact `/auth/callback` URL to `uri_allow_list`; a read-after-write comparison confirmed every other auth setting was unchanged. The production Site URL remains `https://app.causent.ai`. [Supabase redirect configuration](https://supabase.com/docs/guides/auth/redirect-urls).
+
+Fresh OAuth for the existing account now returns to the **candidate** at `/onboarding?flow=decision-report`. Candidate Data, Reports, direct saved-report reopen, Actions and Impact pass. Google Analytics shows **Setup required** with no Connect control. All three existing action rows open both Claude and Codex preview dialogs with the correct action identity; no private brief was exported. Impact retains the primary-outcome/monitoring distinction. The captured candidate error log is empty, and pre/post report, revision, activation, membership, metric, observation, prediction and evidence counts/digests are unchanged.
+
+This is not a new-account test or a new multi-metric activation. Those broader rollout gates remain unverified in this production candidate; an explicit scope decision is pending before #37 is cleared to merge. Automated tests cover the enabled/unassigned/disabled/unavailable rollout matrix and secondary-metric handoff assembly. Live Google account/property acceptance remains deferred while GA4 stays disabled.
 
 ## Rollback and next steps
 
@@ -51,4 +55,6 @@ Keep the additive database schema, audit records and current worker set. The ret
 
 The new rehearsal branch was deleted after its aggregate [evidence](2026-09-22-evidence.json) was retained. The older preflight branch was left untouched.
 
-Next: authenticate to the immutable candidate inside Codex; exercise the required account/action matrix; finish #37; verify the final source, promote, prove alias identity and repeat signed-in checks. Founder/partner and representative-load validation remain separate gates.
+Next: resolve the fresh-account/new-activation gate; finish #37; verify the final source, promote, prove alias identity and repeat signed-in checks. Founder/partner and representative-load validation remain separate gates.
+
+Remove the temporary exact preview callback after release acceptance and any rollback retest are complete; preserve the pre-existing allowlist entries. Final PR merge and application promotion remain with the user/operator.
