@@ -18,7 +18,7 @@ The user merged [#35](https://github.com/Causent-AI/causent-ai/pull/35) as `3b25
 | Drift | `dpl_CdKNvUQVm2RiGhH6tdQXyxhS8KBm` — promoted, runtime source `906dd7a` |
 | Recompute | `dpl_DYLPHBPEF2ch7Xm8BNuj9PW6wgk4` — promoted, runtime source `906dd7a` |
 | Resolve | `dpl_9HkWwZKHZkkzb61a1z7gvW5iK3pt` — promoted, runtime source `906dd7a` |
-| Live app | `app.causent.ai` → `dpl_HCT7nbHEh7hNcCRszzVMSxkdhdfk`, source **#35 / `3b25913`** |
+| Live app | `app.causent.ai` → `dpl_9Grirzn3BB6NDVXjPnbKjbmmFsUy`, source **#36 / `87d3128`**; alias and signed-in Impact verified |
 | Final app candidate | `dpl_4L33WGPe2DteezReXNcJg2cmBkXu`, runtime source **#37 / `906dd7a`**, Ready but not promoted |
 | GA4 | Candidate build/runtime flag explicitly `0`; production has zero connections and credentials |
 | Report exposure | Existing `default-on-with-explicit-rollback` resolver; one enabled assignment, no assignment changes |
@@ -41,13 +41,13 @@ All four protected remote build configuration gates passed. Worker builds used P
 
 Live drift and recompute deployments received successful authenticated scheduled requests (HTTP 200). App cron routes for drift, recompute, resolve and connector inbox returned 200 after the database update. No due resolve job reached the new resolver during the captured window; its bounded handler/database success is build-time evidence, not a successful live HTTP canary. Real retry/queue processing is not claimed from an empty scope.
 
-The #35 automatic deployment initially failed because the old database lacked `workspaces.archived_at`. Applying the rehearsed schema restored the existing signed-in Data, Reports, Actions and Impact routes. All three existing action rows expose both Claude and Codex controls. No report was edited or activated during this read-only check. This is existing-account continuity, not fresh-user or secondary-metric activation acceptance.
+The #35 automatic deployment initially failed because the old database lacked `workspaces.archived_at`. Applying the rehearsed schema restored the existing signed-in Data, Reports, Actions and Impact routes. All three existing action rows expose both Claude and Codex controls. No report was edited or activated during this read-only check. After #36 merged, its automatic deployment was verified on the custom alias and the existing signed-in Impact route. Its runtime application files match #35. This is existing-account continuity, not fresh-user or secondary-metric activation acceptance.
 
 The final candidate passes deployed security-header checks (frame/object/base restrictions, nosniff, referrer and device permissions). Its protected preview still shows Vercel login in Codex after the user's sign-in response. Candidate authentication, fresh-account and changed-flow acceptance remain incomplete. Do not promote the candidate or merge #37 while these gates remain open. Google account/property acceptance is deferred while the connector stays disabled.
 
 ## Rollback and next steps
 
-Keep the additive database schema, audit records and current worker set. The current #35 application is a verified read-only continuity fallback against migration 47, not proof of the full activation matrix. If a later app promotion fails, restore it with `vercel promote https://causent-61nrlxiq1-adamdavidowens-1984s-projects.vercel.app --scope adamdavidowens-1984s-projects --yes` and verify the custom alias. The older August app/worker artifacts are not verified against this schema; do not blindly restore them or run destructive down-migrations.
+Keep the additive database schema, audit records and current worker set. The retained #35 application is a verified read-only continuity fallback against migration 47, not proof of the full activation matrix. If a later app promotion fails, restore it with `vercel promote https://causent-61nrlxiq1-adamdavidowens-1984s-projects.vercel.app --scope adamdavidowens-1984s-projects --yes` and verify the custom alias. The older August app/worker artifacts are not verified against this schema; do not blindly restore them or run destructive down-migrations.
 
 The new rehearsal branch was deleted after its aggregate [evidence](2026-09-22-evidence.json) was retained. The older preflight branch was left untouched.
 

@@ -155,5 +155,19 @@
         }
       ]
     }
-  }
+  },
+  "liveApp": {
+    "deploymentId": "dpl_9Grirzn3BB6NDVXjPnbKjbmmFsUy",
+    "source": "87d3128d04bd0e93a618d40400ff9b4af84cf564",
+    "alias": "app.causent.ai",
+    "existingAccountImpact": "passed"
+  },
+  "candidate": {
+    "deploymentId": "dpl_4L33WGPe2DteezReXNcJg2cmBkXu",
+    "source": "906dd7ab2b2f57e33e1db7367b256b735d1ebd11",
+    "ga4Enabled": false,
+    "promoted": false,
+    "authentication": "blocked at Vercel login in Codex"
+  },
+  "rehearsalBranchDeleted": true
 }

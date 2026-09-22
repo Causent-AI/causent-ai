@@ -10,7 +10,8 @@ update restored the live app's signed-in Data, Reports, Actions and Impact route
 The final #37 application candidate is Ready, with GA4 explicitly off, but has not been
 promoted. Its authentication and fresh-account/action acceptance remain open. #36's parent
 conflict was resolved with an identical reviewed tree; fresh CI passed and #36 is merged
-as `87d3128`. #37 remains a draft targeting main. See the
+as `87d3128`. Its automatic deployment is now on `app.causent.ai`; signed-in Impact
+loads successfully. #37 remains a draft targeting main. See the
 [release record](releases/2026-09-22-production.md) for exact IDs, security findings and rollback.
 The dated entries below describe earlier checkpoints, not the current production state.
 
