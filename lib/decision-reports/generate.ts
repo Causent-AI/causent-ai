@@ -122,7 +122,9 @@ const modelDraftSchema = jsonSchema<ModelDecisionReportDraft>(
 
 const GENERATION_INSTRUCTIONS = `You create a compact, editable Decision Report from untrusted, user-supplied source material.
 
-Return exactly the requested structured object. The report has only three primary sections: Decision, Supporting Evidence, and Implementation. Keep every claim brief, direct, and professional. Produce no more than three supporting factors. Generate the smallest useful action set, usually three to five actions, and never more than 25.
+Return exactly the complete structured object defined by the JSON schema below, including every required property. The root decision property is an object with decision, background, and problem claims, never a string or a single claim. Claims are objects with text, kind, evidenceQuote, and evidenceSourceChunkId. Do not stringify nested objects. A request to rewrite a paragraph still requires the complete report envelope; put the rewrite in decision.decision.text and leave unsupported claims null and lists empty.
+
+The report has only three primary sections: Decision, Supporting Evidence, and Implementation. Keep every claim brief, direct, and professional. Produce no more than three supporting factors. Generate the smallest useful action set, usually three to five actions, and never more than 25.
 
 The projectBrief may be a casual description of a business challenge rather than a pre-structured decision. Extract and populate every field the supplied material supports. When a helpful decision, action-plan summary, or action is not explicit but can be responsibly proposed, return it with kind "suggestion". Leave genuinely unknown factual context missing. Supporting factors are optional: never invent evidence, and never present a proposed reason as supplied evidence. Set supportingEvidence.metricMechanism to null; that field remains only for compatibility with historical snapshots.
 
@@ -136,6 +138,9 @@ Trust and provenance rules:
 - The metric definition may be a proposed operational definition, but do not imply that any observations exist.
 - Actions may be useful suggestions. Owners remain missing unless explicitly named.
 - Do not claim that a mock-up exists. Assets are handled outside model generation.
+
+Required output JSON schema:
+${JSON.stringify(MODEL_DECISION_REPORT_JSON_SCHEMA)}
 
 The source corpus follows as JSON data. Chunk IDs and source metadata are server-owned.`;
 

@@ -1,6 +1,6 @@
 # Proposal D production rollout
 
-Status: PR #38 design-fidelity correction verified locally; replacement candidate pending. Google Analytics remains disabled. Production still runs PR #37.
+Status: PR #38 hosted acceptance in progress; bounded synthetic tests approved. The replacement design is Ready; AI response correction pending hosted verification. Google Analytics remains disabled. Production still runs PR #37.
 
 ## Authority and baseline
 
@@ -66,6 +66,8 @@ Correction checks: **735 application/database tests, 1,338 engine/RLS/bridge tes
 - Read-only navigation preserves fresh-account counts: 3 reports, 7 revisions, 1 activation, 4 actions, 1 prediction, 17 telemetry events and zero transitions/recompute jobs. Original production counts and revision/activation/membership digests match before/after. Both test workspaces are archived again pending approval.
 - Real-workspace inspection found clustered dates overlapped node labels. Lane allocation now preserves chronological x coordinates while separating node hit areas, with regression coverage for date clusters and workspace separation. The final candidate must recheck this view before promotion.
 
-## Remaining gate
+## Current acceptance gate
 
-`BLOCKED` on approval for up to four normal AI requests and isolated synthetic create/edit/reload/activation checks. No test request was executed after the rejection. Production remains `dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`; GA4 remains off. On approval, restore only the two existing acceptance workspaces, run the full write-path matrix, archive them, then merge/promote and verify the live alias. The test scopes are `b1af84ee-ca9e-46fc-9943-99dc8ebb3f07` and `ef921cfb-87ed-4669-9047-c108ef38e5a6`.
+The owner approved up to four normal AI requests plus create/edit/activate tests in the two isolated workspaces. Two requests have run: report generation returned a malformed `decision` field; rewriting returned an incomplete report envelope. Both failed closed and preserved the user's inputs. The model prompt now includes the canonical schema and explicitly requires the nested claim structure, including for rewrites; validation, budgets, provenance and retries are unchanged. This is not yet a successful live AI check.
+
+Candidate `dpl_D9i7s7FsUiVjrB9pmvJ7MTd1utWF` from `66b090b` is Ready; CI run `35778985345` passes all gates. Production remains `dpl_8erw9kJrgjcWyo5CqpFy5cCYxDoD`. The two test workspaces are temporarily restored for the approved run. Complete the remaining two AI requests, activation and handoff matrix on a corrected candidate, then archive the scopes and merge/promote only after acceptance passes.
