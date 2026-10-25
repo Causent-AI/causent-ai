@@ -342,7 +342,7 @@ test("page assembly yields Claude and Codex handoffs for primary and secondary-m
   );
   for (const candidate of handoffs) {
     for (const target of ["claude", "codex"] as const) {
-      const prepared = prepareDecisionLoopCopy(candidate.handoff, target, true);
+      const prepared = prepareDecisionLoopCopy(candidate.handoff, target);
       assert.equal(prepared.ok, true, `${candidate.actionId} ${target}`);
     }
   }
@@ -434,24 +434,24 @@ test("page assembly keeps same-metric supporting actions and fails closed on dup
   }).map((candidate) => candidate.actionId), [supporting.selection.action.id]);
 });
 
-test("classification produces an explicit egress decision without pretending to enforce policy", () => {
+test("classification is retained without a copy confirmation gate", () => {
   const unspecified = built();
   assert.deepEqual(
     {
       decision: unspecified.egress.decision,
       requiresConfirmation: unspecified.egress.requiresConfirmation,
     },
-    { decision: "confirmation_required", requiresConfirmation: true },
+    { decision: "allowed", requiresConfirmation: false },
   );
 
   const organizationInput = validInput();
   organizationInput.currentReport.report.implementation.governance.dataClassification =
     "organization";
-  assert.equal(built(organizationInput).egress.requiresConfirmation, true);
+  assert.equal(built(organizationInput).egress.requiresConfirmation, false);
 
   const privateInput = validInput();
   privateInput.currentReport.report.implementation.governance.dataClassification = "private";
-  assert.equal(built(privateInput).egress.requiresConfirmation, true);
+  assert.equal(built(privateInput).egress.requiresConfirmation, false);
 
   const publicInput = validInput();
   publicInput.currentReport.report.implementation.governance.dataClassification = "public";
@@ -469,10 +469,10 @@ test("Claude and Codex copy preparation preserves the same bounded packet", () =
   const handoff = built();
 
   for (const target of ["claude", "codex"] as const) {
-    const blocked = prepareDecisionLoopCopy(handoff, target, false);
-    assert.equal(blocked.ok, false);
+    const direct = prepareDecisionLoopCopy(handoff, target);
+    assert.equal(direct.ok, true);
 
-    const prepared = prepareDecisionLoopCopy(handoff, target, true);
+    const prepared = prepareDecisionLoopCopy(handoff, target);
     assert.equal(prepared.ok, true);
     if (!prepared.ok) continue;
     assert.equal(prepared.target, target);
@@ -482,22 +482,22 @@ test("Claude and Codex copy preparation preserves the same bounded packet", () =
   }
 });
 
-test("copy preparation applies the same egress rule to both destinations", () => {
+test("copy clicks work immediately for both destinations and all classifications", () => {
   for (const classification of [null, "organization", "private"] as const) {
     const input = validInput();
     input.currentReport.report.implementation.governance.dataClassification = classification;
     const handoff = built(input);
     for (const target of ["claude", "codex"] as const) {
-      assert.equal(prepareDecisionLoopCopy(handoff, target, false).ok, false);
-      assert.equal(prepareDecisionLoopCopy(handoff, target, true).ok, true);
+      assert.equal(prepareDecisionLoopCopy(handoff, target).ok, true);
+      assert.equal(prepareDecisionLoopCopy(handoff, target).ok, true);
     }
   }
 
   const publicInput = validInput();
   publicInput.currentReport.report.implementation.governance.dataClassification = "public";
   const publicHandoff = built(publicInput);
-  assert.equal(prepareDecisionLoopCopy(publicHandoff, "claude", false).ok, true);
-  assert.equal(prepareDecisionLoopCopy(publicHandoff, "codex", false).ok, true);
+  assert.equal(prepareDecisionLoopCopy(publicHandoff, "claude").ok, true);
+  assert.equal(prepareDecisionLoopCopy(publicHandoff, "codex").ok, true);
 });
 
 test("current selection and report/action identities fail closed", () => {
@@ -690,4 +690,12 @@ test("strict handback parser rejects stale, malformed, extra, unsafe, or oversiz
     assert.equal(parseDecisionLoopReview(raw, fingerprint).ok, false, raw.slice(0, 80));
   }
   assert.equal(parseDecisionLoopReview(reviewJson(fingerprint), "not-a-key").ok, false);
+});
+
+ test("handoff explicitly starts and completes an implementation project", () => {
+  const prompt = built().clipboardText;
+  assert.match(prompt, /Start a new implementation project/);
+  assert.match(prompt, /Outline tasks and dependencies, then implement and complete each task/);
+  assert.match(prompt, /Day 0 project without data/);
+  assert.match(prompt, /Verify the result against the completion criteria/);
 });
