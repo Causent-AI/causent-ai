@@ -5,7 +5,6 @@ import Image from "next/image";
 import { AccountMenu } from "@/components/shell/AccountMenu";
 import { WorkspaceSwitcher } from "@/components/shell/WorkspaceSwitcher";
 import { TabStrip } from "@/components/shell/TabStrip";
-import { useWorkspaceTitle } from "@/components/shell/WorkspaceTitle";
 import type { AccessibleWorkspace } from "@/lib/auth/workspace-selection";
 
 export function GlobalHeader({
@@ -17,7 +16,6 @@ export function GlobalHeader({
   workspaces: AccessibleWorkspace[];
   account?: { name: string; detail: string };
 }) {
-  const context = useWorkspaceTitle();
   const current = workspaces.find((w) => w.id === activeWorkspaceId);
   return (
     <header className="causent-topbar">
@@ -32,12 +30,14 @@ export function GlobalHeader({
       </Link>
       <div className="project-navigation">
         <details className="project-menu">
-          <summary title={context?.title || current?.workspace}>
-            <span>{context?.title || current?.workspace || "Projects"}</span>
+          <summary title={current?.project}>
+            <span>{current?.project || "Projects"}</span>
             <span aria-hidden="true">›</span>
           </summary>
           <div className="shell-popover">
+            <Link href="/projects">Projects</Link>
             <Link href="/reports">Reports</Link>
+            <Link href="/projects/new">New project</Link>
             <Link href="/onboarding">New report</Link>
             <WorkspaceSwitcher
               key={activeWorkspaceId}
@@ -65,6 +65,7 @@ export function GlobalHeader({
             Create
           </summary>
           <div className="shell-popover">
+            <Link href="/projects/new">Project</Link>
             <Link href="/onboarding">Report</Link>
             <Link href="/data-workshop?add=metric">Metric</Link>
           </div>

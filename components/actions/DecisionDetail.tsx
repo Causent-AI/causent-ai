@@ -23,7 +23,7 @@ import { ActionSourceLink } from "@/components/actions/ActionSourceLink";
 import { actionReferenceLabel } from "@/components/actions/ActionReference";
 import { LeverCreate } from "@/components/onboarding/LeverCreate";
 import { ManualCompletionForm } from "@/components/actions/ManualCompletionForm";
-import { DecisionLoopHandoff } from "@/components/actions/DecisionLoopHandoff";
+import { DecisionLoopCopyButton } from "@/components/actions/DecisionLoopHandoff";
 import { MetricHistoryExplorer } from "@/components/charts/MetricHistoryExplorer";
 import { CheckIcon, ChevronIcon } from "@/components/ui/icons";
 import type { Claim, DecisionReportV1, DraftAction } from "@/lib/decision-reports/schema";
@@ -35,7 +35,6 @@ import {
 } from "@/lib/decision-reports/product-continuity";
 import { formatLongDate } from "@/lib/format";
 import type {
-  DecisionLoopCopyTarget,
   DecisionLoopHandoff as DecisionLoopHandoffContract,
 } from "@/lib/decision-reports/loop-handoff";
 
@@ -391,10 +390,6 @@ function ReportActionRows({
     selectedActionId,
     actionIds: new Set(selectedActionId ? [selectedActionId] : []),
   }));
-  const [handoffSelection, setHandoffSelection] = useState<{
-    actionId: string;
-    target: DecisionLoopCopyTarget;
-  } | null>(null);
 
   if (selectedActionId !== expansion.selectedActionId) {
     const actionIds = new Set(expansion.actionIds);
@@ -413,10 +408,6 @@ function ReportActionRows({
       return { ...current, actionIds: next };
     });
   }
-
-  const selectedHandoff = handoffSelection
-    ? decisionLoopHandoffs.find((candidate) => candidate.actionId === handoffSelection.actionId)
-    : null;
 
   return (
     <section className="shrink-0">
@@ -502,25 +493,18 @@ function ReportActionRows({
                 hidden={!expanded}
                 className="border-t border-[var(--border)] px-4 py-4 sm:pl-[58px]"
               >
-                <div className="action-row-handoff">                  {loopHandoff ? (
+                <div className="action-row-handoff">
+                  {loopHandoff ? (
                     <>
                       <span className="text-[10px] font-medium text-[var(--text-subtle)]">
                         Copy Task Instructions to:
                       </span>
                       {(["claude", "codex"] as const).map((target) => (
-                        <button
-                          key={target}
-                          type="button"
-                          aria-label={`Copy ${action.displayCode ?? action.title} task instructions to ${target === "claude" ? "Claude" : "Codex"}`}
-                          onClick={() => setHandoffSelection({ actionId: action.id, target })}
-                          className="min-h-11 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-[10px] font-semibold text-indigo-800 hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                        >
-                          {target === "claude" ? "Claude" : "Codex"}
-                        </button>
+                        <DecisionLoopCopyButton key={target} handoff={loopHandoff} target={target} />
                       ))}
                     </>
                   ) : null}
-</div>
+                </div>
                 {summaries.length > 0 ? (
                   <div>
                     <h3 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">Details</h3>
@@ -572,13 +556,6 @@ function ReportActionRows({
           );
         })}
       </div>
-      {handoffSelection && selectedHandoff ? (
-        <DecisionLoopHandoff
-          handoff={selectedHandoff.handoff}
-          target={handoffSelection.target}
-          onClose={() => setHandoffSelection(null)}
-        />
-      ) : null}
     </section>
   );
 }

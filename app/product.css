@@ -1833,3 +1833,9 @@ summary::-webkit-details-marker {
   right: auto;
   max-width: calc(100vw - 48px);
 }
+
+/* The project selector and section tabs share one navigation capsule. */
+.project-navigation { flex: 0 1 auto; gap: 4px; padding: 5px; border: 1px solid #e7e9ed; border-radius: 999px; background: #f2f3f5; }
+.project-navigation .project-tabs { background: transparent; border: 0; padding: 0; }
+.project-navigation .project-menu > summary { padding: 0 14px; }
+@media (max-width: 760px) { .project-navigation { max-width: 100%; flex-wrap: wrap; border-radius: 24px; } .project-navigation .project-tabs { flex-wrap: wrap; justify-content: center; } }
